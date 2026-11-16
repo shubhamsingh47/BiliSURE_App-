@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
-import { COLORS } from '../../theme/colors';
+import { COLORS } from '../../../theme/colors';
 
 const { width } = Dimensions.get('window');
 

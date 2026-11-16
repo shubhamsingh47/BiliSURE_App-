@@ -1,4 +1,5 @@
 # BILISURE — Neonatal Bilirubin Care Management Application
+## React Native CLI + Expo Development Server Integration
 
 BiliSURE is a full-stack, offline-first mobile healthcare platform designed for transcutaneous neonatal bilirubin monitoring, jaundice risk assessment, phototherapy recommendations, and discharge tracking.
 
@@ -9,13 +10,15 @@ The mobile interface is reproduced directly from the physical prototype demonstr
 ## 1. System Architecture & Tech Stack
 
 ### Mobile Application
-- **Framework:** React Native CLI (v0.76.5) with TypeScript (Strict Mode).
+- **Architecture:** React Native CLI with Expo Modules (`install-expo-modules`) and Expo Development Client (`expo-dev-client`).
+- **Development Server:** Expo CLI (`npx expo start`) with Metro Bundler.
+- **Expo SDK Version:** `~52.0.0` (matching React Native `0.76.9` and React `18.3.1`).
 - **Navigation:** React Navigation v7 with Custom Bottom Tabs and Elevated Center Action Button.
 - **State Management:** Zustand (Session & Sync state) + TanStack Query (Server state & caching).
-- **Offline Storage:** SQLite (`react-native-sqlite-storage`) local database with robust repository abstractions.
+- **Offline Storage:** SQLite local database (`react-native-sqlite-storage`) with robust repository abstractions.
 - **Offline Sync:** Idempotent background synchronization queue with exponential retry backoff.
 - **UI & Graphics:** Native styling matching BiliSURE purple identity (`#7C3AED`), SVG wave spline charts, and multi-colored donut analytics.
-- **Native Android:** Accessible Kotlin native project (`mobile/android/`) designed for future BLE/SDK hardware communication.
+- **Native Android:** Accessible Kotlin native project (`mobile/android/`) with `ReactNativeHostWrapper` and `ReactActivityDelegateWrapper`. Zero unnecessary BLE permissions.
 
 ### Backend API
 - **Runtime:** Node.js + Express.js with TypeScript.
@@ -30,7 +33,7 @@ The mobile interface is reproduced directly from the physical prototype demonstr
 | Screen ID | Name | Description |
 |---|---|---|
 | **SCR-01** | Splash Screen | Deep purple background with radial glow and bold white wordmark. |
-| **SCR-02** | Onboarding / Walkthrough | 3D treatment plan clipboard illustration ("Planning ahead"). |
+| **SCR-02** | Onboarding Walkthrough | 3D treatment plan clipboard illustration ("Planning ahead"). |
 | **SCR-03** | Register Patient | Quick admission form (Name, UHID, Weight, Height, Doctor, Severity). |
 | **SCR-04** | Dashboard / Home | Department selector ("Deppt"), "See Report >" banner, Today/Yesterday lists with baby status pills, bottom navigation. |
 | **SCR-05** | New Registration | Coral header, Facility dropdown, Doctor dropdown, Repeat toggle, dashed attachment box, and submission. |
@@ -48,42 +51,56 @@ The mobile interface is reproduced directly from the physical prototype demonstr
 
 ---
 
-## 3. Quick Start & Setup Instructions
+## 3. Development Workflow
 
-### Prerequisites
-- Node.js >= 18
-- Java JDK 17
-- Android SDK (Platform 35, Build Tools 35.0.0)
-
-### 1. Start the Express Backend
+### Terminal 1 — Backend API
 ```bash
 cd backend
-npm install
-npm run build
-npm start
+npm run dev
 ```
-The API server will listen on `http://localhost:5000/api/v1`.
+The Express backend starts on port `5000` with endpoints mounted under `http://localhost:5000/api/v1`.
 
-To run the backend integration test suite:
-```bash
-node dist/tests/runTests.js
-```
-
-### 2. Start the Mobile Application
+### Terminal 2 — Mobile Expo Development Server
 ```bash
 cd mobile
-npm install
-npm start
+npx expo start
 ```
-To run on connected Android device / emulator:
+Or start with a clean cache:
 ```bash
-npm run android
+npm run start:clear
 ```
 
-### 3. Build Android Release APK
+### Terminal 3 — Android Development Client Build
+To install and launch the development client on an Android emulator or connected physical device:
 ```bash
-cd mobile/android
-./gradlew assembleRelease
+cd mobile
+npx expo run:android
 ```
-The output APK will be generated at:
-`mobile/android/app/build/outputs/apk/release/app-release.apk`
+*Note: Once the development client is installed on your Android device, you only need to run `npx expo start` to test JS/TS changes live.*
+
+---
+
+## 4. Connecting a Physical Android Phone
+
+1. **Install Development Client:** Run `npx expo run:android` with your phone connected via USB debugging (or install the built debug APK).
+2. **Start Expo Server:** Run `npx expo start`.
+3. **Connect to Same Wi-Fi:** Ensure your phone and development computer are connected to the same local network.
+4. **Scan QR Code:** Open your phone camera or the installed BiliSURE app and scan the QR code displayed in the terminal.
+5. **Backend URL:** The mobile app automatically detects your computer's LAN IP from `Constants.expoConfig.hostUri` and connects to `http://<your-lan-ip>:5000/api/v1`. If testing across different subnets, run `npx expo start --tunnel`.
+
+---
+
+## 5. Verification Commands
+
+- **TypeScript Validation:**
+  ```bash
+  cd mobile && npm run typecheck
+  ```
+- **Backend Integration Tests (10/10 Passed):**
+  ```bash
+  cd backend && npm run test
+  ```
+- **Metro Android Bundler Test:**
+  ```bash
+  cd mobile && npx expo export:embed --platform android --dev false --entry-file index.js --bundle-output dist/bundle.js --assets-dest dist/assets
+  ```

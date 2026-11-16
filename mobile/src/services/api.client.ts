@@ -1,7 +1,25 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
-export const API_BASE_URL = 'http://10.0.2.2:5000/api/v1'; // standard Android emulator host IP
+const getBackendBaseUrl = (): string => {
+  // If running via Expo development server on a physical device, resolve host machine's LAN IP
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (hostUri) {
+    const hostIp = hostUri.split(':')[0];
+    return `http://${hostIp}:5000/api/v1`;
+  }
+
+  // Android Virtual Device (AVD) emulator alias
+  if (Platform.OS === 'android') {
+    return 'http://10.0.2.2:5000/api/v1';
+  }
+
+  return 'http://localhost:5000/api/v1';
+};
+
+export const API_BASE_URL = getBackendBaseUrl();
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

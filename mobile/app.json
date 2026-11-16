@@ -1,4 +1,22 @@
 {
   "name": "BiliSURE",
-  "displayName": "BiliSURE"
+  "displayName": "BiliSURE",
+  "expo": {
+    "name": "BiliSURE",
+    "slug": "bilisure",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "bilisure",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "com.bilisure",
+      "adaptiveIcon": {
+        "backgroundColor": "#7C3AED"
+      }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-asset"
+    ]
+  }
 }

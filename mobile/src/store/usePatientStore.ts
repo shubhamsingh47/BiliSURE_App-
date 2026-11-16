@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Baby, BilirubinReading, ClinicalObservation } from '../types';
+import { Baby, BilirubinReading, ClinicalObservation, SeverityState } from '../types';
 import { BabyRepository } from '../database/repositories/BabyRepository';
 import { ReadingRepository } from '../database/repositories/ReadingRepository';
 import { SyncQueueRepository } from '../database/repositories/SyncQueueRepository';
@@ -224,7 +224,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     });
 
     // 3. Update store & baby status
-    const updatedSeverity = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
+    const updatedSeverity: SeverityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
     set((state) => {
       const updatedBabies = state.babies.map((b) =>
         b.id === activeBaby.id ? { ...b, severityState: updatedSeverity } : b
