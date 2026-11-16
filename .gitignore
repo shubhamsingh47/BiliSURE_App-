@@ -1,19 +1,2 @@
-# Node & Build artifacts
+# Ignore only node_modules
 node_modules/
-dist/
-build/
-.expo/
-*.log
-.env
-
-# Android
-.gradle/
-local.properties
-*.keystore
-!debug.keystore
-*.apk
-*.aab
-
-# OS
-.DS_Store
-Thumbs.db

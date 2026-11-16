@@ -1,0 +1,12 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.deviceRoutes = void 0;
+const express_1 = require("express");
+const devices_controller_1 = require("./devices.controller");
+const auth_1 = require("../../middleware/auth");
+const router = (0, express_1.Router)();
+router.get('/profile', auth_1.authenticate, devices_controller_1.DevicesController.getProfile);
+router.put('/settings', auth_1.authenticate, devices_controller_1.DevicesController.updateSettings);
+router.post('/calibrate', auth_1.authenticate, devices_controller_1.DevicesController.calibrate);
+router.get('/diagnostics', auth_1.authenticate, devices_controller_1.DevicesController.diagnostics);
+exports.deviceRoutes = router;
