@@ -8,7 +8,7 @@
     "orientation": "portrait",
     "scheme": "bilisure",
     "userInterfaceStyle": "light",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "android": {
       "package": "com.bilisure",
       "adaptiveIcon": {
@@ -16,9 +16,7 @@
       }
     },
     "plugins": [
-      "expo-dev-client",
-      "expo-asset",
-      "expo-sqlite"
+      "expo-dev-client"
     ]
   }
 }
