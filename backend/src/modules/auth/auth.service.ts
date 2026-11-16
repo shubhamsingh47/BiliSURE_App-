@@ -1,7 +1,15 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { UserModel, IUser } from '../../models/User';
+import {
+  UserModel,
+  IUser,
+  normalizeToPrimaryRole,
+  resolvePermissions,
+  PrimaryUserRole,
+  PermissionProfile,
+} from '../../models/User';
 import { ENV } from '../../config/env';
+import { isMongoConnected } from '../../config/database';
 import { UnauthorizedError, ConflictError, NotFoundError } from '../../common/errors';
 
 // In-memory fallback for local mock / detached testing
@@ -12,38 +20,67 @@ export class AuthService {
     email: string;
     password: string;
     name: string;
-    role?: 'admin' | 'doctor' | 'nurse' | 'caregiver';
+    role?: string;
+    primaryRole?: PrimaryUserRole;
+    permissionProfile?: PermissionProfile;
+    permissions?: string[];
     department?: string;
     facility?: string;
+    facilityId?: string;
+    districtId?: string;
   }) {
     const email = data.email.toLowerCase();
-    const existing = await UserModel.findOne({ email }).catch(() => null);
-    if (existing || memoryUsers.has(email)) {
+    if (isMongoConnected) {
+      const existing = await UserModel.findOne({ email }).catch(() => null);
+      if (existing) {
+        throw new ConflictError('User with this email already exists');
+      }
+    }
+    if (memoryUsers.has(email)) {
       throw new ConflictError('User with this email already exists');
     }
 
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(data.password, salt);
 
-    let user: any;
-    try {
-      user = await UserModel.create({
-        email,
-        passwordHash,
-        name: data.name,
-        role: data.role || 'nurse',
-        department: data.department || 'NICU',
-        facility: data.facility || 'Central Children Hospital',
-      });
-    } catch {
+    const inputRole = data.primaryRole || data.role || 'doctor_referring';
+    const { primaryRole, permissionProfile: defaultProfile } = normalizeToPrimaryRole(inputRole);
+    const effectiveProfile = data.permissionProfile || defaultProfile;
+    const effectivePermissions = resolvePermissions(primaryRole, effectiveProfile, data.permissions);
+
+    let user: any = null;
+    if (isMongoConnected) {
+      try {
+        user = await UserModel.create({
+          email,
+          passwordHash,
+          name: data.name,
+          role: data.role || primaryRole,
+          primaryRole,
+          permissionProfile: effectiveProfile,
+          permissions: effectivePermissions,
+          department: data.department || (primaryRole === 'doctor_referring' ? 'Pediatrics' : 'NICU'),
+          facility: data.facility || (primaryRole === 'doctor_referring' ? 'North Community Health Centre' : 'District Civil Hospital'),
+          facilityId: data.facilityId,
+          districtId: data.districtId,
+        });
+      } catch {}
+    }
+
+    if (!user) {
       user = {
         _id: 'usr_' + Date.now(),
         email,
         passwordHash,
         name: data.name,
-        role: data.role || 'nurse',
-        department: data.department || 'NICU',
-        facility: data.facility || 'Central Children Hospital',
+        role: data.role || primaryRole,
+        primaryRole,
+        permissionProfile: effectiveProfile,
+        permissions: effectivePermissions,
+        department: data.department || (primaryRole === 'doctor_referring' ? 'Pediatrics' : 'NICU'),
+        facility: data.facility || (primaryRole === 'doctor_referring' ? 'North Community Health Centre' : 'District Civil Hospital'),
+        facilityId: data.facilityId,
+        districtId: data.districtId,
       };
       memoryUsers.set(email, user);
     }
@@ -57,7 +94,10 @@ export class AuthService {
 
   static async login(emailInput: string, passwordInput: string) {
     const email = emailInput.toLowerCase();
-    let user = await UserModel.findOne({ email }).catch(() => null);
+    let user: any = null;
+    if (isMongoConnected) {
+      user = await UserModel.findOne({ email }).catch(() => null);
+    }
     if (!user && memoryUsers.has(email)) {
       user = memoryUsers.get(email);
     }
@@ -69,6 +109,17 @@ export class AuthService {
     const isMatch = await bcrypt.compare(passwordInput, user.passwordHash);
     if (!isMatch) {
       throw new UnauthorizedError('Invalid email or password');
+    }
+
+    // Dynamic migration for legacy stored accounts without primaryRole
+    if (!user.primaryRole) {
+      const { primaryRole, permissionProfile } = normalizeToPrimaryRole(user.role);
+      user.primaryRole = primaryRole;
+      user.permissionProfile = user.permissionProfile || permissionProfile;
+      user.permissions = resolvePermissions(primaryRole, user.permissionProfile, user.permissions);
+      if (user.save) {
+        await user.save().catch(() => {});
+      }
     }
 
     const tokens = this.generateTokens(user);
@@ -107,8 +158,13 @@ export class AuthService {
       userId: user._id.toString(),
       email: user.email,
       role: user.role,
+      primaryRole: user.primaryRole || normalizeToPrimaryRole(user.role).primaryRole,
+      permissionProfile: user.permissionProfile,
+      permissions: user.permissions || [],
       department: user.department,
       facility: user.facility,
+      facilityId: user.facilityId,
+      districtId: user.districtId,
     };
 
     const accessToken = jwt.sign(payload, ENV.JWT_SECRET, {
@@ -123,13 +179,19 @@ export class AuthService {
   }
 
   private static sanitizeUser(user: any) {
+    const normalized = user.primaryRole || normalizeToPrimaryRole(user.role).primaryRole;
     return {
       id: user._id.toString(),
       email: user.email,
       name: user.name,
       role: user.role,
+      primaryRole: normalized,
+      permissionProfile: user.permissionProfile,
+      permissions: user.permissions || resolvePermissions(normalized, user.permissionProfile),
       department: user.department,
       facility: user.facility,
+      facilityId: user.facilityId,
+      districtId: user.districtId,
     };
   }
 }

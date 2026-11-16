@@ -5,7 +5,7 @@ export class ReadingRepository {
   static async getByBabyId(babyId: string): Promise<BilirubinReading[]> {
     const db = await getDatabase();
     if (isInMemoryFallback) {
-      return memoryTables.local_readings.filter(r => r.babyId === babyId);
+      return memoryTables.local_readings.filter((r) => r.babyId === babyId);
     }
 
     try {
@@ -22,12 +22,17 @@ export class ReadingRepository {
           clientOperationId: row.client_operation_id,
           babyId: row.baby_id,
           value: row.value,
-          unit: row.unit,
+          unit: row.unit || 'mg/dL',
+          method: row.method || 'TSB',
+          sampleTimestamp: row.sample_timestamp || row.timestamp,
+          postnatalAgeHours: row.postnatal_age_hours || 24,
+          bhutaniZone: row.bhutani_zone || 'low',
+          phototherapyPhase: row.phototherapy_phase || 'pre_phototherapy',
           measurementSite: row.measurement_site,
           source: row.source,
           operatorName: row.operator_name,
           symptoms: row.symptoms,
-          riskLevel: row.risk_level,
+          riskLevel: row.risk_level || 'low',
           timestamp: row.timestamp,
           isInitial: row.is_initial === 1,
           isDischarge: row.is_discharge === 1,
@@ -36,14 +41,14 @@ export class ReadingRepository {
       }
       return items;
     } catch {
-      return memoryTables.local_readings.filter(r => r.babyId === babyId);
+      return memoryTables.local_readings.filter((r) => r.babyId === babyId);
     }
   }
 
   static async insertOrUpdate(reading: BilirubinReading): Promise<void> {
     const db = await getDatabase();
     if (isInMemoryFallback) {
-      const idx = memoryTables.local_readings.findIndex(r => r.clientOperationId === reading.clientOperationId);
+      const idx = memoryTables.local_readings.findIndex((r) => r.clientOperationId === reading.clientOperationId);
       if (idx !== -1) {
         memoryTables.local_readings[idx] = reading;
       } else {

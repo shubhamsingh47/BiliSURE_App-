@@ -10,6 +10,7 @@ import {
 import { ChevronDown, Bell, User } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { ChartCard } from '../../../components/ChartCard';
+import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Baby } from '../../../types';
 
@@ -17,20 +18,20 @@ interface PatientTrendsScreenProps {
   onBackToDashboard: () => void;
   onOpenReadingDetail: (readingVal: number, site: string) => void;
   onSeeAllObservations: () => void;
+  onOpenReferral?: () => void;
 }
 
 export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   onBackToDashboard,
   onOpenReadingDetail,
   onSeeAllObservations,
+  onOpenReferral,
 }) => {
-  const { babies, selectedBaby, selectBaby, observations } = usePatientStore();
+  const { babies, selectedBaby, selectBaby, observations, readings } = usePatientStore();
   const activeBaby: Baby = selectedBaby || babies[0];
 
-  const [babyDropdownOpen, setBabyDropdownOpen] = useState(false);
-
   const cycleBaby = () => {
-    const nextIdx = (babies.findIndex(b => b.id === activeBaby.id) + 1) % babies.length;
+    const nextIdx = (babies.findIndex((b) => b.id === activeBaby.id) + 1) % babies.length;
     selectBaby(babies[nextIdx]);
   };
 
@@ -43,16 +44,16 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         {/* Top Header Row from Frame 27 */}
         <View style={styles.headerRow}>
           <TouchableOpacity activeOpacity={0.8} onPress={onBackToDashboard} style={styles.avatarCircle}>
-            <User size={22} color="#7C3AED" />
+            <User size={22} color="#7D3BFF" />
           </TouchableOpacity>
 
           <TouchableOpacity activeOpacity={0.7} onPress={cycleBaby} style={styles.babyDropdownPill}>
-            <ChevronDown size={18} color="#7C3AED" />
+            <ChevronDown size={18} color="#7D3BFF" />
             <Text style={styles.babyDropdownText}>{activeBaby.name}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity activeOpacity={0.7} style={styles.bellBtn}>
-            <Bell size={22} color="#7C3AED" />
+            <Bell size={22} color="#7D3BFF" />
           </TouchableOpacity>
         </View>
 
@@ -70,28 +71,49 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => onOpenReadingDetail(initialVal, 'Palms and soles')}
-            style={[styles.statCard, { backgroundColor: '#059669' }]}
+            style={[styles.statCard, { backgroundColor: '#00A569' }]}
           >
             <Text style={styles.statCardLabel}>Initial Value</Text>
-            <Text style={styles.statCardValue}>{initialVal.toFixed(1)}g/dL</Text>
+            <Text style={styles.statCardValue}>{initialVal.toFixed(1)}mg/dL</Text>
           </TouchableOpacity>
 
           {/* Discharge Value Card (Red/Coral) */}
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={() => onOpenReadingDetail(dischargeVal, 'Forehead')}
-            style={[styles.statCard, { backgroundColor: '#EF4444' }]}
+            style={[styles.statCard, { backgroundColor: '#FC3949' }]}
           >
             <Text style={styles.statCardLabel}>Discharge Value</Text>
-            <Text style={styles.statCardValue}>{dischargeVal.toFixed(1)}g/dL</Text>
+            <Text style={styles.statCardValue}>{dischargeVal.toFixed(1)}mg/dL</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Bilirubin Readings Spline Chart */}
+        {/* Bilirubin Readings Spline Chart (Video Frame 27) */}
         <ChartCard
           initialValue={initialVal}
           dischargeValue={dischargeVal}
         />
+
+        {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section */}
+        <View style={styles.nomogramSection}>
+          <BhutaniNomogramChart
+            readings={readings as any}
+            gestationalAgeWeeks={activeBaby.gestationalAgeWeeks || 38}
+            compact={false}
+            height={260}
+          />
+        </View>
+
+        {/* Referral Action Callout Button */}
+        {onOpenReferral && (
+          <TouchableOpacity
+            onPress={onOpenReferral}
+            style={styles.referralCalloutBtn}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
+          </TouchableOpacity>
+        )}
 
         {/* Recent Observations Section */}
         <View style={styles.obsHeaderRow}>
@@ -116,8 +138,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             <Text style={styles.obsSub}>Readings By Nurse A</Text>
           </View>
           <View style={styles.obsRight}>
-            <Text style={styles.obsReadingVal}>18.0g/dL</Text>
-            <Text style={styles.obsTime}>10:00 AM 16/11/26</Text>
+            <Text style={styles.obsReadingVal}>18.0mg/dL</Text>
+            <Text style={styles.obsTime}>10:00 AM</Text>
           </View>
         </TouchableOpacity>
 
@@ -140,14 +162,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   avatarCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
     borderWidth: 2,
-    borderColor: '#7C3AED',
+    borderColor: '#7D3BFF',
     backgroundColor: '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -155,111 +177,125 @@ const styles = StyleSheet.create({
   babyDropdownPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
   },
   babyDropdownText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#1E1B4B',
+    color: '#181829',
     marginLeft: 6,
   },
   bellBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
   },
   presentStateContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
+    backgroundColor: '#FDF4E5',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    marginBottom: 16,
   },
   presentStateLabel: {
-    fontSize: 14,
-    color: '#64748B',
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 13,
+    color: '#D97706',
+    fontWeight: '600',
   },
   presentStateVal: {
-    fontSize: 38,
+    fontSize: 28,
     fontWeight: '800',
-    color: '#0F172A',
+    color: '#B45309',
+    marginTop: 2,
   },
   statCardsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 16,
   },
   statCard: {
-    flex: 0.48,
+    flex: 1,
+    height: 120,
     borderRadius: 24,
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 3,
+    padding: 16,
+    justifyContent: 'space-between',
+    marginHorizontal: 4,
   },
   statCardLabel: {
-    fontSize: 13,
     color: '#FFFFFF',
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 6,
+    opacity: 0.9,
   },
   statCardValue: {
+    color: '#FFFFFF',
     fontSize: 26,
+    fontWeight: '800',
+  },
+  nomogramSection: {
+    marginVertical: 10,
+  },
+  referralCalloutBtn: {
+    backgroundColor: '#7D3BFF',
+    borderRadius: 16,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  referralCalloutText: {
+    fontSize: 14,
     fontWeight: '800',
     color: '#FFFFFF',
   },
   obsHeaderRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 26,
-    marginBottom: 14,
+    justifyContent: 'space-between',
+    marginTop: 10,
+    marginBottom: 12,
   },
   obsSectionTitle: {
     fontSize: 18,
-    fontWeight: '800',
-    color: '#0F172A',
+    fontWeight: '700',
+    color: '#181829',
   },
   seeAllPill: {
-    backgroundColor: '#F3E8FF',
-    paddingVertical: 6,
+    backgroundColor: '#EDE9FE',
     paddingHorizontal: 14,
+    paddingVertical: 6,
     borderRadius: 14,
   },
   seeAllText: {
-    color: '#7C3AED',
     fontSize: 13,
     fontWeight: '700',
+    color: '#7D3BFF',
   },
   obsCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
     padding: 18,
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
     elevation: 2,
   },
   obsTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: '#181829',
   },
   obsSub: {
     fontSize: 13,
@@ -270,13 +306,13 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   obsReadingVal: {
-    fontSize: 16,
+    fontSize: 17,
     fontWeight: '800',
-    color: '#EF4444',
+    color: '#181829',
   },
   obsTime: {
     fontSize: 12,
     color: '#94A3B8',
-    marginTop: 3,
+    marginTop: 2,
   },
 });

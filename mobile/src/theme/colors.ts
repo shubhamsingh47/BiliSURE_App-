@@ -1,18 +1,36 @@
 export const COLORS = {
-  // Brand Purple (Primary)
-  primary: '#7C3AED',
+  // Brand Purple (Sampled directly from video frames: 0.0s, 5.7s, 27.4s)
+  primary: '#7D3BFF',
   primaryDark: '#6D28D9',
   primaryLight: '#8B5CF6',
+  primaryGradientEnd: '#C440FF',
   primaryBg: '#F3E8FF',
   primarySoft: '#EDE9FE',
 
-  // Status & Risk
-  normal: '#10B981',
-  normalLight: '#D1FAE5',
+  // Status & Clinical Risk (Sampled from frames 8.5s, 17.0s)
+  normal: '#00A569',
+  normalLight: '#F2FDEF',
   moderate: '#F59E0B',
-  moderateLight: '#FEF3C7',
-  critical: '#EF4444',
-  criticalLight: '#FEE2E2',
+  moderateLight: '#FDF4E5',
+  critical: '#FC3949',
+  criticalLight: '#FFF1F2',
+
+  // Bhutani Risk Nomogram Zones
+  bhutaniLow: '#00A569',
+  bhutaniLowBg: '#F0FDF4',
+  bhutaniLowInt: '#84CC16',
+  bhutaniLowIntBg: '#FEFCE8',
+  bhutaniHighInt: '#F59E0B',
+  bhutaniHighIntBg: '#FFFBEB',
+  bhutaniHigh: '#FC3949',
+  bhutaniHighBg: '#FFF1F2',
+  bhutaniIneligible: '#64748B',
+
+  // PT Station Status Colors
+  stationAvailable: '#00A569',
+  stationOccupied: '#FC3949',
+  stationMaintenance: '#64748B',
+  stationCleaning: '#F59E0B',
 
   // Neutrals & Surface
   white: '#FFFFFF',
@@ -23,7 +41,7 @@ export const COLORS = {
   inputBg: '#FFFFFF',
 
   // Typography
-  textPrimary: '#0F172A',
+  textPrimary: '#181829',
   textSecondary: '#64748B',
   textMuted: '#94A3B8',
   textWhite: '#FFFFFF',
@@ -36,8 +54,8 @@ export const COLORS = {
 
   // Charts
   chartYellow: '#F59E0B',
-  chartPurple: '#8B5CF6',
-  chartRed: '#EF4444',
-  chartGreen: '#10B981',
+  chartPurple: '#7D3BFF',
+  chartRed: '#FC3949',
+  chartGreen: '#00A569',
   chartDark: '#1E1B4B',
 };

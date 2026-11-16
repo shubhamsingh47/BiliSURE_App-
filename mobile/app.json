@@ -1,6 +1,4 @@
 {
-  "name": "BiliSURE",
-  "displayName": "BiliSURE",
   "expo": {
     "name": "BiliSURE",
     "slug": "bilisure",
@@ -12,7 +10,7 @@
     "android": {
       "package": "com.bilisure",
       "adaptiveIcon": {
-        "backgroundColor": "#7C3AED"
+        "backgroundColor": "#7D3BFF"
       }
     },
     "plugins": [

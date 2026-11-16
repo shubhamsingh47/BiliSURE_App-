@@ -37,9 +37,14 @@ exports.BilirubinReadingModel = void 0;
 const mongoose_1 = __importStar(require("mongoose"));
 const BilirubinReadingSchema = new mongoose_1.Schema({
     clientOperationId: { type: String, required: true, unique: true, index: true },
-    babyId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Baby', required: true, index: true },
+    babyId: { type: mongoose_1.Schema.Types.Mixed, required: true, index: true },
+    babyUhid: { type: String, index: true },
     value: { type: Number, required: true },
-    unit: { type: String, default: 'mg/dL' },
+    valueMgDl: { type: Number, required: true, default: 0 },
+    unit: { type: String, enum: ['mg/dL', 'µmol/L'], default: 'mg/dL' },
+    method: { type: String, enum: ['TSB', 'TcB'], default: 'TSB' },
+    sampleTimestamp: { type: Date, default: Date.now },
+    postnatalAgeHours: { type: Number, default: 24 },
     measurementSite: {
         type: String,
         enum: ['palms_and_soles', 'face', 'forehead', 'sternum', 'abdomen'],
@@ -50,18 +55,36 @@ const BilirubinReadingSchema = new mongoose_1.Schema({
         enum: ['manual_entry', 'device_transcutaneous', 'serum_lab'],
         default: 'manual_entry',
     },
-    deviceId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'Device' },
-    operatorId: { type: mongoose_1.Schema.Types.ObjectId, ref: 'User' },
-    operatorName: { type: String, default: 'Nurse A' },
-    symptoms: { type: String, default: '' },
-    riskLevel: {
+    bhutaniZone: {
         type: String,
-        enum: ['low', 'intermediate', 'high'],
+        enum: ['low', 'low_intermediate', 'high_intermediate', 'high', 'ineligible'],
         default: 'low',
     },
+    bhutaniPercentileApprox: { type: Number },
+    phototherapyPhase: {
+        type: String,
+        enum: ['pre_phototherapy', 'during_phototherapy', 'post_phototherapy', 'none'],
+        default: 'pre_phototherapy',
+    },
+    guidelineUsed: { type: String, default: 'AAP 2004 / Bhutani Nomogram' },
+    isEligibleForBhutani: { type: Boolean, default: true },
+    ineligibilityReason: { type: String },
+    deviceId: { type: mongoose_1.Schema.Types.Mixed },
+    operatorId: { type: mongoose_1.Schema.Types.Mixed },
+    operatorName: { type: String, default: 'Dr. / Nurse' },
+    symptoms: { type: String, default: '' },
+    riskFactors: [{ type: String }],
     timestamp: { type: Date, default: Date.now, index: true },
     isInitial: { type: Boolean, default: false },
     isDischarge: { type: Boolean, default: false },
+    correctionHistory: [
+        {
+            previousValue: { type: Number, required: true },
+            correctedBy: { type: String, required: true },
+            reason: { type: String, required: true },
+            correctedAt: { type: Date, default: Date.now },
+        },
+    ],
 }, { timestamps: true });
 BilirubinReadingSchema.index({ babyId: 1, timestamp: -1 });
 exports.BilirubinReadingModel = mongoose_1.default.model('BilirubinReading', BilirubinReadingSchema);

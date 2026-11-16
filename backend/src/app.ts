@@ -12,6 +12,12 @@ import { observationRoutes } from './modules/observations/observations.routes';
 import { deviceRoutes } from './modules/devices/devices.routes';
 import { analyticsRoutes } from './modules/analytics/analytics.routes';
 import { syncRoutes } from './modules/sync/sync.routes';
+import { hospitalRoutes } from './modules/hospitals/hospitals.routes';
+import { referralRoutes } from './modules/referrals/referrals.routes';
+import { admissionRoutes } from './modules/admissions/admissions.routes';
+import { notificationRoutes } from './modules/notifications/notifications.routes';
+import { districtRoutes } from './modules/district/district.routes';
+import { reservationRoutes } from './modules/reservations/reservations.routes';
 
 export function createApp(): express.Application {
   const app = express();
@@ -41,6 +47,12 @@ export function createApp(): express.Application {
   apiV1.use('/devices', deviceRoutes);
   apiV1.use('/analytics', analyticsRoutes);
   apiV1.use('/sync', syncRoutes);
+  apiV1.use('/hospitals', hospitalRoutes);
+  apiV1.use('/referrals', referralRoutes);
+  apiV1.use('/admissions', admissionRoutes);
+  apiV1.use('/notifications', notificationRoutes);
+  apiV1.use('/district', districtRoutes);
+  apiV1.use('/reservations', reservationRoutes);
 
   app.use('/api/v1', apiV1);
 

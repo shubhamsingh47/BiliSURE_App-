@@ -35,6 +35,11 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
   const { registerBaby } = usePatientStore();
 
+  const generateUhid = () => {
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    setUhid(`BS-${randomSuffix}`);
+  };
+
   const handleContinue = async () => {
     setLoading(true);
     try {
@@ -84,12 +89,23 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           onChangeText={setDob}
         />
 
-        <CustomInput
-          placeholder="UHID"
-          value={uhid}
-          onChangeText={setUhid}
-          autoCapitalize="characters"
-        />
+        <View style={styles.uhidRow}>
+          <View style={{ flex: 1 }}>
+            <CustomInput
+              placeholder="UHID / Patient ID"
+              value={uhid}
+              onChangeText={setUhid}
+              autoCapitalize="characters"
+            />
+          </View>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={generateUhid}
+            style={styles.genBtn}
+          >
+            <Text style={styles.genBtnText}>Auto</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Dropdowns */}
         <TouchableOpacity activeOpacity={0.7} style={styles.dropdownBox}>
@@ -148,10 +164,10 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#EF4444',
+    backgroundColor: COLORS.critical,
   },
   headerSafeArea: {
-    backgroundColor: '#EF4444',
+    backgroundColor: COLORS.critical,
   },
   header: {
     height: 56,
@@ -167,6 +183,26 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: COLORS.white,
+  },
+  uhidRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+  },
+  genBtn: {
+    height: 54,
+    paddingHorizontal: 14,
+    backgroundColor: COLORS.primaryBg,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.primaryLight,
+  },
+  genBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   contentCard: {
     backgroundColor: COLORS.white,

@@ -1,20 +1,29 @@
 import { BilirubinReadingModel, IBilirubinReading } from '../../models/BilirubinReading';
 import { BabyModel } from '../../models/Baby';
-import { NotFoundError } from '../../common/errors';
+import { evaluateBhutaniRisk, calculatePostnatalAgeHours, mgDlToUmolL, umolLToMgDl } from '../clinical/bhutani.engine';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const mockReadings: any[] = [
   {
     _id: 'rdg_001',
     clientOperationId: 'op_seed_001',
     babyId: '651a00010000000000000001',
+    babyUhid: 'M1A2N3S4I5',
     value: 10.0,
+    valueMgDl: 10.0,
     unit: 'mg/dL',
+    method: 'TSB',
+    postnatalAgeHours: 24,
+    bhutaniZone: 'low_intermediate',
+    bhutaniPercentileApprox: 60,
+    phototherapyPhase: 'pre_phototherapy',
     measurementSite: 'palms_and_soles',
     source: 'manual_entry',
     operatorName: 'Nurse A',
     symptoms: 'Mild jaundice around sclera',
     riskLevel: 'low',
-    timestamp: new Date(Date.now() - 20 * 60 * 1000),
+    timestamp: new Date(Date.now() - 24 * 3600 * 1000),
+    sampleTimestamp: new Date(Date.now() - 24 * 3600 * 1000),
     isInitial: true,
     isDischarge: false,
     createdAt: new Date(),
@@ -23,14 +32,22 @@ const mockReadings: any[] = [
     _id: 'rdg_002',
     clientOperationId: 'op_seed_002',
     babyId: '651a00010000000000000001',
-    value: 12.4,
+    babyUhid: 'M1A2N3S4I5',
+    value: 14.8,
+    valueMgDl: 14.8,
     unit: 'mg/dL',
+    method: 'TSB',
+    postnatalAgeHours: 48,
+    bhutaniZone: 'high_intermediate',
+    bhutaniPercentileApprox: 88,
+    phototherapyPhase: 'pre_phototherapy',
     measurementSite: 'sternum',
     source: 'manual_entry',
-    operatorName: 'Nurse A',
-    symptoms: '',
+    operatorName: 'Dr. Sarah',
+    symptoms: 'Cephalocaudal progression',
     riskLevel: 'intermediate',
-    timestamp: new Date(Date.now() - 6 * 3600 * 1000),
+    timestamp: new Date(Date.now() - 12 * 3600 * 1000),
+    sampleTimestamp: new Date(Date.now() - 12 * 3600 * 1000),
     isInitial: false,
     isDischarge: false,
     createdAt: new Date(),
@@ -39,14 +56,22 @@ const mockReadings: any[] = [
     _id: 'rdg_003',
     clientOperationId: 'op_seed_003',
     babyId: '651a00010000000000000001',
-    value: 18.0,
+    babyUhid: 'M1A2N3S4I5',
+    value: 12.0,
+    valueMgDl: 12.0,
     unit: 'mg/dL',
+    method: 'TSB',
+    postnatalAgeHours: 60,
+    bhutaniZone: 'low_intermediate',
+    bhutaniPercentileApprox: 65,
+    phototherapyPhase: 'during_phototherapy',
     measurementSite: 'face',
     source: 'manual_entry',
-    operatorName: 'Nurse A',
-    symptoms: 'Facial cephalocaudal progression',
-    riskLevel: 'high',
-    timestamp: new Date(Date.now() - 14 * 3600 * 1000),
+    operatorName: 'Nurse Sarah',
+    symptoms: 'Responding well to double LED phototherapy',
+    riskLevel: 'intermediate',
+    timestamp: new Date(Date.now() - 4 * 3600 * 1000),
+    sampleTimestamp: new Date(Date.now() - 4 * 3600 * 1000),
     isInitial: false,
     isDischarge: false,
     createdAt: new Date(),
@@ -55,14 +80,22 @@ const mockReadings: any[] = [
     _id: 'rdg_004',
     clientOperationId: 'op_seed_004',
     babyId: '651a00010000000000000002',
-    value: 7.2,
+    babyUhid: 'B9C8D7E6F5',
+    value: 17.5,
+    valueMgDl: 17.5,
     unit: 'mg/dL',
+    method: 'TSB',
+    postnatalAgeHours: 36,
+    bhutaniZone: 'high',
+    bhutaniPercentileApprox: 98,
+    phototherapyPhase: 'pre_phototherapy',
     measurementSite: 'palms_and_soles',
     source: 'manual_entry',
-    operatorName: 'Nurse B',
-    symptoms: '',
-    riskLevel: 'low',
-    timestamp: new Date(Date.now() - 10 * 3600 * 1000),
+    operatorName: 'Dr. Referring',
+    symptoms: 'Lethargy, poor suckling',
+    riskLevel: 'high',
+    timestamp: new Date(Date.now() - 1 * 3600 * 1000),
+    sampleTimestamp: new Date(Date.now() - 1 * 3600 * 1000),
     isInitial: true,
     isDischarge: false,
     createdAt: new Date(),
@@ -79,7 +112,9 @@ export class ReadingsService {
       }
     } catch {}
 
-    const matched = mockReadings.filter(r => r.babyId === babyId || babyId === 'Baby 1' || babyId === 'M1A2N3S4I5');
+    const matched = mockReadings.filter(
+      (r) => r.babyId === babyId || r.babyUhid === babyId || babyId === 'Baby 1' || babyId === 'M1A2N3S4I5'
+    );
     return this.filterByTimeRange(matched.length > 0 ? matched : mockReadings, timeRange);
   }
 
@@ -89,52 +124,99 @@ export class ReadingsService {
   }
 
   static async createReading(data: any, operatorId?: string, operatorName = 'Nurse A') {
-    // Determine risk level based on clinical thresholds
-    let riskLevel: 'low' | 'intermediate' | 'high' = data.riskLevel || 'low';
-    if (!data.riskLevel) {
-      if (data.value < 11.0) riskLevel = 'low';
-      else if (data.value <= 15.0) riskLevel = 'intermediate';
-      else riskLevel = 'high';
+    const sampleTimestamp = data.sampleTimestamp ? new Date(data.sampleTimestamp) : new Date(data.timestamp || Date.now());
+    const unit = (data.unit === 'µmol/L' ? 'µmol/L' : 'mg/dL') as 'mg/dL' | 'µmol/L';
+    const method = (data.method === 'TcB' ? 'TcB' : 'TSB') as 'TSB' | 'TcB';
+    const valueNum = Number(data.value);
+    const valueMgDl = unit === 'µmol/L' ? umolLToMgDl(valueNum) : valueNum;
+
+    // Fetch baby record to calculate exact postnatal age and gestational eligibility
+    let baby: any = null;
+    try {
+      baby = await BabyModel.findOne({ $or: [{ _id: data.babyId }, { uhid: data.babyId }] });
+    } catch {}
+
+    const dob = baby?.dateOfBirth || data.dateOfBirth || new Date(Date.now() - 3600000 * 24);
+    const exactTime = baby?.exactTimeOfBirth || data.exactTimeOfBirth || '09:00';
+    const gestWeeks = baby?.gestationalAgeWeeks || data.gestationalAgeWeeks || 38;
+
+    const calculatedHours = calculatePostnatalAgeHours(dob, exactTime, sampleTimestamp);
+    const postnatalAgeHours = data.postnatalAgeHours !== undefined ? Number(data.postnatalAgeHours) : calculatedHours;
+
+    // Perform clinical Bhutani Risk Evaluation
+    const bhutaniResult = evaluateBhutaniRisk({
+      dateOfBirth: dob,
+      exactTimeOfBirth: exactTime,
+      sampleTimestamp,
+      value: valueNum,
+      unit,
+      method,
+      gestationalAgeWeeks: gestWeeks,
+      riskFactors: data.riskFactors || baby?.riskFactors || [],
+    });
+
+    const bhutaniZone = bhutaniResult.zone;
+    const bhutaniPercentileApprox = bhutaniResult.percentileApprox;
+
+    // Mapping risk level
+    let riskLevel: 'low' | 'intermediate' | 'high' = 'low';
+    if (bhutaniZone === 'high') riskLevel = 'high';
+    else if (bhutaniZone === 'high_intermediate' || bhutaniZone === 'low_intermediate') riskLevel = 'intermediate';
+
+    const phototherapyPhase = data.phototherapyPhase || 'pre_phototherapy';
+
+    const readingPayload: any = {
+      ...data,
+      value: valueNum,
+      valueMgDl,
+      unit,
+      method,
+      sampleTimestamp,
+      postnatalAgeHours,
+      bhutaniZone,
+      bhutaniPercentileApprox,
+      phototherapyPhase,
+      riskLevel,
+      operatorId,
+      operatorName: data.operatorName || operatorName,
+      timestamp: sampleTimestamp,
+    };
+
+    // If critical alert / high risk zone, trigger immediate notification
+    if (bhutaniZone === 'high' || valueMgDl >= 15.0) {
+      await NotificationsService.createNotification({
+        recipientRole: 'hospital_doctor',
+        title: `CRITICAL BILIRUBIN ALERT: ${valueMgDl} mg/dL`,
+        message: `High risk zone detected at ${postnatalAgeHours}h postnatal age. Urgent clinical evaluation needed.`,
+        type: 'critical_reading',
+        relatedBabyUhid: baby?.uhid || data.babyUhid,
+      }).catch(() => null);
     }
 
     try {
-      // Check idempotent duplicate
       const existing = await BilirubinReadingModel.findOne({ clientOperationId: data.clientOperationId });
-      if (existing) {
-        return existing.toObject();
-      }
+      if (existing) return existing.toObject();
 
-      const reading = await BilirubinReadingModel.create({
-        ...data,
-        riskLevel,
-        operatorId,
-        operatorName: data.operatorName || operatorName,
-        timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
-      });
+      const reading = await BilirubinReadingModel.create(readingPayload);
 
-      // Update baby's severity state & initial/discharge values if needed
       try {
         const severityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
         await BabyModel.findByIdAndUpdate(data.babyId, {
           severityState,
-          ...(data.isInitial ? { initialValue: data.value } : {}),
-          ...(data.isDischarge ? { dischargeValue: data.value } : {}),
+          ...(data.isInitial ? { initialValue: valueMgDl } : {}),
+          ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
         });
       } catch {}
 
-      return reading.toObject();
+      return { ...reading.toObject(), bhutaniAssessment: bhutaniResult };
     } catch {
-      // In-memory fallback
       const created = {
         _id: 'rdg_' + Date.now(),
-        ...data,
-        riskLevel,
-        operatorName: data.operatorName || operatorName,
-        timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+        ...readingPayload,
         createdAt: new Date(),
       };
       mockReadings.unshift(created);
-      return created;
+      return { ...created, bhutaniAssessment: bhutaniResult };
     }
   }
 
@@ -148,7 +230,7 @@ export class ReadingsService {
     else if (timeRange === '24hr') hours = 24;
 
     const cutoff = now - hours * 3600 * 1000;
-    const filtered = readings.filter(r => new Date(r.timestamp).getTime() >= cutoff);
-    return filtered.length > 0 ? filtered : readings; // graceful fallback so chart always renders smoothly
+    const filtered = readings.filter((r) => new Date(r.timestamp).getTime() >= cutoff);
+    return filtered.length > 0 ? filtered : readings;
   }
 }

@@ -1,6 +1,17 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert } from 'react-native';
-import { User, Cpu, RefreshCw, LogOut, ShieldCheck, ChevronRight } from 'lucide-react-native';
+import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import {
+  User,
+  Cpu,
+  RefreshCw,
+  LogOut,
+  ShieldCheck,
+  ChevronRight,
+  Bell,
+  Building2,
+  Users,
+  KeyRound,
+} from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { SyncEngine } from '../../../services/sync.engine';
@@ -8,13 +19,23 @@ import { SyncEngine } from '../../../services/sync.engine';
 interface ProfileScreenProps {
   onOpenCalibration: () => void;
   onLogout: () => void;
+  onOpenNotifications?: () => void;
+  onOpenFacilitySelection?: () => void;
+  onOpenStaffManagement?: () => void;
+  onOpenFacilityManagement?: () => void;
+  onOpenOtp?: () => void;
 }
 
 export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenCalibration,
   onLogout,
+  onOpenNotifications,
+  onOpenFacilitySelection,
+  onOpenStaffManagement,
+  onOpenFacilityManagement,
+  onOpenOtp,
 }) => {
-  const { user, logout } = useAuthStore();
+  const { user, logout, activeRole, primaryRole, activeHospitalProfile, hasPermission } = useAuthStore();
 
   const handleSyncNow = async () => {
     const res = await SyncEngine.syncPending();
@@ -29,28 +50,110 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     onLogout();
   };
 
+  const getPrimaryRoleTitle = () => {
+    switch (primaryRole) {
+      case 'doctor_referring':
+        return 'Doctor / Referring Centre';
+      case 'receiving_hospital':
+        return `Receiving Hospital (${activeHospitalProfile ? activeHospitalProfile.toUpperCase() : 'CLINICAL'})`;
+      case 'district_admin':
+        return 'District Administrator';
+      default:
+        return 'Doctor / Referring Centre';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Clinician Profile</Text>
         </View>
 
         <View style={styles.userCard}>
           <View style={styles.avatar}>
-            <User size={32} color="#7C3AED" />
+            <User size={30} color={COLORS.primary} />
           </View>
           <View style={styles.userInfo}>
-            <Text style={styles.userName}>{user?.name || 'Nurse A'}</Text>
-            <Text style={styles.userMeta}>{user?.email || 'nurse@bilisure.org'}</Text>
+            <Text style={styles.userName}>{user?.name || 'Healthcare Provider'}</Text>
+            <Text style={styles.userMeta}>{user?.email || 'clinician@bilisure.district.org'}</Text>
             <Text style={styles.userDept}>
-              {user?.department || 'NICU'} • {user?.facility || 'Central Children Hospital'}
+              {user?.department || 'Pediatrics'} • {user?.facility || 'District Health Network'}
             </Text>
+            <View style={styles.roleChip}>
+              <Text style={styles.roleChipText}>
+                {getPrimaryRoleTitle().toUpperCase()}
+              </Text>
+            </View>
           </View>
         </View>
 
         {/* Menu Options */}
         <View style={styles.menuSection}>
+          {onOpenNotifications && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onOpenNotifications}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: COLORS.primaryBg }]}>
+                  <Bell size={18} color={COLORS.primary} />
+                </View>
+                <Text style={styles.menuLabel}>Notifications & Clinical Alerts</Text>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+
+          {onOpenFacilitySelection && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onOpenFacilitySelection}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#F1F5F9' }]}>
+                  <Building2 size={18} color={COLORS.textPrimary} />
+                </View>
+                <Text style={styles.menuLabel}>Switch Clinical Facility</Text>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+
+          {(primaryRole === 'receiving_hospital' || activeRole === 'hospital_admin' || activeRole === 'hospital_doctor') && hasPermission('manage_staff') && onOpenStaffManagement && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onOpenStaffManagement}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#E0E7FF' }]}>
+                  <Users size={18} color="#4338CA" />
+                </View>
+                <Text style={styles.menuLabel}>Hospital Staff & Permissions</Text>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+
+          {(primaryRole === 'district_admin' || activeRole === 'district_admin') && onOpenFacilityManagement && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onOpenFacilityManagement}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#ECFDF5' }]}>
+                  <Building2 size={18} color="#059669" />
+                </View>
+                <Text style={styles.menuLabel}>District Facilities & Network</Text>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={onOpenCalibration}
@@ -58,12 +161,28 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           >
             <View style={styles.menuLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#F3E8FF' }]}>
-                <Cpu size={20} color="#7C3AED" />
+                <Cpu size={18} color={COLORS.primary} />
               </View>
               <Text style={styles.menuLabel}>BiliSURE Device & Calibration</Text>
             </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
+
+          {onOpenOtp && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onOpenOtp}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
+                  <KeyRound size={18} color="#D97706" />
+                </View>
+                <Text style={styles.menuLabel}>Device Activation / OTP</Text>
+              </View>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
 
           <TouchableOpacity
             activeOpacity={0.7}
@@ -72,17 +191,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           >
             <View style={styles.menuLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
-                <RefreshCw size={20} color="#059669" />
+                <RefreshCw size={18} color="#059669" />
               </View>
               <Text style={styles.menuLabel}>Sync Pending Records Now</Text>
             </View>
-            <ChevronRight size={20} color="#94A3B8" />
+            <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
 
           <View style={styles.menuItem}>
             <View style={styles.menuLeft}>
               <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
-                <ShieldCheck size={20} color="#D97706" />
+                <ShieldCheck size={18} color="#D97706" />
               </View>
               <Text style={styles.menuLabel}>Offline SQLite Cache: Active</Text>
             </View>
@@ -94,10 +213,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           onPress={handleLogoutPress}
           style={styles.logoutBtn}
         >
-          <LogOut size={20} color="#EF4444" style={{ marginRight: 8 }} />
+          <LogOut size={18} color="#EF4444" style={{ marginRight: 8 }} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -105,103 +224,114 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#FAFAFA',
+    backgroundColor: COLORS.background,
   },
   container: {
-    padding: 24,
-    flex: 1,
-    justifyContent: 'space-between',
+    padding: 16,
+    paddingBottom: 40,
   },
   header: {
-    marginBottom: 20,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '800',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   userCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: COLORS.border,
+    marginBottom: 20,
   },
   avatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#F3E8FF',
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.primaryBg,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: 14,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   userMeta: {
-    fontSize: 14,
-    color: '#64748B',
-    marginTop: 2,
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    marginTop: 1,
   },
   userDept: {
-    fontSize: 12,
-    color: '#7C3AED',
-    fontWeight: '600',
-    marginTop: 4,
+    fontSize: 11,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  roleChip: {
+    backgroundColor: COLORS.primaryBg,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    alignSelf: 'flex-start',
+    marginTop: 6,
+  },
+  roleChipText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: COLORS.primary,
   },
   menuSection: {
     backgroundColor: COLORS.white,
-    borderRadius: 24,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#F1F5F9',
+    borderColor: COLORS.border,
     overflow: 'hidden',
+    marginBottom: 20,
   },
   menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 18,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    borderBottomColor: COLORS.borderLight,
   },
   menuLeft: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   iconBox: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   menuLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#0F172A',
+    color: COLORS.textPrimary,
   },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 54,
-    borderRadius: 18,
     backgroundColor: '#FEE2E2',
-    marginBottom: 20,
+    borderRadius: 14,
+    height: 50,
   },
   logoutText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#EF4444',
   },

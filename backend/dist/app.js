@@ -17,6 +17,12 @@ const observations_routes_1 = require("./modules/observations/observations.route
 const devices_routes_1 = require("./modules/devices/devices.routes");
 const analytics_routes_1 = require("./modules/analytics/analytics.routes");
 const sync_routes_1 = require("./modules/sync/sync.routes");
+const hospitals_routes_1 = require("./modules/hospitals/hospitals.routes");
+const referrals_routes_1 = require("./modules/referrals/referrals.routes");
+const admissions_routes_1 = require("./modules/admissions/admissions.routes");
+const notifications_routes_1 = require("./modules/notifications/notifications.routes");
+const district_routes_1 = require("./modules/district/district.routes");
+const reservations_routes_1 = require("./modules/reservations/reservations.routes");
 function createApp() {
     const app = (0, express_1.default)();
     // Security and standard middlewares
@@ -41,6 +47,12 @@ function createApp() {
     apiV1.use('/devices', devices_routes_1.deviceRoutes);
     apiV1.use('/analytics', analytics_routes_1.analyticsRoutes);
     apiV1.use('/sync', sync_routes_1.syncRoutes);
+    apiV1.use('/hospitals', hospitals_routes_1.hospitalRoutes);
+    apiV1.use('/referrals', referrals_routes_1.referralRoutes);
+    apiV1.use('/admissions', admissions_routes_1.admissionRoutes);
+    apiV1.use('/notifications', notifications_routes_1.notificationRoutes);
+    apiV1.use('/district', district_routes_1.districtRoutes);
+    apiV1.use('/reservations', reservations_routes_1.reservationRoutes);
     app.use('/api/v1', apiV1);
     // Centralized Error Handler
     app.use(errorHandler_1.errorHandler);

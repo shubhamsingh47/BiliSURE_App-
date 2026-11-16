@@ -1,0 +1,11 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.reservationRoutes = void 0;
+const express_1 = require("express");
+const reservation_controller_1 = require("./reservation.controller");
+const router = (0, express_1.Router)();
+exports.reservationRoutes = router;
+router.post('/', reservation_controller_1.ReservationController.createReservation);
+router.get('/hospital/:hospitalId', reservation_controller_1.ReservationController.getHospitalReservations);
+router.post('/:reservationId/extend', reservation_controller_1.ReservationController.extendReservation);
+router.post('/:reservationId/cancel', reservation_controller_1.ReservationController.cancelReservation);
