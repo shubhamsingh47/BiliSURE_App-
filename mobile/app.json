@@ -16,7 +16,8 @@
     },
     "plugins": [
       "expo-dev-client",
-      "expo-asset"
+      "expo-asset",
+      "expo-sqlite"
     ]
   }
 }

@@ -1,5 +1,5 @@
-// SQLite database connection manager for BiliSURE
-// Uses react-native-sqlite-storage with fallback for offline-first persistence
+// Unified SQLite database connection manager for BiliSURE
+// Adapts expo-sqlite, react-native-sqlite-storage, or in-memory fallback
 
 let sqliteInstance: any = null;
 let isInMemoryFallback = false;
@@ -16,6 +16,40 @@ const memoryTables: Record<string, any[]> = {
 export async function getDatabase() {
   if (sqliteInstance) return sqliteInstance;
 
+  // 1. Try expo-sqlite first (Native support in Expo Go & Dev Client)
+  try {
+    const ExpoSQLite = require('expo-sqlite');
+    if (ExpoSQLite.openDatabaseAsync) {
+      const expoDb = await ExpoSQLite.openDatabaseAsync('bilisure.db');
+      sqliteInstance = {
+        async executeSql(sql: string, params: any[] = []) {
+          const lower = sql.trim().toLowerCase();
+          if (lower.startsWith('select')) {
+            const rows = await expoDb.getAllAsync(sql, params);
+            return [
+              {
+                rows: {
+                  length: rows.length,
+                  raw: () => rows,
+                  item: (i: number) => rows[i],
+                },
+              },
+            ];
+          } else {
+            const res = await expoDb.runAsync(sql, params);
+            return [{ rowsAffected: res.changes }];
+          }
+        },
+      };
+      await initSchema(sqliteInstance);
+      console.log('[SQLite] Connected via expo-sqlite driver');
+      return sqliteInstance;
+    }
+  } catch (err) {
+    // Continue to next driver
+  }
+
+  // 2. Try react-native-sqlite-storage (Bare React Native CLI)
   try {
     const SQLite = require('react-native-sqlite-storage');
     SQLite.enablePromise(true);
@@ -27,7 +61,7 @@ export async function getDatabase() {
     await initSchema(sqliteInstance);
     return sqliteInstance;
   } catch (err) {
-    console.warn('[SQLite] Native SQLite driver unavailable, activating robust in-memory SQLite emulator');
+    console.warn('[SQLite] Native SQLite driver unavailable, activating in-memory SQLite emulator');
     isInMemoryFallback = true;
     sqliteInstance = createMemoryEmulator();
     return sqliteInstance;
@@ -109,7 +143,9 @@ async function initSchema(db: any) {
   ];
 
   for (const sql of statements) {
-    await db.executeSql(sql);
+    try {
+      await db.executeSql(sql);
+    } catch {}
   }
 }
 
@@ -117,10 +153,8 @@ function createMemoryEmulator() {
   return {
     isEmulator: true,
     async executeSql(sql: string, params: any[] = []) {
-      // Basic SQL emulator for local testing without crashing
       const lower = sql.toLowerCase().trim();
       if (lower.startsWith('select')) {
-        // Find table name
         let tableName = 'local_babies';
         for (const t of Object.keys(memoryTables)) {
           if (lower.includes(t)) {
