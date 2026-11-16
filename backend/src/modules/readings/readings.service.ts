@@ -1,6 +1,6 @@
-import { BilirubinReadingModel, IBilirubinReading } from '../../models/BilirubinReading.js';
-import { BabyModel } from '../../models/Baby.js';
-import { NotFoundError } from '../../common/errors.js';
+import { BilirubinReadingModel, IBilirubinReading } from '../../models/BilirubinReading';
+import { BabyModel } from '../../models/Baby';
+import { NotFoundError } from '../../common/errors';
 
 const mockReadings: any[] = [
   {

@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { ObservationsService } from './observations.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { ObservationsService } from './observations.service';
+import { sendSuccess } from '../../common/response';
 
 export class ObservationsController {
   static async list(req: Request, res: Response, next: NextFunction) {

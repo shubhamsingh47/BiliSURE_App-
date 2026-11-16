@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { SyncService } from './sync.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { SyncService } from './sync.service';
+import { sendSuccess } from '../../common/response';
 
 export class SyncController {
   static async batch(req: Request, res: Response, next: NextFunction) {

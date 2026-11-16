@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnalyticsService } from './analytics.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { AnalyticsService } from './analytics.service';
+import { sendSuccess } from '../../common/response';
 
 export class AnalyticsController {
   static async getSummary(req: Request, res: Response, next: NextFunction) {

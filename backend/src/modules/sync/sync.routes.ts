@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { SyncController } from './sync.controller.js';
-import { authenticate } from '../../middleware/auth.js';
+import { SyncController } from './sync.controller';
+import { authenticate } from '../../middleware/auth';
 
 const router = Router();
 

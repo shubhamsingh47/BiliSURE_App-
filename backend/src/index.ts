@@ -1,6 +1,6 @@
-import { createApp } from './app.js';
-import { connectDatabase } from './config/database.js';
-import { ENV } from './config/env.js';
+import { createApp } from './app';
+import { connectDatabase } from './config/database';
+import { ENV } from './config/env';
 
 async function bootstrap() {
   await connectDatabase();

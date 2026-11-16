@@ -1,4 +1,4 @@
-import { ObservationModel } from '../../models/Observation.js';
+import { ObservationModel } from '../../models/Observation';
 
 const mockObservations: any[] = [
   {

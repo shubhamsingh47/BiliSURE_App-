@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { AuthService } from './auth.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { AuthService } from './auth.service';
+import { sendSuccess } from '../../common/response';
 
 export class AuthController {
   static async register(req: Request, res: Response, next: NextFunction) {

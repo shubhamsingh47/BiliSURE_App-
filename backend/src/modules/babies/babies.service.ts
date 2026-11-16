@@ -1,6 +1,6 @@
-import { BabyModel, IBaby } from '../../models/Baby.js';
-import { BilirubinReadingModel } from '../../models/BilirubinReading.js';
-import { ConflictError, NotFoundError } from '../../common/errors.js';
+import { BabyModel, IBaby } from '../../models/Baby';
+import { BilirubinReadingModel } from '../../models/BilirubinReading';
+import { ConflictError, NotFoundError } from '../../common/errors';
 
 // Realistic mock patients matching video demo
 const mockBabies: any[] = [

@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { BabiesController } from './babies.controller.js';
-import { validateBody, validateQuery } from '../../middleware/validate.js';
-import { CreateBabySchema, QueryBabySchema } from './babies.validator.js';
-import { authenticate } from '../../middleware/auth.js';
+import { BabiesController } from './babies.controller';
+import { validateBody, validateQuery } from '../../middleware/validate';
+import { CreateBabySchema, QueryBabySchema } from './babies.validator';
+import { authenticate } from '../../middleware/auth';
 
 const router = Router();
 

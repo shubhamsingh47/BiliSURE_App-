@@ -1,17 +1,17 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { ENV } from './config/env.js';
-import { errorHandler } from './middleware/errorHandler.js';
+import { ENV } from './config/env';
+import { errorHandler } from './middleware/errorHandler';
 
-import { authRoutes } from './modules/auth/auth.routes.js';
-import { babyRoutes } from './modules/babies/babies.routes.js';
-import { readingRoutes } from './modules/readings/readings.routes.js';
-import { recommendationRoutes } from './modules/recommendations/recommendations.routes.js';
-import { observationRoutes } from './modules/observations/observations.routes.js';
-import { deviceRoutes } from './modules/devices/devices.routes.js';
-import { analyticsRoutes } from './modules/analytics/analytics.routes.js';
-import { syncRoutes } from './modules/sync/sync.routes.js';
+import { authRoutes } from './modules/auth/auth.routes';
+import { babyRoutes } from './modules/babies/babies.routes';
+import { readingRoutes } from './modules/readings/readings.routes';
+import { recommendationRoutes } from './modules/recommendations/recommendations.routes';
+import { observationRoutes } from './modules/observations/observations.routes';
+import { deviceRoutes } from './modules/devices/devices.routes';
+import { analyticsRoutes } from './modules/analytics/analytics.routes';
+import { syncRoutes } from './modules/sync/sync.routes';
 
 export function createApp(): express.Application {
   const app = express();

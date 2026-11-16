@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { UserModel, IUser } from '../../models/User.js';
-import { ENV } from '../../config/env.js';
-import { UnauthorizedError, ConflictError, NotFoundError } from '../../common/errors.js';
+import { UserModel, IUser } from '../../models/User';
+import { ENV } from '../../config/env';
+import { UnauthorizedError, ConflictError, NotFoundError } from '../../common/errors';
 
 // In-memory fallback for local mock / detached testing
 const memoryUsers = new Map<string, any>();

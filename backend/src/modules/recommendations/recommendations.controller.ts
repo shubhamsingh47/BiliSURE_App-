@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { RecommendationsService } from './recommendations.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { RecommendationsService } from './recommendations.service';
+import { sendSuccess } from '../../common/response';
 
 export class RecommendationsController {
   static async getByBaby(req: Request, res: Response, next: NextFunction) {

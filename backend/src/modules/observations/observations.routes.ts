@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { ObservationsController } from './observations.controller.js';
-import { authenticate } from '../../middleware/auth.js';
+import { ObservationsController } from './observations.controller';
+import { authenticate } from '../../middleware/auth';
 
 const router = Router();
 

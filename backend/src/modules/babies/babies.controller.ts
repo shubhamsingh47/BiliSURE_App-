@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { BabiesService } from './babies.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { BabiesService } from './babies.service';
+import { sendSuccess } from '../../common/response';
 
 export class BabiesController {
   static async list(req: Request, res: Response, next: NextFunction) {

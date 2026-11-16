@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { DevicesService } from './devices.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { DevicesService } from './devices.service';
+import { sendSuccess } from '../../common/response';
 
 export class DevicesController {
   static async getProfile(req: Request, res: Response, next: NextFunction) {

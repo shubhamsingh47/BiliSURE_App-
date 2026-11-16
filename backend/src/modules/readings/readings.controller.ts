@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { ReadingsService } from './readings.service.js';
-import { sendSuccess } from '../../common/response.js';
+import { ReadingsService } from './readings.service';
+import { sendSuccess } from '../../common/response';
 
 export class ReadingsController {
   static async getByBaby(req: Request, res: Response, next: NextFunction) {

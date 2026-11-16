@@ -1,4 +1,4 @@
-import { DeviceModel } from '../../models/Device.js';
+import { DeviceModel } from '../../models/Device';
 
 let mockDevice = {
   _id: 'dev_bilisure_01',

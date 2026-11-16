@@ -1,4 +1,4 @@
-import { RecommendationModel } from '../../models/Recommendation.js';
+import { RecommendationModel } from '../../models/Recommendation';
 
 export class RecommendationsService {
   static async getForBaby(babyId: string, currentBilirubin = 10.0) {

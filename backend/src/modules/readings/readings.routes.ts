@@ -1,8 +1,8 @@
 import { Router } from 'express';
-import { ReadingsController } from './readings.controller.js';
-import { validateBody } from '../../middleware/validate.js';
-import { CreateReadingSchema } from './readings.validator.js';
-import { authenticate } from '../../middleware/auth.js';
+import { ReadingsController } from './readings.controller';
+import { validateBody } from '../../middleware/validate';
+import { CreateReadingSchema } from './readings.validator';
+import { authenticate } from '../../middleware/auth';
 
 const router = Router();
 

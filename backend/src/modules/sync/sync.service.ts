@@ -1,9 +1,9 @@
-import { BilirubinReadingModel } from '../../models/BilirubinReading.js';
-import { BabyModel } from '../../models/Baby.js';
-import { ObservationModel } from '../../models/Observation.js';
-import { ReadingsService } from '../readings/readings.service.js';
-import { BabiesService } from '../babies/babies.service.js';
-import { ObservationsService } from '../observations/observations.service.js';
+import { BilirubinReadingModel } from '../../models/BilirubinReading';
+import { BabyModel } from '../../models/Baby';
+import { ObservationModel } from '../../models/Observation';
+import { ReadingsService } from '../readings/readings.service';
+import { BabiesService } from '../babies/babies.service';
+import { ObservationsService } from '../observations/observations.service';
 
 export interface SyncOperationItem {
   operationId: string;
