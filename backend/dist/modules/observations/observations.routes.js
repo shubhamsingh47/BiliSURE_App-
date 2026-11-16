@@ -1,0 +1,10 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.observationRoutes = void 0;
+const express_1 = require("express");
+const observations_controller_1 = require("./observations.controller");
+const auth_1 = require("../../middleware/auth");
+const router = (0, express_1.Router)();
+router.get('/', auth_1.authenticate, observations_controller_1.ObservationsController.list);
+router.post('/', auth_1.authenticate, observations_controller_1.ObservationsController.create);
+exports.observationRoutes = router;

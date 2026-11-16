@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "BiliSURE",
+    "slug": "bilisure",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "bilisure",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "android": {
+      "package": "com.bilisure",
+      "adaptiveIcon": {
+        "backgroundColor": "#7D3BFF"
+      }
+    },
+    "plugins": [
+      "expo-dev-client"
+    ]
+  }
+}
