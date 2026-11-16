@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Home, Share2, Plus, PieChart, User } from 'lucide-react-native';
-import { COLORS } from '../../theme/colors';
+import { COLORS } from '../theme/colors';
 
 export type TabName = 'home' | 'phototherapy' | 'report' | 'profile';
 

@@ -1,25 +1,25 @@
 import React, { useState } from 'react';
 import { View, StyleSheet } from 'react-native';
-import { SplashScreen } from '../../features/authentication/screens/SplashScreen';
-import { OnboardingScreen } from '../../features/authentication/screens/OnboardingScreen';
-import { LoginScreen } from '../../features/authentication/screens/LoginScreen';
-import { DashboardScreen } from '../../features/dashboard/screens/DashboardScreen';
-import { PatientTrendsScreen } from '../../features/trends/screens/PatientTrendsScreen';
-import { NewRegistrationScreen } from '../../features/babies/screens/NewRegistrationScreen';
-import { RegistrationSuccessScreen } from '../../features/babies/screens/RegistrationSuccessScreen';
-import { PresentBilirubinScreen } from '../../features/bilirubin/screens/PresentBilirubinScreen';
-import { RiskScreen } from '../../features/recommendations/screens/RiskScreen';
-import { RecommendationsScreen } from '../../features/recommendations/screens/RecommendationsScreen';
-import { StoriesCarouselScreen } from '../../features/analytics/screens/StoriesCarouselScreen';
-import { SummaryTotalScreen } from '../../features/analytics/screens/SummaryTotalScreen';
-import { CalibrationScreen } from '../../features/devices/screens/CalibrationScreen';
-import { CalibrationStatusScreen } from '../../features/devices/screens/CalibrationStatusScreen';
-import { DeviceAlertScreen } from '../../features/devices/screens/DeviceAlertScreen';
-import { ExportDataScreen } from '../../features/reports/screens/ExportDataScreen';
-import { ObservationsListScreen } from '../../features/observations/screens/ObservationsListScreen';
-import { ProfileScreen } from '../../features/profile/screens/ProfileScreen';
+import { SplashScreen } from '../features/authentication/screens/SplashScreen';
+import { OnboardingScreen } from '../features/authentication/screens/OnboardingScreen';
+import { LoginScreen } from '../features/authentication/screens/LoginScreen';
+import { DashboardScreen } from '../features/dashboard/screens/DashboardScreen';
+import { PatientTrendsScreen } from '../features/trends/screens/PatientTrendsScreen';
+import { NewRegistrationScreen } from '../features/babies/screens/NewRegistrationScreen';
+import { RegistrationSuccessScreen } from '../features/babies/screens/RegistrationSuccessScreen';
+import { PresentBilirubinScreen } from '../features/bilirubin/screens/PresentBilirubinScreen';
+import { RiskScreen } from '../features/recommendations/screens/RiskScreen';
+import { RecommendationsScreen } from '../features/recommendations/screens/RecommendationsScreen';
+import { StoriesCarouselScreen } from '../features/analytics/screens/StoriesCarouselScreen';
+import { SummaryTotalScreen } from '../features/analytics/screens/SummaryTotalScreen';
+import { CalibrationScreen } from '../features/devices/screens/CalibrationScreen';
+import { CalibrationStatusScreen } from '../features/devices/screens/CalibrationStatusScreen';
+import { DeviceAlertScreen } from '../features/devices/screens/DeviceAlertScreen';
+import { ExportDataScreen } from '../features/reports/screens/ExportDataScreen';
+import { ObservationsListScreen } from '../features/observations/screens/ObservationsListScreen';
+import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
 import { BottomTabBar, TabName } from './BottomTabNavigator';
-import { usePatientStore } from '../../store/usePatientStore';
+import { usePatientStore } from '../store/usePatientStore';
 
 type ScreenRoute =
   | 'splash'
@@ -78,7 +78,7 @@ export const RootNavigator: React.FC = () => {
         return (
           <NewRegistrationScreen
             onBack={() => setCurrentRoute('main')}
-            onSuccess={(uhid) => {
+            onSuccess={(uhid: string) => {
               setRegisteredUhid(uhid);
               setCurrentRoute('registration_success');
             }}
@@ -134,7 +134,7 @@ export const RootNavigator: React.FC = () => {
         return (
           <StoriesCarouselScreen
             onClose={() => setCurrentRoute('main')}
-            onNavigateAction={(action) => {
+            onNavigateAction={(action: string) => {
               if (action.includes('Discharge')) {
                 setActiveTab('report');
                 setCurrentRoute('main');
