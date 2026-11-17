@@ -5,10 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
 import { ChevronDown, Network, PieChart, ArrowUpDown, ArrowLeft } from 'lucide-react-native';
 import Svg, { Circle, G } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 
 interface SummaryTotalScreenProps {
@@ -42,8 +42,10 @@ export const SummaryTotalScreen: React.FC<SummaryTotalScreenProps> = ({ onBack, 
   const dischDash = `${circumference * 0.83} ${circumference * 0.17}`;
   const treatDash = `${circumference * 0.17} ${circumference * 0.83}`;
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       {/* Header Bar */}
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
@@ -257,7 +259,7 @@ export const SummaryTotalScreen: React.FC<SummaryTotalScreenProps> = ({ onBack, 
 
         <View style={{ height: 60 }} />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

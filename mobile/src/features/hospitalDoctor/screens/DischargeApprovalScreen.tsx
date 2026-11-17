@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Admission } from '../../../types';
@@ -64,8 +65,10 @@ export const DischargeApprovalScreen: React.FC<DischargeApprovalScreenProps> = (
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 10 }]}>
       {/* Header */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>

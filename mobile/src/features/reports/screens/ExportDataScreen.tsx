@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { ArrowLeft, ChevronDown, Download } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { apiClient } from '../../../services/api.client';
@@ -55,8 +55,10 @@ export const ExportDataScreen: React.FC<ExportDataScreenProps> = ({ onBack }) =>
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
           <ArrowLeft size={24} color="#0F172A" />
@@ -103,7 +105,7 @@ export const ExportDataScreen: React.FC<ExportDataScreenProps> = ({ onBack }) =>
           style={styles.exportBtn}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

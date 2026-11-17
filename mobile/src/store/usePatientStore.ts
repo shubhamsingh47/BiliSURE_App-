@@ -17,6 +17,7 @@ interface PatientState {
   selectBaby: (baby: Baby) => void;
   setSelectedDepartment: (dept: string) => void;
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
+  updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
   addReading: (readingData: Partial<BilirubinReading>) => Promise<BilirubinReading>;
 }
 
@@ -73,7 +74,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       bilisureId: 'BS-2026-0043',
       name: 'Baby 3',
       parentsName: 'Maria Rodriguez',
-      dateOfBirth: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+      dateOfBirth: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
       exactTimeOfBirth: '10:15',
       gestationalAgeWeeks: 39,
       weight: 3.4,
@@ -226,6 +227,29 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     SyncEngine.syncPending().catch(() => {});
 
     return newBaby;
+  },
+
+  updateBaby: async (babyId: string, updates: Partial<Baby>) => {
+    let updated: Baby | null = null;
+    set((state) => {
+      const newBabies = state.babies.map((b) => {
+        if (b.id === babyId) {
+          updated = { ...b, ...updates, updatedAt: new Date().toISOString() };
+          return updated;
+        }
+        return b;
+      });
+      return {
+        babies: newBabies,
+        selectedBaby: state.selectedBaby?.id === babyId ? updated : state.selectedBaby,
+      };
+    });
+
+    if (updated) {
+      await BabyRepository.insertOrUpdate(updated).catch(() => {});
+    }
+
+    return updated || (get().babies.find((b) => b.id === babyId) as Baby);
   },
 
   addReading: async (readingData) => {

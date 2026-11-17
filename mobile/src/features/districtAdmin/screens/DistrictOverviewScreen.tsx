@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions } from 'react-native';
 import Svg, { G, Circle } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { COLORS } from '../../../theme/colors';
@@ -38,8 +39,10 @@ export const DistrictOverviewScreen: React.FC<DistrictOverviewScreenProps> = ({
   const stroke2 = circumference * 0.33;
   const stroke3 = circumference * 0.17;
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>

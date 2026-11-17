@@ -6,34 +6,49 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
-  SafeAreaView,
+  Alert,
 } from 'react-native';
-import { ArrowLeft, Paperclip, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, Paperclip, ChevronDown, Check } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { usePatientStore } from '../../../store/usePatientStore';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { SeverityState } from '../../../types';
 
 interface NewRegistrationScreenProps {
   onBack: () => void;
   onSuccess: (uhid: string) => void;
 }
 
+const formatCurrentDateTime = () => {
+  const now = new Date();
+  const day = String(now.getDate()).padStart(2, '0');
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const year = now.getFullYear();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return `${day}/${month}/${year} ${timeStr}`;
+};
+
 export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   onBack,
   onSuccess,
 }) => {
-  const [patientName, setPatientName] = useState('Baby 4');
-  const [parentsName, setParentsName] = useState('Jane Doe');
-  const [dob, setDob] = useState('16/11/2026 09:41 AM');
-  const [uhid, setUhid] = useState('M1A2N3S4I5');
-  const [facility, setFacility] = useState('General Hospital');
-  const [doctor, setDoctor] = useState('Dr. XYZ');
+  const { user } = useAuthStore();
+  const [patientName, setPatientName] = useState('');
+  const [parentsName, setParentsName] = useState('');
+  const [dob, setDob] = useState(formatCurrentDateTime());
+  const [uhid, setUhid] = useState('');
+  const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
+  const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
+  const [severity, setSeverity] = useState<SeverityState>('normal');
   const [repeatTransaction, setRepeatTransaction] = useState(false);
   const [hasAttachment, setHasAttachment] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const { registerBaby } = usePatientStore();
+  const insets = useSafeAreaInsets();
 
   const generateUhid = () => {
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
@@ -41,17 +56,29 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   };
 
   const handleContinue = async () => {
+    if (!patientName.trim()) {
+      Alert.alert('Required Field', "Please enter the baby's name");
+      return;
+    }
+
     setLoading(true);
     try {
+      const now = new Date();
+      const finalUhid = uhid.trim() || `BS-${Math.floor(100000 + Math.random() * 900000)}`;
       const created = await registerBaby({
-        name: patientName,
-        parentsName,
-        uhid: uhid || `M1A2N3S4I5`,
+        name: patientName.trim(),
+        parentsName: parentsName.trim() || 'Parent',
+        uhid: finalUhid,
         assignedDoctor: doctor,
         facility,
-        severityState: 'moderate',
+        severityState: severity,
+        dateOfBirth: now.toISOString(),
+        exactTimeOfBirth: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        updatedAt: now.toISOString(),
       });
       onSuccess(created.uhid);
+    } catch {
+      Alert.alert('Error', 'Failed to register newborn');
     } finally {
       setLoading(false);
     }
@@ -59,8 +86,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      {/* Coral / Red Header from Frame 12 */}
-      <SafeAreaView style={styles.headerSafeArea}>
+      {/* Coral / Red Header from Frame 12 with Dynamic Camera Inset */}
+      <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />
@@ -68,7 +95,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           <Text style={styles.headerTitle}>New registration</Text>
           <View style={{ width: 24 }} />
         </View>
-      </SafeAreaView>
+      </View>
 
       <ScrollView contentContainerStyle={styles.contentCard} showsVerticalScrollIndicator={false}>
         <CustomInput
@@ -105,6 +132,46 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           >
             <Text style={styles.genBtnText}>Auto</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Severity / Risk Level Selector */}
+        <View style={styles.severitySection}>
+          <Text style={styles.severityLabel}>Clinical Risk Status</Text>
+          <View style={styles.severityRow}>
+            {(['normal', 'moderate', 'critical'] as const).map((level) => {
+              const isSelected = severity === level;
+              const colorMap = {
+                normal: COLORS.normal,
+                moderate: COLORS.moderate,
+                critical: COLORS.critical,
+              };
+              const activeColor = colorMap[level];
+              return (
+                <TouchableOpacity
+                  key={level}
+                  activeOpacity={0.75}
+                  onPress={() => setSeverity(level)}
+                  style={[
+                    styles.severityBtn,
+                    isSelected && {
+                      backgroundColor: activeColor,
+                      borderColor: activeColor,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.severityBtnText,
+                      isSelected && styles.severityBtnTextActive,
+                    ]}
+                  >
+                    {level.charAt(0).toUpperCase() + level.slice(1)}
+                  </Text>
+                  {isSelected && <Check size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
 
         {/* Dropdowns */}
@@ -275,5 +342,42 @@ const styles = StyleSheet.create({
   continueBtn: {
     marginTop: 10,
     backgroundColor: '#7C3AED',
+  },
+  severitySection: {
+    marginBottom: 16,
+    marginTop: 4,
+  },
+  severityLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#475569',
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  severityRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  severityBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F8FAFC',
+  },
+  severityBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  severityBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
 });

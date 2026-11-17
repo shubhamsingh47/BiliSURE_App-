@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, FlatList } from 'react-native';
 import { COLORS } from '../../../theme/colors';
 import { CustomHeader } from '../../../components/CustomHeader';
 import { usePatientStore } from '../../../store/usePatientStore';
@@ -12,7 +12,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
   const { observations, selectedBaby } = usePatientStore();
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <CustomHeader title={`Observations - ${selectedBaby?.name || 'Baby 1'}`} onBack={onBack} />
       <FlatList
         data={observations}
@@ -34,7 +34,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
           </View>
         )}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

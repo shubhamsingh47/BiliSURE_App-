@@ -5,10 +5,10 @@ import {
   StyleSheet,
   Switch,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import Svg, { Rect, Path } from 'react-native-svg';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 
 interface CalibrationScreenProps {
@@ -26,8 +26,10 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
   const [accuracyTest, setAccuracyTest] = useState(true);
   const [recordLog, setRecordLog] = useState(false);
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
           <ArrowLeft size={24} color="#0F172A" />
@@ -113,7 +115,7 @@ export const CalibrationScreen: React.FC<CalibrationScreenProps> = ({
           <Text style={styles.gridHint}>Tap sensor to view calibration status</Text>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

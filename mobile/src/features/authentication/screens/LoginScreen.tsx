@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
@@ -28,10 +29,10 @@ const PRIMARY_ROLES: {
   },
   {
     key: 'receiving_hospital',
-    title: 'Receiving Hospital',
-    facility: 'District Civil Hospital NICU / Operations',
+    title: 'Hospital (Receiving)',
+    facility: 'District Civil Hospital (NICU / Pediatrics)',
     icon: '🏥',
-    defaultEmail: 'rajesh.verma@dch.district.org',
+    defaultEmail: 'hospital@dch.district.org',
   },
   {
     key: 'district_admin',
@@ -44,13 +45,12 @@ const PRIMARY_ROLES: {
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
   const [selectedPrimaryRole, setSelectedPrimaryRole] = useState<PrimaryUserRole>('doctor_referring');
-  const [selectedHospitalProfile, setSelectedHospitalProfile] = useState<PermissionProfile>('clinical');
   const [email, setEmail] = useState('priya.sharma@chc.district.org');
   const [password, setPassword] = useState('Password123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { setUser, switchRole, setHospitalPermissionProfile } = useAuthStore();
+  const { setUser, switchRole } = useAuthStore();
 
   const handleLogin = async () => {
     setLoading(true);
@@ -64,27 +64,23 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
       // Graceful offline/demo session fallback with matching preset
       const matched = PRIMARY_PRESET_USERS[selectedPrimaryRole] || PRIMARY_PRESET_USERS.doctor_referring;
       setUser(matched, 'mock_jwt_token');
-      if (selectedPrimaryRole === 'receiving_hospital') {
-        setHospitalPermissionProfile(selectedHospitalProfile);
-      }
       onSuccess();
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickRoleLogin = (role: PrimaryUserRole, profile?: PermissionProfile) => {
+  const handleQuickRoleLogin = (role: PrimaryUserRole) => {
     switchRole(role);
-    if (role === 'receiving_hospital' && profile) {
-      setHospitalPermissionProfile(profile);
-    }
     const user = PRIMARY_PRESET_USERS[role];
     setUser(user, 'mock_jwt_token');
     onSuccess();
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 20 }]}>
       <View style={styles.header}>
         <Text style={styles.brandTitle}>BiliSURE</Text>
         <Text style={styles.subtitle}>Newborn Jaundice Monitoring & PT Network</Text>
@@ -105,6 +101,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
               onPress={() => {
                 setSelectedPrimaryRole(r.key);
                 setEmail(r.defaultEmail);
+                setPassword('Password123!');
               }}
               activeOpacity={0.8}
             >
@@ -120,35 +117,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
           );
         })}
       </View>
-
-      {/* Permissions Profile Selector for Receiving Hospital */}
-      {selectedPrimaryRole === 'receiving_hospital' && (
-        <View style={styles.profileBox}>
-          <Text style={styles.profileBoxTitle}>Hospital Permission Profile:</Text>
-          <View style={styles.profileRow}>
-            {(['clinical', 'nursing', 'management'] as PermissionProfile[]).map((prof) => {
-              const isPActive = selectedHospitalProfile === prof;
-              const label =
-                prof === 'clinical'
-                  ? 'Doctor (Clinical)'
-                  : prof === 'nursing'
-                  ? 'Nurse (Treatment)'
-                  : 'Admin (Operations)';
-              return (
-                <TouchableOpacity
-                  key={prof}
-                  onPress={() => setSelectedHospitalProfile(prof)}
-                  style={[styles.profilePill, isPActive && styles.profilePillActive]}
-                >
-                  <Text style={[styles.profilePillText, isPActive && styles.profilePillTextActive]}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      )}
 
       {/* Login Credentials Form */}
       <View style={styles.formCard}>
@@ -181,7 +149,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
 
         <TouchableOpacity
           style={styles.oneTapBtn}
-          onPress={() => handleQuickRoleLogin(selectedPrimaryRole, selectedHospitalProfile)}
+          onPress={() => handleQuickRoleLogin(selectedPrimaryRole)}
         >
           <Text style={styles.oneTapBtnText}>⚡ 1-Tap Quick Demo Sign In</Text>
         </TouchableOpacity>

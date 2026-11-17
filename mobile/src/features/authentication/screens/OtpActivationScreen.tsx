@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import { ShieldCheck, ArrowLeft, RefreshCw } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 
@@ -35,8 +35,10 @@ export const OtpActivationScreen: React.FC<OtpActivationScreenProps> = ({
     }, 600);
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}
@@ -76,7 +78,7 @@ export const OtpActivationScreen: React.FC<OtpActivationScreenProps> = ({
           style={styles.verifyBtn}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </View>
   );
 };
 

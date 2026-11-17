@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { Building2, ShieldCheck, MapPin, Users, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
@@ -28,7 +27,7 @@ export const FacilityUserManagementScreen: React.FC<FacilityUserManagementScreen
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <PurpleHeader
         title="District Facilities & Users"
         subtitle="Healthcare Network Governance"
@@ -89,7 +88,7 @@ export const FacilityUserManagementScreen: React.FC<FacilityUserManagementScreen
           </View>
         )}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

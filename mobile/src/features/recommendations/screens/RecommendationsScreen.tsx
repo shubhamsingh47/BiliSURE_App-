@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 
@@ -21,9 +22,11 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
   providerAction = 'Suggested:\nPhototherapy',
   providerFrequency = 'Blue LED irradiance (> 30 uW/cm2/nm)',
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.contentSafeArea}>
+      <View style={[styles.contentSafeArea, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />
@@ -47,7 +50,7 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
             <Text style={styles.cardFreqLabel}>Frequency: {providerFrequency}</Text>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* Bottom White Bar */}
       <View style={styles.bottomBar}>

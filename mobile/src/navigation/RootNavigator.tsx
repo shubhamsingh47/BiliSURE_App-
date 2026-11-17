@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, StyleSheet, SafeAreaView } from 'react-native';
+import { View, StyleSheet } from 'react-native';
 import { SplashScreen } from '../features/authentication/screens/SplashScreen';
 import { OnboardingScreen } from '../features/authentication/screens/OnboardingScreen';
 import { LoginScreen } from '../features/authentication/screens/LoginScreen';
 import { DashboardScreen } from '../features/dashboard/screens/DashboardScreen';
 import { PatientTrendsScreen } from '../features/trends/screens/PatientTrendsScreen';
 import { NewRegistrationScreen } from '../features/babies/screens/NewRegistrationScreen';
+import { PatientsScreen } from '../features/babies/screens/PatientsScreen';
 import { RegistrationSuccessScreen } from '../features/babies/screens/RegistrationSuccessScreen';
 import { PresentBilirubinScreen } from '../features/bilirubin/screens/PresentBilirubinScreen';
 import { RiskScreen } from '../features/recommendations/screens/RiskScreen';
@@ -86,7 +87,10 @@ export const RootNavigator: React.FC = () => {
 
   const handleSplashFinish = () => setCurrentRoute('onboarding');
   const handleOnboardingContinue = () => setCurrentRoute('login');
-  const handleLoginSuccess = () => setCurrentRoute('main');
+  const handleLoginSuccess = () => {
+    setActiveTab('home');
+    setCurrentRoute('main');
+  };
 
   const handleSelectBaby = (baby: any) => {
     selectBaby(baby);
@@ -102,7 +106,10 @@ export const RootNavigator: React.FC = () => {
   const renderProfile = () => (
     <ProfileScreen
       onOpenCalibration={() => setCurrentRoute('calibration')}
-      onLogout={() => setCurrentRoute('login')}
+      onLogout={() => {
+        setActiveTab('home');
+        setCurrentRoute('login');
+      }}
       onOpenNotifications={() => setCurrentRoute('notifications')}
       onOpenFacilitySelection={() => setCurrentRoute('facility_selection')}
       onOpenStaffManagement={() => setCurrentRoute('staff_management')}
@@ -322,23 +329,22 @@ export const RootNavigator: React.FC = () => {
       default:
         // Unified 3-Primary-Role views for 'main' route
         if (primaryRole === 'receiving_hospital') {
-          if (activeTab === 'home') {
-            if (activeHospitalProfile === 'nursing') {
-              return (
-                <NurseArrivalsScreen
-                  onArrivalConfirmed={(admId) => setActiveTab('allocation')}
-                />
-              );
-            }
-            if (activeHospitalProfile === 'management') {
-              return <AdminStationsManagementScreen />;
-            }
+          // Tab 1: Arrivals & Admissions
+          if (activeTab === 'home' || activeTab === 'arrivals') {
+            return (
+              <NurseArrivalsScreen
+                onArrivalConfirmed={(admId) => setActiveTab('allocation')}
+              />
+            );
+          }
+
+          // Tab 2: Incoming Referrals
+          if (activeTab === 'inbox') {
             return <HospitalReferralsInboxScreen />;
           }
 
-          if (activeTab === 'inbox') return <HospitalReferralsInboxScreen />;
-
-          if (activeTab === 'admitted') {
+          // Tab 3: Phototherapy Tracking
+          if (activeTab === 'tracking' || activeTab === 'admitted') {
             return (
               <NurseTreatmentTrackerScreen
                 onRecordBilirubin={(uhid) => {
@@ -349,11 +355,14 @@ export const RootNavigator: React.FC = () => {
             );
           }
 
+          // Tab 4: PT Station Allocation
           if (activeTab === 'allocation') {
-            if (activeHospitalProfile === 'management') {
-              return <AdminStationsManagementScreen />;
-            }
             return <NurseStationAllocationScreen />;
+          }
+
+          // Tab 5: Profile
+          if (activeTab === 'profile') {
+            return renderProfile();
           }
 
           if (activeTab === 'discharge') {
@@ -366,11 +375,11 @@ export const RootNavigator: React.FC = () => {
             );
           }
 
-          if (activeTab === 'profile') {
-            return renderProfile();
-          }
-
-          return <HospitalReferralsInboxScreen />;
+          return (
+            <NurseArrivalsScreen
+              onArrivalConfirmed={(admId) => setActiveTab('allocation')}
+            />
+          );
         }
 
         if (primaryRole === 'district_admin') {
@@ -406,10 +415,9 @@ export const RootNavigator: React.FC = () => {
         // Primary Role: Doctor / Referring Centre (Default)
         if (activeTab === 'admitted') {
           return (
-            <DashboardScreen
+            <PatientsScreen
               onSelectBaby={handleSelectBaby}
-              onOpenReportStories={() => setCurrentRoute('stories_carousel')}
-              onOpenNewRegistration={() => setCurrentRoute('new_registration')}
+              onRegisterNew={() => setCurrentRoute('new_registration')}
             />
           );
         }
@@ -452,12 +460,12 @@ export const RootNavigator: React.FC = () => {
   const showRoleSwitcher = currentRoute === 'main' || currentRoute === 'trends';
 
   return (
-    <SafeAreaView style={styles.rootContainer}>
+    <View style={styles.rootContainer}>
       {showRoleSwitcher && (
         <RoleSwitcherBar onOpenNotifications={() => setCurrentRoute('notifications')} />
       )}
 
-      <View style={styles.screenContainer}>
+      <View style={[styles.screenContainer, !showBottomNav && { paddingBottom: 0 }]}>
         {renderCurrentScreen()}
       </View>
 
@@ -471,7 +479,7 @@ export const RootNavigator: React.FC = () => {
           onFabPress={handleFabPress}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

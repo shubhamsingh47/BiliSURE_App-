@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
@@ -20,6 +21,7 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
   referenceText = 'AAP 2022 Guidelines: Serum Bilirubin is in the hour-specific High-Intermediate risk zone (75th–95th percentile). Surveillance and phototherapy indication threshold assessment indicated.',
 }) => {
   const { readings, selectedBaby } = usePatientStore();
+  const insets = useSafeAreaInsets();
 
   const getRiskColor = () => {
     const lower = riskLevel.toLowerCase();
@@ -30,7 +32,7 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.contentSafeArea}>
+      <View style={[styles.contentSafeArea, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />
@@ -59,7 +61,7 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
             </View>
           </View>
         </ScrollView>
-      </SafeAreaView>
+      </View>
 
       {/* Bottom White Bar */}
       <View style={styles.bottomBar}>

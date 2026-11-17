@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { Building2, Check, ArrowRight } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
@@ -58,7 +57,7 @@ export const FacilitySelectionScreen: React.FC<FacilitySelectionScreenProps> = (
   const selectedFacility = MOCK_FACILITIES.find((f) => f.id === selectedId) || MOCK_FACILITIES[0];
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <PurpleHeader
         title="Select Active Facility"
         subtitle="Choose your assigned healthcare station for this session"
@@ -104,7 +103,7 @@ export const FacilitySelectionScreen: React.FC<FacilitySelectionScreenProps> = (
           />
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

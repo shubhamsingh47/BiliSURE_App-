@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../theme/colors';
 
 interface PurpleHeaderProps {
@@ -18,8 +19,11 @@ export const PurpleHeader: React.FC<PurpleHeaderProps> = ({
   rightAction,
   style,
 }) => {
+  const insets = useSafeAreaInsets();
+  const dynamicTopPadding = Math.max(insets.top, 14) + 6;
+
   return (
-    <View style={[styles.container, style]}>
+    <View style={[styles.container, { paddingTop: dynamicTopPadding }, style]}>
       <View style={styles.topRow}>
         <View style={styles.leftContainer}>
           {onBack && (

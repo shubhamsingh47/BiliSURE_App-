@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
 import {
   User,
   Cpu,
@@ -55,7 +55,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       case 'doctor_referring':
         return 'Doctor / Referring Centre';
       case 'receiving_hospital':
-        return `Receiving Hospital (${activeHospitalProfile ? activeHospitalProfile.toUpperCase() : 'CLINICAL'})`;
+        return 'Hospital (Receiving)';
       case 'district_admin':
         return 'District Administrator';
       default:
@@ -64,7 +64,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>Clinician Profile</Text>
@@ -217,7 +217,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

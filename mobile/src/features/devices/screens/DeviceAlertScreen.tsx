@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Alert,
 } from 'react-native';
 import { ArrowLeft, Trash2, AlertCircle } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 
@@ -23,8 +23,10 @@ export const DeviceAlertScreen: React.FC<DeviceAlertScreenProps> = ({ onBack }) 
     );
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
       {/* Header Bar */}
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
@@ -65,7 +67,7 @@ export const DeviceAlertScreen: React.FC<DeviceAlertScreenProps> = ({ onBack }) 
           style={styles.supportBtn}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

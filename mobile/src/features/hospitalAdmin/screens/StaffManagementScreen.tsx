@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { UserCheck, Shield, Phone, Mail, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
@@ -75,7 +74,7 @@ export const StaffManagementScreen: React.FC<StaffManagementScreenProps> = ({ on
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <PurpleHeader
         title="Clinical Staff Management"
         subtitle="District Civil Hospital Roster"
@@ -123,7 +122,7 @@ export const StaffManagementScreen: React.FC<StaffManagementScreenProps> = ({ on
           )}
         />
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 

@@ -4,9 +4,9 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
 } from 'react-native';
 import { ArrowLeft, CheckCircle2 } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 
 interface CalibrationStatusScreenProps {
@@ -18,9 +18,11 @@ export const CalibrationStatusScreen: React.FC<CalibrationStatusScreenProps> = (
   onBack,
   onOpenAlert,
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.safeArea, { paddingTop: insets.top + 6 }]}>
         {/* Top Progress Step Bar */}
         <View style={styles.stepBar}>
           <View style={[styles.stepItem, styles.stepItemActive]} />
@@ -76,7 +78,7 @@ export const CalibrationStatusScreen: React.FC<CalibrationStatusScreenProps> = (
             </View>
           </View>
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };

@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   FlatList,
   StyleSheet,
-  SafeAreaView,
 } from 'react-native';
 import { CheckCheck, BellOff } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
@@ -39,7 +38,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
   });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <PurpleHeader
         title="Notifications & Alerts"
         subtitle={`Role: ${activeRole.replace('_', ' ').toUpperCase()}`}
@@ -113,7 +112,7 @@ export const NotificationsScreen: React.FC<NotificationsScreenProps> = ({
           />
         )}
       />
-    </SafeAreaView>
+    </View>
   );
 };
 

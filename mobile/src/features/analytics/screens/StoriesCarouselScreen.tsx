@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   Dimensions,
 } from 'react-native';
 import { X, ShoppingBag, Banknote, Send } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 
 const { width } = Dimensions.get('window');
@@ -76,9 +76,11 @@ export const StoriesCarouselScreen: React.FC<StoriesCarouselScreenProps> = ({
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={[styles.screen, { backgroundColor: slide.bgColor }]}>
-      <SafeAreaView style={styles.safeArea}>
+      <View style={[styles.safeArea, { paddingTop: insets.top + 8 }]}>
         {/* Top Progress Segmented Indicators from Frame 32/35/38 */}
         <View style={styles.progressRow}>
           {slides.map((s, idx) => (
@@ -145,7 +147,7 @@ export const StoriesCarouselScreen: React.FC<StoriesCarouselScreenProps> = ({
             </TouchableOpacity>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 };

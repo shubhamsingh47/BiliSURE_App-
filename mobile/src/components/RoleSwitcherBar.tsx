@@ -1,125 +1,67 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNetworkStore } from '../store/useNetworkStore';
-import { PrimaryUserRole, PermissionProfile } from '../types';
-import { COLORS } from '../theme/colors';
-
-const PRIMARY_ROLES: { key: PrimaryUserRole; label: string; badge: string }[] = [
-  { key: 'doctor_referring', label: 'Doctor / Referring Centre', badge: 'REFERRING' },
-  { key: 'receiving_hospital', label: 'Receiving Hospital', badge: 'HOSPITAL' },
-  { key: 'district_admin', label: 'District Administrator', badge: 'DISTRICT' },
-];
-
-const HOSPITAL_PROFILES: { key: PermissionProfile; label: string }[] = [
-  { key: 'clinical', label: 'Doctor (Clinical)' },
-  { key: 'nursing', label: 'Nurse (Treatment)' },
-  { key: 'management', label: 'Admin (Operations)' },
-];
 
 interface RoleSwitcherBarProps {
   onOpenNotifications?: () => void;
 }
 
 export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({ onOpenNotifications }) => {
-  const {
-    primaryRole,
-    switchRole,
-    activeHospitalProfile,
-    setHospitalPermissionProfile,
-    user,
-  } = useAuthStore();
+  const { user, primaryRole } = useAuthStore();
   const { notifications } = useNetworkStore();
   const [showNotifModal, setShowNotifModal] = useState(false);
+  const insets = useSafeAreaInsets();
+
+  const isReceiving =
+    primaryRole === 'receiving_hospital' ||
+    user?.role === 'receiving_hospital' ||
+    user?.primaryRole === 'receiving_hospital';
+  const displayName = isReceiving
+    ? 'District Civil Hospital (NICU / Pediatrics)'
+    : user.name;
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  const handleOpenNotifications = () => {
+    if (onOpenNotifications) {
+      onOpenNotifications();
+    } else {
+      setShowNotifModal(true);
+    }
+  };
+
   return (
-    <View style={styles.wrapper}>
-      {/* Primary Role Pill Switcher (3 Roles Only) */}
-      <View style={styles.topRow}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {PRIMARY_ROLES.map((r) => {
-            const isActive = primaryRole === r.key;
-            return (
-              <TouchableOpacity
-                key={r.key}
-                onPress={() => switchRole(r.key)}
-                style={[styles.rolePill, isActive && styles.rolePillActive]}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.rolePillText, isActive && styles.rolePillTextActive]}>
-                  {r.label}
-                </Text>
-                <View style={[styles.miniBadge, isActive && styles.miniBadgeActive]}>
-                  <Text style={[styles.miniBadgeText, isActive && styles.miniBadgeTextActive]}>
-                    {r.badge}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-
-        {/* Notification Bell */}
-        <TouchableOpacity
-          onPress={() => setShowNotifModal(true)}
-          style={styles.notifBtn}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.bellIcon}>🔔</Text>
-          {unreadCount > 0 && (
-            <View style={styles.badgeDot}>
-              <Text style={styles.badgeDotText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {/* Sub-bar for Receiving Hospital: Configurable Permissions Profile */}
-      {primaryRole === 'receiving_hospital' && (
-        <View style={styles.profileRow}>
-          <Text style={styles.profileLabel}>Permissions Profile:</Text>
-          <View style={styles.profileButtons}>
-            {HOSPITAL_PROFILES.map((p) => {
-              const isSelected = activeHospitalProfile === p.key;
-              return (
-                <TouchableOpacity
-                  key={p.key}
-                  onPress={() => setHospitalPermissionProfile(p.key)}
-                  style={[styles.profilePill, isSelected && styles.profilePillSelected]}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.profilePillText,
-                      isSelected && styles.profilePillTextSelected,
-                    ]}
-                  >
-                    {p.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
+    <View style={[styles.wrapper, { paddingTop: insets.top }]}>
       {/* User & Facility Active Identity Banner */}
       <View style={styles.identityRow}>
         <View style={styles.identityLeft}>
-          <Text style={styles.userNameText}>{user.name}</Text>
-          <Text style={styles.facilityText}>
-            {user.facility} • {user.department}
+          <Text style={styles.userNameText} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.facilityText} numberOfLines={1}>
+            {isReceiving
+              ? 'District Civil Hospital • Neonatal Intensive Care & PT Unit'
+              : `${user.facility} • ${user.department}`}
           </Text>
         </View>
-        <View style={styles.onlineBadge}>
-          <View style={styles.greenDot} />
-          <Text style={styles.onlineText}>Connected</Text>
+
+        <View style={styles.identityRight}>
+          {/* Preserved Notification Bell with unread badge */}
+          <TouchableOpacity
+            onPress={handleOpenNotifications}
+            style={styles.notifBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badgeDot}>
+                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -166,96 +108,33 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
+    shadowRadius: 3,
   },
-  topRow: {
+  identityRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingLeft: 12,
-    paddingRight: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
   },
-  scrollContent: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    paddingRight: 8,
+  identityLeft: {
+    flex: 1,
+    marginRight: 12,
   },
-  rolePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: '#F1F5F9',
-    gap: 6,
+  userNameText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  rolePillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  rolePillText: {
+  facilityText: {
     fontSize: 12,
-    fontWeight: '600',
     color: '#64748B',
+    marginTop: 2,
   },
-  rolePillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  miniBadge: {
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 4,
-    backgroundColor: '#E2E8F0',
-  },
-  miniBadgeActive: {
-    backgroundColor: 'rgba(255,255,255,0.25)',
-  },
-  miniBadgeText: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  miniBadgeTextActive: {
-    color: '#FFFFFF',
-  },
-  profileRow: {
+  identityRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8FAFC',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-  },
-  profileLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-    marginRight: 8,
-  },
-  profileButtons: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  profilePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
-    backgroundColor: '#E2E8F0',
-  },
-  profilePillSelected: {
-    backgroundColor: '#7D3BFF',
-  },
-  profilePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  profilePillTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   notifBtn: {
     width: 36,
@@ -265,15 +144,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
-    marginLeft: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   bellIcon: {
     fontSize: 18,
   },
   badgeDot: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: -2,
+    right: -2,
     backgroundColor: '#EF4444',
     borderRadius: 8,
     minWidth: 16,
@@ -286,48 +166,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 9,
     fontWeight: '800',
-  },
-  identityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    backgroundColor: '#FAFAFD',
-    borderTopWidth: 1,
-    borderTopColor: '#F8FAFC',
-  },
-  identityLeft: {
-    flex: 1,
-  },
-  userNameText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E293B',
-  },
-  facilityText: {
-    fontSize: 11,
-    color: '#64748B',
-  },
-  onlineBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ECFDF5',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-    gap: 4,
-  },
-  greenDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-  },
-  onlineText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#059669',
   },
   modalOverlay: {
     flex: 1,

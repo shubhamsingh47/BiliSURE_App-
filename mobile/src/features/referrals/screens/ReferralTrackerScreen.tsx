@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { Referral, ReferralStatus } from '../../../types';
 import { COLORS } from '../../../theme/colors';
@@ -35,10 +36,12 @@ export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerRow}>
           {onBack && (
             <TouchableOpacity onPress={onBack} style={styles.backBtn}>

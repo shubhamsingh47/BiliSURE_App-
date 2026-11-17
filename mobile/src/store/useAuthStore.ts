@@ -61,12 +61,12 @@ export const PRIMARY_PRESET_USERS: Record<PrimaryUserRole, User> = {
   },
   receiving_hospital: {
     id: 'usr_hosp_doc',
-    email: 'rajesh.verma@dch.district.org',
-    name: 'Dr. Rajesh Verma (Neonatologist)',
+    email: 'hospital@dch.district.org',
+    name: 'District Civil Hospital (NICU / Pediatrics)',
     role: 'receiving_hospital',
     primaryRole: 'receiving_hospital',
     permissionProfile: 'clinical',
-    permissions: CLINICAL_PERMISSIONS,
+    permissions: ALL_HOSPITAL_PERMISSIONS,
     department: 'NICU / Pediatrics',
     facility: 'District Civil Hospital',
     facilityId: 'hosp_001',
@@ -96,12 +96,12 @@ export const PRESET_USERS: Record<UserRole, User> = {
   hospital_doctor: PRIMARY_PRESET_USERS.receiving_hospital,
   hospital_nurse: {
     id: 'usr_nurse_staff',
-    email: 'sunita.nurse@dch.district.org',
-    name: 'Nurse Sunita',
+    email: 'hospital@dch.district.org',
+    name: 'District Civil Hospital (NICU / Pediatrics)',
     role: 'receiving_hospital',
     primaryRole: 'receiving_hospital',
     permissionProfile: 'nursing',
-    permissions: NURSING_PERMISSIONS,
+    permissions: ALL_HOSPITAL_PERMISSIONS,
     department: 'NICU Phototherapy Unit',
     facility: 'District Civil Hospital',
     facilityId: 'hosp_001',
@@ -109,12 +109,12 @@ export const PRESET_USERS: Record<UserRole, User> = {
   },
   hospital_admin: {
     id: 'usr_hosp_admin',
-    email: 'admin.mehta@dch.district.org',
-    name: 'Admin Ramesh Mehta',
+    email: 'hospital@dch.district.org',
+    name: 'District Civil Hospital (NICU / Pediatrics)',
     role: 'receiving_hospital',
     primaryRole: 'receiving_hospital',
     permissionProfile: 'management',
-    permissions: MANAGEMENT_PERMISSIONS,
+    permissions: ALL_HOSPITAL_PERMISSIONS,
     department: 'Operations & Facilities',
     facility: 'District Civil Hospital',
     facilityId: 'hosp_001',
@@ -196,20 +196,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   setHospitalPermissionProfile: (profile: PermissionProfile) => {
     const current = get().user;
-    let permissions = CLINICAL_PERMISSIONS;
-    let name = 'Dr. Rajesh Verma (Neonatologist)';
+    let permissions = ALL_HOSPITAL_PERMISSIONS;
+    let name = 'District Civil Hospital (NICU / Pediatrics)';
     let department = 'NICU / Pediatrics';
 
     if (profile === 'nursing') {
-      permissions = NURSING_PERMISSIONS;
-      name = 'Nurse Sunita';
       department = 'NICU Phototherapy Unit';
     } else if (profile === 'management') {
-      permissions = MANAGEMENT_PERMISSIONS;
-      name = 'Admin Ramesh Mehta';
       department = 'Operations & Facilities';
-    } else if (profile === 'all') {
-      permissions = ALL_HOSPITAL_PERMISSIONS;
     }
 
     const updatedUser: User = {

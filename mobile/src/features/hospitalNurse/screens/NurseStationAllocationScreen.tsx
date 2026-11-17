@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PTStation, Admission } from '../../../types';
@@ -71,6 +72,8 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
         return { label: 'MAINTENANCE', bg: '#F1F5F9', text: '#64748B' };
     }
   };
+
+  const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>

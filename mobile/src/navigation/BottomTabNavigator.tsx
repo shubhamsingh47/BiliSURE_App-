@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Home,
   Share2,
@@ -30,7 +31,8 @@ export type TabName =
   | 'fleet'
   | 'capacity'
   | 'grid'
-  | 'nomogram_stats';
+  | 'nomogram_stats'
+  | 'tracking';
 
 interface BottomTabBarProps {
   activeTab: TabName;
@@ -44,6 +46,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   onFabPress,
 }) => {
   const { primaryRole } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   const renderRoleTabs = () => {
     switch (primaryRole) {
@@ -92,47 +95,66 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           </>
         );
 
-      // 2. Receiving Hospital
-      // Tabs: Home | Incoming Referrals | Patients | PT Stations | Profile
-      case 'receiving_hospital':
+      // 2. Hospital (Receiving)
+      // 5 Options from all three roles: Arrivals & Admissions | Incoming Referrals | Phototherapy Tracking | PT Station Allocation | Profile
+      case 'receiving_hospital': {
+        const isArrivalsActive = activeTab === 'home' || activeTab === 'arrivals';
+        const isTrackingActive = activeTab === 'tracking' || activeTab === 'admitted';
+
         return (
           <>
             <TouchableOpacity onPress={() => onTabPress('home')} style={styles.tabItem}>
-              <Home size={22} color={activeTab === 'home' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-                Home
+              <Bed size={20} color={isArrivalsActive ? '#7D3BFF' : '#94A3B8'} />
+              <Text
+                style={[styles.tabLabel, isArrivalsActive && styles.tabLabelActive, styles.hospitalTabLabel]}
+                numberOfLines={2}
+              >
+                Arrivals & Admissions
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => onTabPress('inbox')} style={styles.tabItem}>
-              <Inbox size={22} color={activeTab === 'inbox' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'inbox' && styles.tabLabelActive]}>
-                Referrals
+              <Inbox size={20} color={activeTab === 'inbox' ? '#7D3BFF' : '#94A3B8'} />
+              <Text
+                style={[styles.tabLabel, activeTab === 'inbox' && styles.tabLabelActive, styles.hospitalTabLabel]}
+                numberOfLines={2}
+              >
+                Incoming Referrals
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => onTabPress('admitted')} style={styles.tabItem}>
-              <Bed size={22} color={activeTab === 'admitted' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'admitted' && styles.tabLabelActive]}>
-                Patients
+            <TouchableOpacity onPress={() => onTabPress('tracking')} style={styles.tabItem}>
+              <Activity size={20} color={isTrackingActive ? '#7D3BFF' : '#94A3B8'} />
+              <Text
+                style={[styles.tabLabel, isTrackingActive && styles.tabLabelActive, styles.hospitalTabLabel]}
+                numberOfLines={2}
+              >
+                Phototherapy Tracking
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => onTabPress('allocation')} style={styles.tabItem}>
-              <Hospital size={22} color={activeTab === 'allocation' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'allocation' && styles.tabLabelActive]}>
-                PT Stations
+              <Hospital size={20} color={activeTab === 'allocation' ? '#7D3BFF' : '#94A3B8'} />
+              <Text
+                style={[styles.tabLabel, activeTab === 'allocation' && styles.tabLabelActive, styles.hospitalTabLabel]}
+                numberOfLines={2}
+              >
+                PT Station Allocation
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => onTabPress('profile')} style={styles.tabItem}>
-              <User size={22} color={activeTab === 'profile' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>
+              <User size={20} color={activeTab === 'profile' ? '#7D3BFF' : '#94A3B8'} />
+              <Text
+                style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive, styles.hospitalTabLabel]}
+                numberOfLines={1}
+              >
                 Profile
               </Text>
             </TouchableOpacity>
           </>
         );
+      }
 
       // 3. District Administrator
       // Tabs: Overview | Hospitals | Referrals | Reports | Profile
@@ -179,7 +201,19 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
     }
   };
 
-  return <View style={styles.tabBarContainer}>{renderRoleTabs()}</View>;
+  return (
+    <View
+      style={[
+        styles.tabBarContainer,
+        {
+          height: 65 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 6,
+        },
+      ]}
+    >
+      {renderRoleTabs()}
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
@@ -217,6 +251,12 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: '#7D3BFF',
     fontWeight: '700',
+  },
+  hospitalTabLabel: {
+    fontSize: 9,
+    textAlign: 'center',
+    lineHeight: 11,
+    paddingHorizontal: 1,
   },
   fabWrapper: {
     width: 64,

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, TextInput } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Hospital } from '../../../types';
@@ -22,10 +23,12 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
     (h) => h.type === 'receiving_hospital' && h.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const insets = useSafeAreaInsets();
+
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={styles.headerTop}>
           {onBack && (
             <TouchableOpacity onPress={onBack} style={styles.backBtn}>

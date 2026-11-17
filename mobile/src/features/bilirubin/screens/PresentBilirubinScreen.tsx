@@ -4,10 +4,10 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
 import { ArrowLeft, ChevronDown } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
@@ -34,6 +34,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
   const [showHistory, setShowHistory] = useState(false);
   const [showNomogram, setShowNomogram] = useState(true);
   const { readings, selectedBaby } = usePatientStore();
+  const insets = useSafeAreaInsets();
 
   const formattedDate = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString();
 
@@ -48,7 +49,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      <SafeAreaView style={styles.topSafeArea}>
+      <View style={[styles.topSafeArea, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />
@@ -82,7 +83,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
           </View>
           <Text style={styles.readingSite}>Site: {measurementSite}</Text>
         </View>
-      </SafeAreaView>
+      </View>
 
       {/* Bottom Sheet Card */}
       <View style={styles.bottomCard}>
