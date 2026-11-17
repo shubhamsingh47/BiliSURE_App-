@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, useWindowDimensions } from 'react-native';
 import Svg, { Path, Line, Circle, Rect, Text as SvgText, G } from 'react-native-svg';
-import { BHUTANI_NOMOGRAM_DATA, mgDlToUmolL, getPercentilesAtHour } from '../services/bhutani.service';
+import { BHUTANI_NOMOGRAM_DATA } from '../services/bhutani.service';
 import { BilirubinReading } from '../types';
 import { COLORS } from '../theme/colors';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
 
 interface BhutaniNomogramChartProps {
   readings?: BilirubinReading[];
@@ -24,12 +22,29 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
   compact = false,
   onSelectReading,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
+  const sortedReadings = [...readings].sort(
+    (a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0)
+  );
+
   const [selectedPoint, setSelectedPoint] = useState<BilirubinReading | null>(
-    activeReading || (readings.length > 0 ? readings[0] : null)
+    activeReading || (sortedReadings.length > 0 ? sortedReadings[sortedReadings.length - 1] : null)
   );
   const [isExpanded, setIsExpanded] = useState<boolean>(!compact);
 
-  const chartWidth = Math.min(SCREEN_WIDTH - 40, 360);
+  // Keep selectedPoint in sync with incoming readings
+  useEffect(() => {
+    if (sortedReadings.length > 0) {
+      setSelectedPoint((prev) => {
+        if (!prev) return sortedReadings[sortedReadings.length - 1];
+        const match = sortedReadings.find((r) => r.id === prev.id);
+        return match || sortedReadings[sortedReadings.length - 1];
+      });
+    }
+  }, [readings.length]);
+
+  // Dynamically scale chart width across any phone/tablet/orientation
+  const chartWidth = Math.max(280, Math.min(windowWidth - 48, 560));
   const chartHeight = compact ? 180 : isExpanded ? height : 140;
 
   const paddingLeft = 36;
@@ -88,13 +103,24 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
   const p75Path = buildCurvePath('p75');
   const p40Path = buildCurvePath('p40');
 
-  // Trajectory path for serial readings
-  const sortedReadings = [...readings].sort((a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0));
+  // Trajectory path for serial readings across advancing hours
+  // Deduplicate points with identical postnatal hours to prevent vertical zig-zag spikes
+  const trajectoryPoints: BilirubinReading[] = [];
+  sortedReadings.forEach((r) => {
+    const last = trajectoryPoints[trajectoryPoints.length - 1];
+    if (last && Math.abs((r.postnatalAgeHours || 0) - (last.postnatalAgeHours || 0)) < 0.25) {
+      // If at same hour, track latest reading at that time anchor
+      trajectoryPoints[trajectoryPoints.length - 1] = r;
+    } else {
+      trajectoryPoints.push(r);
+    }
+  });
+
   let trajectoryPath = '';
-  if (sortedReadings.length > 1) {
-    trajectoryPath = `M ${scaleX(sortedReadings[0].postnatalAgeHours || 0)} ${scaleY(sortedReadings[0].value || 0)}`;
-    for (let i = 1; i < sortedReadings.length; i++) {
-      trajectoryPath += ` L ${scaleX(sortedReadings[i].postnatalAgeHours || 0)} ${scaleY(sortedReadings[i].value || 0)}`;
+  if (trajectoryPoints.length > 1) {
+    trajectoryPath = `M ${scaleX(trajectoryPoints[0].postnatalAgeHours || 0)} ${scaleY(trajectoryPoints[0].value || 0)}`;
+    for (let i = 1; i < trajectoryPoints.length; i++) {
+      trajectoryPath += ` L ${scaleX(trajectoryPoints[i].postnatalAgeHours || 0)} ${scaleY(trajectoryPoints[i].value || 0)}`;
     }
   }
 
@@ -128,11 +154,11 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
       {/* Main SVG Chart Area */}
       <View style={styles.svgWrapper}>
         <Svg width={chartWidth} height={chartHeight}>
-          {/* Background Risk Zone Shading */}
-          <Path d={buildZonePath('p95', 'top')} fill="#FFF1F2" opacity={0.8} />
-          <Path d={buildZonePath('p75', 'p95')} fill="#FFFBEB" opacity={0.85} />
-          <Path d={buildZonePath('p40', 'p75')} fill="#FEFCE8" opacity={0.85} />
-          <Path d={buildZonePath('zero', 'p40')} fill="#F0FDF4" opacity={0.9} />
+          {/* Background Risk Zone Shading with distinct clinical tints */}
+          <Path d={buildZonePath('p95', 'top')} fill="#FEE2E2" opacity={0.85} />
+          <Path d={buildZonePath('p75', 'p95')} fill="#FFEDD5" opacity={0.85} />
+          <Path d={buildZonePath('p40', 'p75')} fill="#FEF9C3" opacity={0.85} />
+          <Path d={buildZonePath('zero', 'p40')} fill="#DCFCE7" opacity={0.85} />
 
           {/* Grid lines: X-axis (Hours: 24, 48, 72, 96, 120, 144) */}
           {[24, 48, 72, 96, 120, 144].map((h) => (
@@ -142,13 +168,13 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
               y1={paddingTop}
               x2={scaleX(h)}
               y2={paddingTop + plotHeight}
-              stroke="#E2E8F0"
+              stroke="#CBD5E1"
               strokeDasharray="2,2"
-              strokeWidth={1}
+              strokeWidth={0.8}
             />
           ))}
 
-          {/* Grid lines: Y-axis (mg/dL: 5, 10, 15) */}
+          {/* Grid lines: Y-axis (mg/dL: 5, 10, 15, 20) */}
           {[5, 10, 15, 20].map((v) => (
             <Line
               key={`grid-y-${v}`}
@@ -156,35 +182,35 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
               y1={scaleY(v)}
               x2={paddingLeft + plotWidth}
               y2={scaleY(v)}
-              stroke="#E2E8F0"
+              stroke="#CBD5E1"
               strokeDasharray="2,2"
-              strokeWidth={1}
+              strokeWidth={0.8}
             />
           ))}
 
           {/* Percentile Curves */}
-          <Path d={p95Path} stroke="#FC3949" strokeWidth={2} fill="none" strokeDasharray="4,2" />
-          <Path d={p75Path} stroke="#F59E0B" strokeWidth={2} fill="none" />
-          <Path d={p40Path} stroke="#00A569" strokeWidth={2} fill="none" />
+          <Path d={p95Path} stroke="#E11D48" strokeWidth={1.8} fill="none" strokeDasharray="4,2" />
+          <Path d={p75Path} stroke="#D97706" strokeWidth={1.8} fill="none" />
+          <Path d={p40Path} stroke="#059669" strokeWidth={1.8} fill="none" />
 
           {/* Percentile Curve End Labels */}
           {isExpanded && (
             <G>
-              <SvgText x={scaleX(138)} y={scaleY(18.6) - 4} fontSize={9} fill="#FC3949" fontWeight="bold">
+              <SvgText x={scaleX(138)} y={scaleY(18.6) - 4} fontSize={9} fill="#E11D48" fontWeight="bold">
                 95th
               </SvgText>
-              <SvgText x={scaleX(138)} y={scaleY(16.5) - 4} fontSize={9} fill="#F59E0B" fontWeight="bold">
+              <SvgText x={scaleX(138)} y={scaleY(16.5) - 4} fontSize={9} fill="#D97706" fontWeight="bold">
                 75th
               </SvgText>
-              <SvgText x={scaleX(138)} y={scaleY(13.6) - 4} fontSize={9} fill="#00A569" fontWeight="bold">
+              <SvgText x={scaleX(138)} y={scaleY(13.6) - 4} fontSize={9} fill="#059669" fontWeight="bold">
                 40th
               </SvgText>
             </G>
           )}
 
-          {/* Trajectory line for multiple readings */}
+          {/* Trajectory line for multiple readings - clean, sleek 1.5px stroke */}
           {trajectoryPath.length > 0 && (
-            <Path d={trajectoryPath} stroke="#7D3BFF" strokeWidth={2.5} fill="none" />
+            <Path d={trajectoryPath} stroke="#7D3BFF" strokeWidth={1.5} opacity={0.85} fill="none" />
           )}
 
           {/* Plotted Patient Readings */}
@@ -195,42 +221,51 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
             const isLatest = idx === sortedReadings.length - 1;
 
             return (
-              <G key={`point-${reading.id || idx}`}>
-                {/* Glow ring around latest / selected reading */}
+              <G
+                key={`point-${reading.id || idx}`}
+                onPress={() => {
+                  setSelectedPoint(reading);
+                  onSelectReading?.(reading);
+                }}
+              >
+                {/* Invisible touch target for mobile fingertips */}
+                <Circle cx={cx} cy={cy} r={14} fill="transparent" />
+
+                {/* Subtle glow ring around latest / selected reading */}
                 {(isSelected || isLatest) && (
-                  <Circle cx={cx} cy={cy} r={10} fill="#7D3BFF" opacity={0.25} />
+                  <Circle cx={cx} cy={cy} r={9} fill="#7D3BFF" opacity={0.2} />
                 )}
 
                 {/* Differentiated symbols: Pre (circle), During (diamond/rect), Post (square) */}
                 {reading.phototherapyPhase === 'during_phototherapy' ? (
                   <Rect
-                    x={cx - 5}
-                    y={cy - 5}
-                    width={10}
-                    height={10}
+                    x={cx - 4}
+                    y={cy - 4}
+                    width={8}
+                    height={8}
                     fill="#3B82F6"
                     stroke="#FFFFFF"
-                    strokeWidth={1.5}
+                    strokeWidth={1.2}
                     transform={`rotate(45, ${cx}, ${cy})`}
                   />
                 ) : reading.phototherapyPhase === 'post_phototherapy' ? (
                   <Rect
-                    x={cx - 5}
-                    y={cy - 5}
-                    width={10}
-                    height={10}
+                    x={cx - 4}
+                    y={cy - 4}
+                    width={8}
+                    height={8}
                     fill="#10B981"
                     stroke="#FFFFFF"
-                    strokeWidth={1.5}
+                    strokeWidth={1.2}
                   />
                 ) : (
                   <Circle
                     cx={cx}
                     cy={cy}
-                    r={6}
-                    fill="#7D3BFF"
+                    r={4.5}
+                    fill={isSelected ? '#7D3BFF' : '#5B21B6'}
                     stroke="#FFFFFF"
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                   />
                 )}
               </G>
@@ -294,11 +329,11 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
       {/* Zone Legend */}
       <View style={styles.legendRow}>
         <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#FC3949' }]} />
+          <View style={[styles.legendColor, { backgroundColor: '#E11D48' }]} />
           <Text style={styles.legendText}>High Risk (&gt;95th)</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#F59E0B' }]} />
+          <View style={[styles.legendColor, { backgroundColor: '#D97706' }]} />
           <Text style={styles.legendText}>High-Int (75-95th)</Text>
         </View>
         <View style={styles.legendItem}>
@@ -306,76 +341,10 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
           <Text style={styles.legendText}>Low-Int (40-75th)</Text>
         </View>
         <View style={styles.legendItem}>
-          <View style={[styles.legendColor, { backgroundColor: '#00A569' }]} />
+          <View style={[styles.legendColor, { backgroundColor: '#059669' }]} />
           <Text style={styles.legendText}>Low (&lt;40th)</Text>
         </View>
       </View>
-
-      {/* Interactive Detail Callout Panel */}
-      {selectedPoint && (
-        <View style={styles.detailCard}>
-          <View style={styles.detailHeader}>
-            <View style={styles.readingPill}>
-              <Text style={styles.readingVal}>{selectedPoint.value} {selectedPoint.unit || 'mg/dL'}</Text>
-              <Text style={styles.readingUmol}>({mgDlToUmolL(selectedPoint.value)} µmol/L)</Text>
-            </View>
-            <View
-              style={[
-                styles.zoneBadge,
-                selectedPoint.bhutaniZone === 'high'
-                  ? { backgroundColor: '#FFF1F2', borderColor: '#FC3949' }
-                  : selectedPoint.bhutaniZone === 'high_intermediate'
-                  ? { backgroundColor: '#FFFBEB', borderColor: '#F59E0B' }
-                  : selectedPoint.bhutaniZone === 'low_intermediate'
-                  ? { backgroundColor: '#FEFCE8', borderColor: '#84CC16' }
-                  : { backgroundColor: '#F0FDF4', borderColor: '#00A569' },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.zoneBadgeText,
-                  selectedPoint.bhutaniZone === 'high'
-                    ? { color: '#FC3949' }
-                    : selectedPoint.bhutaniZone === 'high_intermediate'
-                    ? { color: '#D97706' }
-                    : selectedPoint.bhutaniZone === 'low_intermediate'
-                    ? { color: '#65A30D' }
-                    : { color: '#00A569' },
-                ]}
-              >
-                {selectedPoint.bhutaniZone === 'high'
-                  ? 'HIGH RISK ZONE'
-                  : selectedPoint.bhutaniZone === 'high_intermediate'
-                  ? 'HIGH-INTERMEDIATE RISK'
-                  : selectedPoint.bhutaniZone === 'low_intermediate'
-                  ? 'LOW-INTERMEDIATE RISK'
-                  : 'LOW RISK ZONE'}
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.detailGrid}>
-            <View style={styles.detailCol}>
-              <Text style={styles.detailLabel}>Postnatal Age</Text>
-              <Text style={styles.detailValue}>{selectedPoint.postnatalAgeHours} Hours</Text>
-            </View>
-            <View style={styles.detailCol}>
-              <Text style={styles.detailLabel}>Test Method</Text>
-              <Text style={styles.detailValue}>{selectedPoint.method || 'TSB (Serum Lab)'}</Text>
-            </View>
-            <View style={styles.detailCol}>
-              <Text style={styles.detailLabel}>Phase</Text>
-              <Text style={styles.detailValue}>
-                {selectedPoint.phototherapyPhase === 'during_phototherapy'
-                  ? 'During PT'
-                  : selectedPoint.phototherapyPhase === 'post_phototherapy'
-                  ? 'Post PT'
-                  : 'Pre-PT'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      )}
 
       {/* Mandatory Clinical Disclaimer */}
       <Text style={styles.disclaimerText}>
@@ -479,61 +448,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#64748B',
     fontWeight: '500',
-  },
-  detailCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    marginTop: 10,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  readingPill: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  readingVal: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#181829',
-  },
-  readingUmol: {
-    fontSize: 11,
-    color: '#64748B',
-    marginLeft: 4,
-  },
-  zoneBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-  },
-  zoneBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  detailGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  detailCol: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: 10,
-    color: '#94A3B8',
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#181829',
   },
   disclaimerText: {
     fontSize: 9,

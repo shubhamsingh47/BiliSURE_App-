@@ -14,11 +14,14 @@ import {
 } from 'react-native';
 import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
-import { ChartCard, GraphReading } from '../../../components/ChartCard';
+import { ChartCard } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
+import { calculatePostnatalAgeHours, binPostnatalAge12h, evaluateBhutaniRisk } from '../../../services/bhutani.service';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { Baby, ClinicalObservation } from '../../../types';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Baby, ClinicalObservation, BilirubinReading } from '../../../types';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 const OBS_SITES = ['Forehead', 'Sternum'];
 
@@ -35,6 +38,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   onSeeAllObservations,
   onOpenReferral,
 }) => {
+  const insets = useSafeAreaInsets();
   const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
   const { user } = useAuthStore();
   const activeBaby: Baby = selectedBaby || babies[0];
@@ -100,58 +104,92 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const babyObservations = observations
     .filter((o) => o.babyId === activeBaby.id)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  const babyReadings = readings
-    .filter((r) => r.babyId === activeBaby.id)
-    .sort((a, b) => new Date(b.sampleTimestamp || b.timestamp).getTime() - new Date(a.sampleTimestamp || a.timestamp).getTime());
-
-  const initialObs = babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
-  const initialRdg = babyReadings.length > 0 ? babyReadings[babyReadings.length - 1].value : null;
-  const initialVal: number | null = initialObs ?? initialRdg ?? activeBaby.initialValue ?? null;
-
+  const initialVal: number | null =
+    babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
   const isDischarged = activeBaby.status === 'discharged';
   const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
 
   const handleDischarge = async () => {
-    const lastObs = babyObservations.length > 0 ? babyObservations[0].bilirubinValue : null;
-    const lastRdg = babyReadings.length > 0 ? babyReadings[0].value : null;
-    const lastVal = lastObs ?? lastRdg;
-
-    if (lastVal === null) {
-      Alert.alert('No readings', 'Add an observation or reading before discharging.');
+    if (babyObservations.length === 0) {
+      Alert.alert('No readings', 'Add an observation before discharging.');
       return;
     }
+    const lastVal = babyObservations[0].bilirubinValue;
     await updateBaby(activeBaby.id, {
       status: 'discharged',
       dischargeValue: lastVal,
     });
-    Alert.alert(
-      'Discharged',
-      `${activeBaby.parentsName || activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`
-    );
+    Alert.alert('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
   };
 
   const recentObservations = babyObservations.slice(0, 4);
+  // Chart points oldest -> newest
+  const chartPoints = [...babyObservations].reverse().map((o) => o.bilirubinValue);
 
-  // Unified list of actual readings for data-driven graph (oldest -> newest)
-  const graphReadings: GraphReading[] = [
-    ...babyObservations.map((o) => ({
-      id: o.id,
-      value: o.bilirubinValue,
-      timestamp: o.timestamp,
-      site: o.site,
-    })),
-    ...babyReadings
-      .filter((r) => !babyObservations.some((o) => o.id === r.id))
-      .map((r) => ({
-        id: r.id,
-        value: r.value,
-        timestamp: r.sampleTimestamp || r.timestamp,
-        site: r.measurementSite,
-      })),
-  ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  // Merge baby readings and observations dynamically so Bhutani Nomogram plots every single observation
+  const combinedBhutaniReadings: BilirubinReading[] = React.useMemo(() => {
+    const babyReadings = readings.filter((r) => r.babyId === activeBaby.id);
+    const existingIds = new Set(babyReadings.map((r) => r.id));
 
-  // Chart points oldest -> newest (for backwards compatibility fallback)
-  const chartPoints = graphReadings.map((g) => g.value);
+    const obsAsReadings: BilirubinReading[] = babyObservations
+      .filter((o) => !existingIds.has(o.id))
+      .map((o) => {
+        const rawAge = calculatePostnatalAgeHours(
+          activeBaby.dateOfBirth,
+          activeBaby.exactTimeOfBirth || '08:00',
+          o.timestamp
+        );
+        const binnedAge = binPostnatalAge12h(rawAge);
+        const evalRisk = evaluateBhutaniRisk({
+          dateOfBirth: activeBaby.dateOfBirth,
+          exactTimeOfBirth: activeBaby.exactTimeOfBirth,
+          sampleTimestamp: o.timestamp,
+          value: o.bilirubinValue,
+          unit: 'mg/dL',
+          method: o.site === 'Forehead' || o.site === 'Sternum' ? 'TcB' : 'TSB',
+          gestationalAgeWeeks: activeBaby.gestationalAgeWeeks || 38,
+        });
+
+        return {
+          id: o.id,
+          clientOperationId: o.clientOperationId || ('op_' + o.id),
+          babyId: activeBaby.id,
+          babyUhid: activeBaby.uhid,
+          value: o.bilirubinValue,
+          unit: 'mg/dL',
+          method: o.site === 'Forehead' || o.site === 'Sternum' ? 'TcB' : 'TSB',
+          sampleTimestamp: o.timestamp,
+          postnatalAgeHours: binnedAge,
+          bhutaniZone: evalRisk.zone,
+          bhutaniPercentileApprox: evalRisk.percentileApprox,
+          phototherapyPhase:
+            activeBaby.status === 'under_treatment'
+              ? 'during_phototherapy'
+              : 'pre_phototherapy',
+          measurementSite: o.site,
+          source: 'manual_entry',
+          operatorName: o.observerName,
+          riskLevel:
+            evalRisk.zone === 'high'
+              ? 'high'
+              : evalRisk.zone.includes('intermediate')
+              ? 'intermediate'
+              : 'low',
+          timestamp: o.timestamp,
+        };
+      });
+
+    // Ensure direct baby readings are also binned into standard 12-hour slots for the nomogram
+    const binnedBabyReadings = babyReadings.map((r) => ({
+      ...r,
+      postnatalAgeHours: binPostnatalAge12h(r.postnatalAgeHours || 12),
+    }));
+
+    const all = [...binnedBabyReadings, ...obsAsReadings];
+    return all.sort(
+      (a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0)
+    );
+  }, [readings, babyObservations, activeBaby]);
 
   const handleOpenAddObs = () => {
     setEditingObs(null);
@@ -191,18 +229,28 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       setObsError('Enter a value between 0 and 30');
       return;
     }
+
     if (editingObs) {
-      updateObservation(editingObs.id, { bilirubinValue: num, site: obsSite });
+      updateObservation(editingObs.id, {
+        bilirubinValue: num,
+        site: obsSite,
+      });
     } else {
-      addObservation(activeBaby.id, obsSite, num, user?.name || 'Nurse A');
+      addObservation(
+        activeBaby.id,
+        obsSite,
+        num,
+        user?.name || 'Nurse A',
+        new Date().toISOString()
+      );
     }
     setShowObsModal(false);
   };
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: Math.max(insets.top, 12) }]}>
       <ScrollView
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="always"
       >
@@ -476,11 +524,10 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           )}
         </View>
 
-        {/* Bilirubin Readings Data-Driven Graph - straight lines connecting actual readings */}
+        {/* Bilirubin Readings Spline Chart - driven by observation data */}
         <ChartCard
           initialValue={initialVal ?? undefined}
           dischargeValue={dischargeVal ?? undefined}
-          readings={graphReadings}
           points={chartPoints}
         />
 
@@ -498,7 +545,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section (last) */}
         <View style={styles.nomogramSection}>
           <BhutaniNomogramChart
-            readings={babyReadings as any}
+            readings={combinedBhutaniReadings}
             gestationalAgeWeeks={activeBaby.gestationalAgeWeeks || 38}
             compact={false}
             height={260}
@@ -599,19 +646,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   container: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.sm,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: SPACING.md,
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: '#FFFFFF',
@@ -622,30 +669,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EDE9FE',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 24,
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(20),
   },
   babyDropdownText: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
     color: '#181829',
-    marginLeft: 6,
+    marginLeft: moderateScale(6),
   },
   presentStateContainer: {
     backgroundColor: '#FDF4E5',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: moderateScale(16),
+    marginBottom: SPACING.md,
   },
   presentStateLabel: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     color: '#D97706',
     fontWeight: '600',
   },
   presentStateVal: {
-    fontSize: 28,
+    fontSize: fontScale(26),
     fontWeight: '800',
     color: '#B45309',
     marginTop: 2,
@@ -653,78 +700,78 @@ const styles = StyleSheet.create({
   statCardsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
   },
   statCard: {
     flex: 1,
-    height: 72,
-    borderRadius: 16,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    minHeight: moderateScale(68),
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(10),
     justifyContent: 'space-between',
-    marginHorizontal: 4,
   },
   statCardLabel: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: fontScale(11),
     fontWeight: '600',
     opacity: 0.9,
   },
   statCardValue: {
     color: '#FFFFFF',
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '800',
   },
   dischargeBtn: {
     backgroundColor: '#FC3949',
-    borderRadius: 16,
-    height: 50,
+    borderRadius: moderateScale(14),
+    minHeight: moderateScale(48),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 16,
+    marginTop: SPACING.lg,
   },
   dischargeBtnText: {
     color: '#FFFFFF',
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
   },
   obsHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: moderateScale(8),
   },
   addObsPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#7D3BFF',
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: 16,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(14),
     gap: 4,
   },
   addObsText: {
     color: '#FFFFFF',
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '700',
   },
   obsTable: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 18,
+    borderRadius: moderateScale(16),
     borderWidth: 1,
     borderColor: '#F1F5F9',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
     marginBottom: 4,
   },
   obsTableHead: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: moderateScale(8),
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
   },
   obsHeadText: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#94A3B8',
     textTransform: 'uppercase',
@@ -732,12 +779,12 @@ const styles = StyleSheet.create({
   obsRowItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: moderateScale(10),
     borderBottomWidth: 1,
     borderBottomColor: '#F8FAFC',
   },
   obsCell: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '600',
     color: '#0F172A',
   },
@@ -746,25 +793,25 @@ const styles = StyleSheet.create({
     color: '#7D3BFF',
   },
   obsCellTime: {
-    fontSize: 12,
+    fontSize: fontScale(11),
     color: '#64748B',
   },
   obsEditBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: moderateScale(14),
     backgroundColor: '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   obsEmptyText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     color: '#94A3B8',
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: moderateScale(16),
   },
   obsErrorText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#FC3949',
     marginTop: 4,
     fontWeight: '600',
@@ -772,45 +819,45 @@ const styles = StyleSheet.create({
   radioRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: moderateScale(8),
   },
   radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(10),
     borderWidth: 2,
     borderColor: '#CBD5E1',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: moderateScale(10),
   },
   radioOuterActive: {
     borderColor: '#7D3BFF',
   },
   radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: moderateScale(10),
+    height: moderateScale(10),
+    borderRadius: moderateScale(5),
     backgroundColor: '#7D3BFF',
   },
   radioLabel: {
-    fontSize: 14,
+    fontSize: fontScale(13),
     color: '#0F172A',
     fontWeight: '600',
   },
   nomogramSection: {
-    marginVertical: 10,
+    marginVertical: SPACING.sm,
   },
   referralCalloutBtn: {
     backgroundColor: '#7D3BFF',
-    borderRadius: 16,
-    height: 50,
+    borderRadius: moderateScale(14),
+    minHeight: moderateScale(48),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   referralCalloutText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '800',
     color: '#FFFFFF',
   },
@@ -818,29 +865,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 10,
-    marginBottom: 12,
+    marginTop: SPACING.sm,
+    marginBottom: SPACING.sm,
   },
   obsSectionTitle: {
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '700',
     color: '#181829',
   },
   seeAllPill: {
     backgroundColor: '#EDE9FE',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(12),
   },
   seeAllText: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#7D3BFF',
   },
   obsCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 18,
+    borderRadius: moderateScale(20),
+    padding: moderateScale(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -853,12 +900,12 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   obsTitle: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
     color: '#181829',
   },
   obsSub: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     color: '#64748B',
     marginTop: 3,
   },
@@ -866,12 +913,12 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   obsReadingVal: {
-    fontSize: 17,
+    fontSize: fontScale(16),
     fontWeight: '800',
     color: '#181829',
   },
   obsTime: {
-    fontSize: 12,
+    fontSize: fontScale(11),
     color: '#94A3B8',
     marginTop: 2,
   },

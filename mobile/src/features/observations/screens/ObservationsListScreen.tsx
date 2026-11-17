@@ -18,6 +18,7 @@ import { CustomHeader } from '../../../components/CustomHeader';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { ClinicalObservation } from '../../../types';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 const OBS_SITES = ['Forehead', 'Sternum', 'Face', 'Palms and soles'];
 
@@ -123,7 +124,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
               style={styles.headerAddBtn}
               accessibilityLabel="Add Observation"
             >
-              <Plus size={16} color="#FFFFFF" />
+              <Plus size={moderateScale(15)} color="#FFFFFF" />
               <Text style={styles.headerAddBtnText}>Add</Text>
             </TouchableOpacity>
           ) : undefined
@@ -161,7 +162,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 accessibilityLabel="Edit Observation"
               >
-                <Edit3 size={13} color="#7D3BFF" />
+                <Edit3 size={moderateScale(13)} color="#7D3BFF" />
                 <Text style={styles.editBtnText}>Edit</Text>
               </TouchableOpacity>
             </View>
@@ -170,15 +171,15 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
 
             {/* 2. Primary Information: Date and Time */}
             <View style={styles.metaRow}>
-              <Calendar size={14} color="#7D3BFF" style={styles.metaIcon} />
+              <Calendar size={moderateScale(14)} color="#7D3BFF" style={styles.metaIcon} />
               <Text style={styles.dateTimeText}>
                 {formatObservationDateTime(item.timestamp)}
               </Text>
             </View>
 
             {/* 3. Primary Information: Taken By */}
-            <View style={[styles.metaRow, { marginTop: 6 }]}>
-              <User size={14} color="#64748B" style={styles.metaIcon} />
+            <View style={[styles.metaRow, { marginTop: moderateScale(6) }]}>
+              <User size={moderateScale(14)} color="#64748B" style={styles.metaIcon} />
               <Text style={styles.takenByText}>
                 {item.observerName
                   ? `Recorded by: ${item.observerName}`
@@ -220,7 +221,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
                   {isAddingNew ? 'Add Observation' : 'Edit Observation'}
                 </Text>
                 <TouchableOpacity onPress={handleCloseModal} style={styles.editCloseBtn}>
-                  <X size={20} color="#64748B" />
+                  <X size={moderateScale(20)} color="#64748B" />
                 </TouchableOpacity>
               </View>
 
@@ -235,7 +236,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
               />
               {!!obsError && <Text style={styles.obsErrorText}>{obsError}</Text>}
 
-              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Measurement Site</Text>
+              <Text style={[styles.inputLabel, { marginTop: moderateScale(14) }]}>Measurement Site</Text>
               {OBS_SITES.map((s) => {
                 const sel = obsSite === s;
                 return (
@@ -284,25 +285,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#7D3BFF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(14),
     gap: 4,
   },
   headerAddBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#FFFFFF',
   },
   list: {
-    padding: 16,
-    paddingBottom: 32,
+    padding: SPACING.md,
+    paddingBottom: SPACING.xl,
   },
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: moderateScale(18),
+    padding: moderateScale(16),
+    marginBottom: moderateScale(12),
     borderWidth: 1,
     borderColor: '#F1F5F9',
     shadowColor: '#000',
@@ -322,12 +323,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   valueNumber: {
-    fontSize: 22,
+    fontSize: fontScale(22),
     fontWeight: '800',
     color: '#0F172A',
   },
   valueUnit: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#7D3BFF',
   },
@@ -336,19 +337,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: '#F3E8FF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(5),
+    borderRadius: moderateScale(12),
   },
   editBtnText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#7D3BFF',
   },
   divider: {
     height: 1,
     backgroundColor: '#F1F5F9',
-    marginVertical: 10,
+    marginVertical: moderateScale(10),
   },
   metaRow: {
     flexDirection: 'row',
@@ -359,55 +360,55 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   dateTimeText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#1E293B',
   },
   takenByText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '500',
     color: '#64748B',
   },
   notesText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     color: '#475569',
     lineHeight: 18,
-    marginTop: 8,
+    marginTop: moderateScale(8),
     backgroundColor: '#F8FAFC',
-    padding: 8,
-    borderRadius: 8,
+    padding: moderateScale(8),
+    borderRadius: moderateScale(8),
   },
   siteRow: {
-    marginTop: 12,
+    marginTop: moderateScale(12),
     flexDirection: 'row',
   },
   siteChip: {
     backgroundColor: '#F1F5F9',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   siteChipText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '600',
     color: '#64748B',
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 48,
-    paddingHorizontal: 24,
+    paddingVertical: moderateScale(48),
+    paddingHorizontal: moderateScale(24),
   },
   emptyTitle: {
-    fontSize: 16,
+    fontSize: fontScale(16),
     fontWeight: '700',
     color: '#334155',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
   },
   emptySub: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     color: '#94A3B8',
     textAlign: 'center',
     lineHeight: 18,
@@ -420,10 +421,10 @@ const styles = StyleSheet.create({
   },
   editModalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
     maxHeight: '85%',
-    padding: 20,
+    padding: moderateScale(20),
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -431,11 +432,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    paddingBottom: 14,
-    marginBottom: 14,
+    paddingBottom: moderateScale(14),
+    marginBottom: moderateScale(14),
   },
   editModalTitle: {
-    fontSize: 17,
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#0F172A',
   },
@@ -443,7 +444,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#334155',
     marginBottom: 5,
@@ -453,14 +454,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    height: 44,
-    paddingHorizontal: 12,
-    fontSize: 14,
+    borderRadius: moderateScale(12),
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(12),
+    fontSize: fontScale(14),
     color: '#0F172A',
   },
   obsErrorText: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#FC3949',
     marginTop: 4,
     fontWeight: '600',
@@ -468,13 +469,13 @@ const styles = StyleSheet.create({
   radioRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: moderateScale(8),
     gap: 10,
   },
   radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(10),
     borderWidth: 2,
     borderColor: '#CBD5E1',
     alignItems: 'center',
@@ -484,45 +485,45 @@ const styles = StyleSheet.create({
     borderColor: '#7D3BFF',
   },
   radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: moderateScale(10),
+    height: moderateScale(10),
+    borderRadius: moderateScale(5),
     backgroundColor: '#7D3BFF',
   },
   radioLabel: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '600',
     color: '#334155',
   },
   modalBtnRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 20,
-    marginBottom: 8,
+    marginTop: moderateScale(20),
+    marginBottom: moderateScale(8),
   },
   cancelBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#64748B',
   },
   saveBtn: {
     flex: 1,
-    height: 44,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#FFFFFF',
   },

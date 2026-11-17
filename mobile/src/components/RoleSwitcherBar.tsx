@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Modal } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNetworkStore } from '../store/useNetworkStore';
+import { moderateScale, fontScale, SPACING } from '../theme/responsive';
 
 interface RoleSwitcherBarProps {
   onOpenNotifications?: () => void;
@@ -120,21 +121,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
     backgroundColor: '#FFFFFF',
   },
   identityLeft: {
     flex: 1,
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   userNameText: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '800',
     color: '#0F172A',
   },
   facilityText: {
-    fontSize: 12,
+    fontSize: fontScale(11),
     color: '#64748B',
     marginTop: 2,
   },
@@ -143,9 +144,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notifBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     backgroundColor: '#F8FAFC',
     justifyContent: 'center',
     alignItems: 'center',
@@ -154,23 +155,23 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   bellIcon: {
-    fontSize: 18,
+    fontSize: fontScale(17),
   },
   badgeDot: {
     position: 'absolute',
     top: -2,
     right: -2,
     backgroundColor: '#EF4444',
-    borderRadius: 8,
-    minWidth: 16,
-    height: 16,
+    borderRadius: moderateScale(8),
+    minWidth: moderateScale(16),
+    height: moderateScale(16),
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 3,
   },
   badgeDotText: {
     color: '#FFFFFF',
-    fontSize: 9,
+    fontSize: fontScale(9),
     fontWeight: '800',
   },
   modalOverlay: {

@@ -190,7 +190,128 @@ const INITIAL_STATIONS: PTStation[] = [
     lastCleanedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
     lastUpdated: new Date().toISOString(),
   },
+  // Mother & Child Apex Hospital (hosp_002) Stations
+  {
+    id: 'st_mcah_01',
+    stationId: 'PT-MCA-01',
+    hospitalId: 'hosp_002',
+    hospitalName: 'Mother & Child Apex Hospital',
+    name: 'Double Surface LED MCA-1',
+    type: 'double_surface',
+    location: 'NICU Pod 1',
+    operationalStatus: 'occupied',
+    currentBabyId: 'baby_apex_1',
+    currentBabyName: 'Baby Aarav',
+    currentBabyUhid: 'BS-IN-MCA-01',
+    lastCleanedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'st_mcah_02',
+    stationId: 'PT-MCA-02',
+    hospitalId: 'hosp_002',
+    hospitalName: 'Mother & Child Apex Hospital',
+    name: 'High-Intensity LED Tunnel MCA-2',
+    type: 'led_tunnel',
+    location: 'NICU Pod 2',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    lastCleanedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'st_mcah_03',
+    stationId: 'PT-MCA-03',
+    hospitalId: 'hosp_002',
+    hospitalName: 'Mother & Child Apex Hospital',
+    name: 'Overhead Blue LED MCA-3',
+    type: 'single_surface',
+    location: 'NICU Pod 3',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    lastCleanedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'st_mcah_04',
+    stationId: 'PT-MCA-04',
+    hospitalId: 'hosp_002',
+    hospitalName: 'Mother & Child Apex Hospital',
+    name: 'BiliBed Fiberoptic MCA-4',
+    type: 'fiberoptic_blanket',
+    location: 'NICU Pod 4',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    lastCleanedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  // St. Jude Neonatal Care Centre (hosp_003) Stations
+  {
+    id: 'st_sjnc_01',
+    stationId: 'PT-SJN-01',
+    hospitalId: 'hosp_003',
+    hospitalName: 'St. Jude Neonatal Care Centre',
+    name: 'Double Surface LED S1',
+    type: 'double_surface',
+    location: 'Care Unit 1',
+    operationalStatus: 'occupied',
+    currentBabyId: 'baby_jude_1',
+    currentBabyName: 'Baby Ananya',
+    currentBabyUhid: 'BS-IN-SJN-01',
+    lastCleanedAt: new Date(Date.now() - 3600000 * 30).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'st_sjnc_02',
+    stationId: 'PT-SJN-02',
+    hospitalId: 'hosp_003',
+    hospitalName: 'St. Jude Neonatal Care Centre',
+    name: 'Overhead Blue LED S2',
+    type: 'single_surface',
+    location: 'Care Unit 2',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    lastCleanedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
+  {
+    id: 'st_sjnc_03',
+    stationId: 'PT-SJN-03',
+    hospitalId: 'hosp_003',
+    hospitalName: 'St. Jude Neonatal Care Centre',
+    name: 'Fiberoptic Blanket S3',
+    type: 'fiberoptic_blanket',
+    location: 'Care Unit 3',
+    operationalStatus: 'maintenance',
+    currentBabyId: null,
+    notes: 'Scheduled optical irradiance calibration',
+    lastCleanedAt: new Date(Date.now() - 3600000 * 60).toISOString(),
+    lastUpdated: new Date().toISOString(),
+  },
 ];
+
+/**
+ * Derives true real-time hospital capacity metrics from physical station ground truth.
+ * Available = operational stations that are currently marked 'available'
+ */
+export const recalculateHospitalCapacity = (hospitals: Hospital[], stations: PTStation[]): Hospital[] => {
+  return hospitals.map((h) => {
+    const hospStations = stations.filter((s) => s.hospitalId === h.id || s.hospitalId === h._id);
+    if (hospStations.length === 0) return h;
+    const total = hospStations.length;
+    const operational = hospStations.filter((s) => s.operationalStatus !== 'maintenance' && s.operationalStatus !== 'out_of_service').length;
+    const occupied = hospStations.filter((s) => s.operationalStatus === 'occupied').length;
+    const available = hospStations.filter((s) => s.operationalStatus === 'available').length;
+    return {
+      ...h,
+      totalPTStations: total,
+      operationalPTStations: operational,
+      occupiedPTStations: occupied,
+      availablePTStations: available,
+      lastAvailabilityUpdated: new Date().toISOString(),
+    };
+  });
+};
 
 const INITIAL_REFERRALS: Referral[] = [
   {
@@ -311,7 +432,7 @@ const INITIAL_NOTIFICATIONS: InAppNotification[] = [
 ];
 
 export const useNetworkStore = create<NetworkState>((set, get) => ({
-  hospitals: INITIAL_HOSPITALS,
+  hospitals: recalculateHospitalCapacity(INITIAL_HOSPITALS, INITIAL_STATIONS),
   stations: INITIAL_STATIONS,
   referrals: INITIAL_REFERRALS,
   admissions: INITIAL_ADMISSIONS,
@@ -463,43 +584,65 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   },
 
   allocateStation: async (admissionId, stationId, nurseName) => {
-    const targetStation = get().stations.find((s) => s.id === stationId || s.stationId === stationId);
-    const admission = get().admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
+    const state = get();
+    const targetStation = state.stations.find((s) => s.id === stationId || s.stationId === stationId);
+    const admission = state.admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
 
-    // Update station to occupied
-    set((state) => ({
-      stations: state.stations.map((s) =>
-        s.id === stationId || s.stationId === stationId
-          ? {
-              ...s,
-              operationalStatus: 'occupied',
-              currentBabyId: admission?.babyId,
-              currentBabyName: admission?.babyName,
-              currentBabyUhid: admission?.babyUhid,
-              allocatedAt: new Date().toISOString(),
-            }
-          : s
-      ),
-      admissions: state.admissions.map((a) =>
-        a.id === admissionId || a.admissionId === admissionId
-          ? {
-              ...a,
-              ptStationId: stationId,
-              ptStationName: `${targetStation?.name || 'PT Station'} (${targetStation?.stationId || stationId})`,
-              admissionStatus: 'under_treatment',
-            }
-          : a
-      ),
-      hospitals: state.hospitals.map((h) =>
-        h.id === targetStation?.hospitalId
-          ? {
-              ...h,
-              occupiedPTStations: h.occupiedPTStations + 1,
-              availablePTStations: Math.max(0, h.availablePTStations - 1),
-            }
-          : h
-      ),
-    }));
+    if (!targetStation) {
+      throw new Error('Station not found');
+    }
+    if (!admission) {
+      throw new Error('Admission record not found');
+    }
+
+    if (targetStation.operationalStatus === 'occupied') {
+      throw new Error(`Station ${targetStation.stationId} is already occupied by ${targetStation.currentBabyName || 'another patient'}`);
+    }
+
+    // STRICT DEFENSE: One UHID patient once allotted to a station cannot get another!
+    const alreadyAllocated = state.stations.find(
+      (s) =>
+        s.operationalStatus === 'occupied' &&
+        ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
+         (admission.babyId && s.currentBabyId === admission.babyId))
+    );
+    if (alreadyAllocated) {
+      throw new Error(`Patient ${admission.babyName} (${admission.babyUhid}) is already allocated to station ${alreadyAllocated.stationId}`);
+    }
+
+    if (admission.ptStationId) {
+      throw new Error(`Admission ${admission.admissionId} already has an active PT station assigned.`);
+    }
+
+    const updatedStations = state.stations.map((s) =>
+      s.id === stationId || s.stationId === stationId
+        ? {
+            ...s,
+            operationalStatus: 'occupied' as const,
+            currentBabyId: admission.babyId,
+            currentBabyName: admission.babyName,
+            currentBabyUhid: admission.babyUhid,
+            allocatedAt: new Date().toISOString(),
+          }
+        : s
+    );
+
+    const updatedAdmissions = state.admissions.map((a) =>
+      a.id === admissionId || a.admissionId === admissionId
+        ? {
+            ...a,
+            ptStationId: stationId,
+            ptStationName: `${targetStation.name} (${targetStation.stationId})`,
+            admissionStatus: 'under_treatment' as const,
+          }
+        : a
+    );
+
+    set({
+      stations: updatedStations,
+      admissions: updatedAdmissions,
+      hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
+    });
 
     apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => {});
   },
@@ -562,12 +705,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   approveDischarge: async (admissionId, data) => {
     const admission = get().admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
 
-    set((state) => ({
-      admissions: state.admissions.map((a) =>
+    set((state) => {
+      const updatedAdmissions = state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
               ...a,
-              admissionStatus: 'discharged',
+              admissionStatus: 'discharged' as const,
               dischargeApprovedByDoctor: data.doctorName,
               dischargeApprovedAt: new Date().toISOString(),
               dischargeBilirubinValue: data.dischargeBilirubinValue,
@@ -577,29 +720,28 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               stationReleased: true,
             }
           : a
-      ),
+      );
+
       // Release station to cleaning_prep
-      stations: state.stations.map((s) =>
+      const updatedStations = state.stations.map((s) =>
         s.id === admission?.ptStationId || s.stationId === admission?.ptStationId
           ? {
               ...s,
-              operationalStatus: 'cleaning_prep',
+              operationalStatus: 'cleaning_prep' as const,
               currentBabyId: null,
               currentBabyName: null,
               currentBabyUhid: null,
               notes: `Freed upon discharge of ${admission?.babyName}. Ready for sanitization.`,
             }
           : s
-      ),
-      hospitals: state.hospitals.map((h) =>
-        h.id === admission?.hospitalId
-          ? {
-              ...h,
-              occupiedPTStations: Math.max(0, h.occupiedPTStations - 1),
-            }
-          : h
-      ),
-    }));
+      );
+
+      return {
+        admissions: updatedAdmissions,
+        stations: updatedStations,
+        hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
+      };
+    });
 
     apiClient.post(`/admissions/${admissionId}/discharge`, data).catch(() => {});
   },
@@ -620,21 +762,9 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         };
       });
 
-      // Recalculate capacity
-      const targetStation = state.stations.find((s) => s.id === stationId || s.stationId === stationId);
-      const hospitalId = targetStation?.hospitalId;
-      const hospitalStations = updatedStations.filter((s) => s.hospitalId === hospitalId);
-      const operational = hospitalStations.filter((s) => s.operationalStatus !== 'maintenance' && s.operationalStatus !== 'out_of_service').length;
-      const occupied = hospitalStations.filter((s) => s.operationalStatus === 'occupied').length;
-      const available = Math.max(0, operational - occupied);
-
       return {
         stations: updatedStations,
-        hospitals: state.hospitals.map((h) =>
-          h.id === hospitalId
-            ? { ...h, operationalPTStations: operational, occupiedPTStations: occupied, availablePTStations: available }
-            : h
-        ),
+        hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
       };
     });
 
@@ -655,19 +785,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       lastUpdated: new Date().toISOString(),
     };
 
-    set((state) => ({
-      stations: [...state.stations, newStation],
-      hospitals: state.hospitals.map((h) =>
-        h.id === stationData.hospitalId
-          ? {
-              ...h,
-              totalPTStations: h.totalPTStations + 1,
-              operationalPTStations: h.operationalPTStations + 1,
-              availablePTStations: h.availablePTStations + 1,
-            }
-          : h
-      ),
-    }));
+    set((state) => {
+      const updatedStations = [...state.stations, newStation];
+      return {
+        stations: updatedStations,
+        hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
+      };
+    });
 
     apiClient.post(`/hospitals/${stationData.hospitalId}/stations`, stationData).catch(() => {});
   },

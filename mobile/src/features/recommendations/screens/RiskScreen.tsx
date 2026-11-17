@@ -22,9 +22,6 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
 }) => {
   const { readings, selectedBaby } = usePatientStore();
   const insets = useSafeAreaInsets();
-  const babyReadings = selectedBaby
-    ? readings.filter((r) => r.babyId === selectedBaby.id || r.babyUhid === selectedBaby.uhid)
-    : readings;
 
   const getRiskColor = () => {
     const lower = riskLevel.toLowerCase();
@@ -52,7 +49,7 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
 
             {/* Embedded Bhutani Nomogram Curve */}
             <BhutaniNomogramChart
-              readings={babyReadings as any}
+              readings={readings as any}
               gestationalAgeWeeks={selectedBaby?.gestationalAgeWeeks || 38}
               compact={false}
               height={230}

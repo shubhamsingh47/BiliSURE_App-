@@ -11,6 +11,7 @@ exports.CONVERSION_FACTOR_MG_TO_UMOL = exports.BHUTANI_NOMOGRAM_DATA = void 0;
 exports.mgDlToUmolL = mgDlToUmolL;
 exports.umolLToMgDl = umolLToMgDl;
 exports.calculatePostnatalAgeHours = calculatePostnatalAgeHours;
+exports.binPostnatalAge12h = binPostnatalAge12h;
 exports.getPercentilesAtHour = getPercentilesAtHour;
 exports.evaluateBhutaniRisk = evaluateBhutaniRisk;
 // Clinically validated hour-specific reference values (mg/dL)
@@ -74,6 +75,23 @@ function calculatePostnatalAgeHours(dateOfBirth, exactTimeOfBirth, sampleTimesta
     const diffMs = sampleDate.getTime() - birthDate.getTime();
     const hours = diffMs / (1000 * 60 * 60);
     return Math.max(0, Math.round(hours * 10) / 10);
+}
+/**
+ * Automatically bins postnatal age in hours into standard 12-hour intervals for Bhutani Nomogram:
+ * 0 < hours <= 12  -> 12h
+ * 12 < hours <= 24 -> 24h
+ * 24 < hours <= 36 -> 36h
+ * 36 < hours <= 48 -> 48h
+ * 48 < hours <= 60 -> 60h
+ * 60 < hours <= 72 -> 72h
+ * 72 < hours <= 84 -> 84h
+ * 84 < hours <= 96 -> 96h
+ * etc.
+ */
+function binPostnatalAge12h(hours) {
+    if (hours <= 0)
+        return 12;
+    return Math.max(12, Math.ceil(hours / 12) * 12);
 }
 /**
  * Linearly interpolates percentile thresholds for any given hour.

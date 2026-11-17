@@ -14,6 +14,7 @@ import { PrimaryButton } from '../../../components/PrimaryButton';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { evaluateBhutaniRisk, mgDlToUmolL } from '../../../services/bhutani.service';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface PresentBilirubinScreenProps {
   onBack: () => void;
@@ -35,9 +36,6 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
   const [showNomogram, setShowNomogram] = useState(true);
   const { readings, selectedBaby } = usePatientStore();
   const insets = useSafeAreaInsets();
-  const babyReadings = selectedBaby
-    ? readings.filter((r) => r.babyId === selectedBaby.id || r.babyUhid === selectedBaby.uhid)
-    : readings;
 
   const formattedDate = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString();
 
@@ -90,7 +88,10 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
 
       {/* Bottom Sheet Card */}
       <View style={styles.bottomCard}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, 28) }}
+        >
           {/* Bhutani Curve Preview */}
           <TouchableOpacity
             onPress={() => setShowNomogram(!showNomogram)}
@@ -102,7 +103,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
 
           {showNomogram && (
             <BhutaniNomogramChart
-              readings={babyReadings as any}
+              readings={readings as any}
               gestationalAgeWeeks={selectedBaby?.gestationalAgeWeeks || 38}
               compact={false}
               height={220}
@@ -166,23 +167,24 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   header: {
-    height: 56,
+    minHeight: moderateScale(56),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.xs,
   },
   backBtn: {
     padding: 4,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: fontScale(18),
     fontWeight: '700',
     color: COLORS.white,
   },
   readingHero: {
-    paddingHorizontal: 24,
-    marginTop: 12,
+    paddingHorizontal: SPACING.lg,
+    marginTop: SPACING.sm,
   },
   heroTopRow: {
     flexDirection: 'row',
@@ -192,22 +194,22 @@ const styles = StyleSheet.create({
   },
   readingSource: {
     color: '#EDE9FE',
-    fontSize: 15,
+    fontSize: fontScale(14),
     fontWeight: '600',
   },
   zoneBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(8),
     borderWidth: 1,
   },
   zoneBadgeText: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '800',
   },
   readingTime: {
     color: '#DDD6FE',
-    fontSize: 12,
+    fontSize: fontScale(11),
     marginBottom: 4,
   },
   valRow: {
@@ -215,34 +217,34 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   readingNumber: {
-    fontSize: 48,
+    fontSize: fontScale(44),
     fontWeight: '900',
     color: COLORS.white,
     letterSpacing: -1,
   },
   readingUnit: {
-    fontSize: 18,
+    fontSize: fontScale(16),
     fontWeight: '700',
     color: '#DDD6FE',
     marginLeft: 6,
   },
   umolText: {
-    fontSize: 12,
+    fontSize: fontScale(11),
     color: '#EDE9FE',
     marginLeft: 8,
   },
   readingSite: {
     color: '#EDE9FE',
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '600',
     marginTop: 4,
   },
   bottomCard: {
     flex: 1,
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 36,
-    borderTopRightRadius: 36,
-    padding: 20,
+    borderTopLeftRadius: moderateScale(32),
+    borderTopRightRadius: moderateScale(32),
+    padding: SPACING.lg,
   },
   nomogramToggle: {
     flexDirection: 'row',

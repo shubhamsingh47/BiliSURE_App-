@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { Referral, ReferralStatus } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface ReferralTrackerScreenProps {
   onBack?: () => void;
@@ -77,7 +78,7 @@ export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
       <FlatList
         data={filteredReferrals}
         keyExtractor={(item) => item.id || item.referralId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No referrals in '{activeFilter}' state.</Text>
@@ -152,33 +153,33 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.md,
+    borderBottomLeftRadius: moderateScale(24),
+    borderBottomRightRadius: moderateScale(24),
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: SPACING.sm,
   },
   backBtn: {
     marginRight: 12,
     padding: 6,
   },
   backBtnText: {
-    fontSize: 22,
+    fontSize: fontScale(20),
     color: '#FFFFFF',
     fontWeight: '700',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: fontScale(20),
     fontWeight: '800',
     color: '#FFFFFF',
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
@@ -186,20 +187,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 14,
+    borderRadius: moderateScale(14),
     padding: 4,
   },
   filterPill: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 7,
-    borderRadius: 10,
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(10),
   },
   filterPillActive: {
     backgroundColor: '#FFFFFF',
   },
   filterText: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     fontWeight: '600',
     color: '#FFFFFF',
   },
@@ -208,14 +209,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   listContent: {
-    padding: 16,
+    padding: SPACING.lg,
     paddingBottom: 40,
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: moderateScale(20),
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -228,33 +229,33 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   idPill: {
     backgroundColor: '#F3E8FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
   },
   idText: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#7D3BFF',
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
   },
   statusBadgeText: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '700',
   },
   babyName: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
     color: '#181829',
-    marginBottom: 8,
+    marginBottom: SPACING.xs,
   },
   detailsBox: {
     backgroundColor: '#F8FAFC',

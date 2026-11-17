@@ -139,6 +139,16 @@ class AdmissionsService {
      */
     static async allocateStation(data) {
         const admission = await this.getById(data.admissionId);
+        if (!admission)
+            throw new errors_1.NotFoundError('Admission not found');
+        if (admission.ptStationId) {
+            throw new errors_1.BadRequestError(`Admission ${data.admissionId} already has an allocated station (${admission.ptStationName})`);
+        }
+        const hospitalStations = await hospitals_service_1.HospitalsService.getStations(String(admission.hospitalId));
+        const alreadyAllocated = hospitalStations.find((s) => s.operationalStatus === 'occupied' && s.currentBabyUhid === admission.babyUhid);
+        if (alreadyAllocated) {
+            throw new errors_1.BadRequestError(`Patient with UHID ${admission.babyUhid} is already allocated to station ${alreadyAllocated.stationId}`);
+        }
         // Update station status to occupied with baby info
         const station = await hospitals_service_1.HospitalsService.updateStationStatus(data.stationId, 'occupied', {
             babyId: String(admission.babyId),

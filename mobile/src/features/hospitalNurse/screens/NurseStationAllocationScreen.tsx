@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
@@ -16,18 +16,57 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   const { stations, admissions, allocateStation } = useNetworkStore();
   const { user } = useAuthStore();
 
-  // Find admitted babies awaiting station allocation
+  // Check if a baby (by UHID or ID) is already occupying an active station
+  const isBabyAlreadyAllocated = (babyUhid?: string, babyId?: string) => {
+    if (!babyUhid && !babyId) return false;
+    return stations.some(
+      (s) =>
+        s.operationalStatus === 'occupied' &&
+        ((babyUhid && s.currentBabyUhid === babyUhid) || (babyId && s.currentBabyId === babyId))
+    );
+  };
+
+  // Find admitted babies awaiting station allocation (excluding any baby already occupying a station)
   const pendingAdmissions = admissions.filter(
-    (a) => a.admissionStatus === 'admitted' && !a.ptStationId
+    (a) =>
+      a.admissionStatus === 'admitted' &&
+      !a.ptStationId &&
+      !isBabyAlreadyAllocated(a.babyUhid, a.babyId)
   );
-  const [selectedAdmission, setSelectedAdmission] = useState<Admission | null>(
-    pendingAdmissions[0] || null
+
+  const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(
+    pendingAdmissions[0]?.admissionId || pendingAdmissions[0]?.id || null
   );
+
+  // Sync selectedAdmissionId: if selected baby was allocated or no longer in pending, update immediately
+  useEffect(() => {
+    const isStillPending = pendingAdmissions.some(
+      (a) => (a.admissionId === selectedAdmissionId || a.id === selectedAdmissionId)
+    );
+    if (!isStillPending) {
+      setSelectedAdmissionId(pendingAdmissions[0]?.admissionId || pendingAdmissions[0]?.id || null);
+    }
+  }, [admissions, stations, pendingAdmissions.length, selectedAdmissionId]);
+
+  const selectedAdmission = pendingAdmissions.find(
+    (a) => a.admissionId === selectedAdmissionId || a.id === selectedAdmissionId
+  ) || null;
+
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAllocate = async (station: PTStation) => {
     if (!selectedAdmission) {
       Alert.alert('Select Patient', 'Please select an admitted patient above to allocate.');
+      return;
+    }
+
+    // STRICT CHECK: Ensure patient is not already allocated anywhere
+    if (isBabyAlreadyAllocated(selectedAdmission.babyUhid, selectedAdmission.babyId)) {
+      Alert.alert(
+        'Patient Already Allocated',
+        `Patient ${selectedAdmission.babyName} (${selectedAdmission.babyUhid}) is already assigned to an active phototherapy station. A patient cannot occupy more than one station.`
+      );
+      setSelectedAdmissionId(pendingAdmissions[0]?.admissionId || null);
       return;
     }
 
@@ -47,14 +86,23 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     }
 
     setIsProcessing(true);
+    const babyName = selectedAdmission.babyName;
+    const babyUhid = selectedAdmission.babyUhid;
     try {
       await allocateStation(selectedAdmission.id || selectedAdmission.admissionId, station.id || station.stationId, user.name);
+      
+      // Auto-select next unallocated patient if any
+      const nextPending = pendingAdmissions.filter(
+        (a) => a.admissionId !== selectedAdmission.admissionId && a.id !== selectedAdmission.id
+      );
+      setSelectedAdmissionId(nextPending[0]?.admissionId || nextPending[0]?.id || null);
+
       Alert.alert(
         'Station Allocated!',
-        `${selectedAdmission.babyName} successfully placed in ${station.name} (${station.stationId}). Phototherapy treatment can now begin.`
+        `${babyName} (${babyUhid}) successfully placed in ${station.name} (${station.stationId}). Phototherapy treatment can now begin.`
       );
-    } catch {
-      Alert.alert('Error', 'Failed to allocate station');
+    } catch (err: any) {
+      Alert.alert('Error', err?.message || 'Failed to allocate station');
     } finally {
       setIsProcessing(false);
     }
@@ -75,6 +123,10 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
 
   const insets = useSafeAreaInsets();
 
+  const availableCount = stations.filter((s) => s.operationalStatus === 'available').length;
+  const occupiedCount = stations.filter((s) => s.operationalStatus === 'occupied').length;
+  const cleaningCount = stations.filter((s) => s.operationalStatus === 'cleaning_prep').length;
+
   return (
     <View style={styles.container}>
       {/* Header */}
@@ -91,17 +143,40 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
           </View>
         </View>
 
+        {/* Live Fleet Capacity Strip */}
+        <View style={styles.fleetStatusCard}>
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.fleetStatusVal, { color: '#00A569' }]}>{availableCount}</Text>
+            <Text style={styles.fleetStatusLbl}>Available</Text>
+          </View>
+          <View style={styles.fleetDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.fleetStatusVal, { color: '#FC3949' }]}>{occupiedCount}</Text>
+            <Text style={styles.fleetStatusLbl}>Occupied</Text>
+          </View>
+          <View style={styles.fleetDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.fleetStatusVal, { color: '#D97706' }]}>{cleaningCount}</Text>
+            <Text style={styles.fleetStatusLbl}>Sanitizing</Text>
+          </View>
+          <View style={styles.fleetDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={styles.fleetStatusVal}>{stations.length}</Text>
+            <Text style={styles.fleetStatusLbl}>Total</Text>
+          </View>
+        </View>
+
         {/* Admitted Patient Selector Banner */}
         {pendingAdmissions.length > 0 ? (
           <View style={styles.patientSelectBox}>
             <Text style={styles.selectLabel}>Select Patient for Bed Assignment:</Text>
             <View style={styles.pillList}>
               {pendingAdmissions.map((adm) => {
-                const isSel = selectedAdmission?.admissionId === adm.admissionId;
+                const isSel = selectedAdmission?.admissionId === adm.admissionId || selectedAdmission?.id === adm.id;
                 return (
                   <TouchableOpacity
-                    key={adm.admissionId}
-                    onPress={() => setSelectedAdmission(adm)}
+                    key={adm.admissionId || adm.id}
+                    onPress={() => setSelectedAdmissionId(adm.admissionId || adm.id)}
                     style={[styles.patientPill, isSel && styles.patientPillActive]}
                   >
                     <Text style={[styles.patientPillText, isSel && styles.patientPillTextActive]}>
@@ -123,7 +198,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
       <FlatList
         data={stations}
         keyExtractor={(item) => item.id || item.stationId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         renderItem={({ item }) => {
           const badge = getStationBadge(item.operationalStatus);
           const isAvail = item.operationalStatus === 'available';
@@ -153,18 +228,28 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
                 <Text style={styles.notesText}>Note: {item.notes}</Text>
               ) : null}
 
-              {/* Allocate Button */}
+              {/* Allocate Button / Station Status */}
               {isAvail ? (
-                <TouchableOpacity
-                  onPress={() => handleAllocate(item)}
-                  style={[styles.allocateBtn, (!selectedAdmission || isProcessing) && styles.allocateBtnDisabled]}
-                  disabled={!selectedAdmission || isProcessing}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.allocateBtnText}>
-                    {selectedAdmission ? `Allocate to ${selectedAdmission.babyName} →` : 'Select Patient Above'}
-                  </Text>
-                </TouchableOpacity>
+                selectedAdmission ? (
+                  <TouchableOpacity
+                    onPress={() => handleAllocate(item)}
+                    style={[styles.allocateBtn, isProcessing && styles.allocateBtnDisabled]}
+                    disabled={isProcessing}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.allocateBtnText}>
+                      Allocate to {selectedAdmission.babyName} ({selectedAdmission.babyUhid}) →
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <View style={styles.availableUnassignedBox}>
+                    <Text style={styles.availableUnassignedText}>
+                      {pendingAdmissions.length === 0
+                        ? '✓ Station Available • No Patients Awaiting Bed'
+                        : 'Select Admitted Patient Above to Allocate'}
+                    </Text>
+                  </View>
+                )
               ) : (
                 <View style={styles.unavailableRow}>
                   <Text style={styles.unavailableText}>
@@ -200,7 +285,7 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   backBtn: {
     marginRight: 12,
@@ -220,6 +305,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+  },
+  fleetStatusCard: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 10,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  fleetStatusCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  fleetDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+  },
+  fleetStatusVal: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  fleetStatusLbl: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.85)',
+    marginTop: 1,
   },
   patientSelectBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -259,7 +375,7 @@ const styles = StyleSheet.create({
   noPendingBanner: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
     borderRadius: 12,
-    padding: 8,
+    padding: 10,
     marginTop: 4,
   },
   noPendingText: {
@@ -357,6 +473,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  availableUnassignedBox: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  availableUnassignedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#64748B',
   },
   unavailableRow: {
     backgroundColor: '#F8FAFC',

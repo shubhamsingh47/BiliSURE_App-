@@ -6,6 +6,7 @@ import { LoginScreen } from '../features/authentication/screens/LoginScreen';
 import { DashboardScreen } from '../features/dashboard/screens/DashboardScreen';
 import { PatientTrendsScreen } from '../features/trends/screens/PatientTrendsScreen';
 import { NewRegistrationScreen } from '../features/babies/screens/NewRegistrationScreen';
+import { PatientsScreen } from '../features/babies/screens/PatientsScreen';
 import { RegistrationSuccessScreen } from '../features/babies/screens/RegistrationSuccessScreen';
 import { PresentBilirubinScreen } from '../features/bilirubin/screens/PresentBilirubinScreen';
 import { RiskScreen } from '../features/recommendations/screens/RiskScreen';
@@ -411,7 +412,7 @@ export const RootNavigator: React.FC = () => {
           );
         }
 
-        // Primary Role: Doctor / Referring Centre (Default)
+        // Primary Role: Doctor / Referring Centre (Strategy A: Unified Census & Hospital Capacity)
         if (activeTab === 'phototherapy') {
           return (
             <HospitalDirectoryScreen
@@ -437,6 +438,7 @@ export const RootNavigator: React.FC = () => {
         if (activeTab === 'profile') {
           return renderProfile();
         }
+        // Unified Patients Census screen for 'home' and 'admitted'
         return (
           <DashboardScreen
             onSelectBaby={handleSelectBaby}
@@ -482,6 +484,5 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
-    paddingBottom: 70, // reserve space for bottom tab bar
   },
 });

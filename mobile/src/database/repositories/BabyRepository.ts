@@ -20,7 +20,6 @@ export class BabyRepository {
           name: row.name,
           parentsName: row.parents_name,
           dateOfBirth: row.date_of_birth,
-          exactTimeOfBirth: row.exact_time_of_birth || (row.date_of_birth ? new Date(row.date_of_birth).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '09:00'),
           weight: row.weight,
           height: row.height,
           assignedDoctor: row.assigned_doctor,

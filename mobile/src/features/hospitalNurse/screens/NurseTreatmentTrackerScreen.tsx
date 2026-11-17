@@ -82,7 +82,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
       <FlatList
         data={treatedPatients}
         keyExtractor={(item) => item.id || item.admissionId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>💡</Text>

@@ -87,6 +87,23 @@ export function calculatePostnatalAgeHours(
 }
 
 /**
+ * Automatically bins postnatal age in hours into standard 12-hour intervals for Bhutani Nomogram:
+ * 0 < hours <= 12  -> 12h
+ * 12 < hours <= 24 -> 24h
+ * 24 < hours <= 36 -> 36h
+ * 36 < hours <= 48 -> 48h
+ * 48 < hours <= 60 -> 60h
+ * 60 < hours <= 72 -> 72h
+ * 72 < hours <= 84 -> 84h
+ * 84 < hours <= 96 -> 96h
+ * etc.
+ */
+export function binPostnatalAge12h(hours: number): number {
+  if (hours <= 0) return 12;
+  return Math.max(12, Math.ceil(hours / 12) * 12);
+}
+
+/**
  * Linearly interpolates percentile thresholds for any given hour.
  */
 export function getPercentilesAtHour(hour: number): { p40: number; p75: number; p95: number } {

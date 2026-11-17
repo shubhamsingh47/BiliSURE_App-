@@ -78,6 +78,23 @@ export function calculatePostnatalAgeHours(
   return Math.max(0, Math.round(hours * 10) / 10);
 }
 
+/**
+ * Automatically bins postnatal age in hours into standard 12-hour intervals for Bhutani Nomogram:
+ * 0 < hours <= 12  -> 12h
+ * 12 < hours <= 24 -> 24h
+ * 24 < hours <= 36 -> 36h
+ * 36 < hours <= 48 -> 48h
+ * 48 < hours <= 60 -> 60h
+ * 60 < hours <= 72 -> 72h
+ * 72 < hours <= 84 -> 84h
+ * 84 < hours <= 96 -> 96h
+ * etc.
+ */
+export function binPostnatalAge12h(hours: number): number {
+  if (hours <= 0) return 12;
+  return Math.max(12, Math.ceil(hours / 12) * 12);
+}
+
 export function getPercentilesAtHour(hour: number): { p40: number; p75: number; p95: number } {
   const clampedHour = Math.max(0, Math.min(168, hour));
 
@@ -101,6 +118,7 @@ export function getPercentilesAtHour(hour: number): { p40: number; p75: number; 
 
 export interface BhutaniAssessment {
   postnatalAgeHours: number;
+  binnedPostnatalAgeHours: number;
   valueMgDl: number;
   valueUmolL: number;
   zone: BhutaniZone;
@@ -135,6 +153,7 @@ export function evaluateBhutaniRisk(params: {
   } = params;
 
   const ageHours = calculatePostnatalAgeHours(dateOfBirth, exactTimeOfBirth, sampleTimestamp);
+  const binnedPostnatalAgeHours = binPostnatalAge12h(ageHours);
   const valueMgDl = unit === 'µmol/L' ? umolLToMgDl(value) : Math.round(value * 100) / 100;
   const valueUmolL = unit === 'mg/dL' ? mgDlToUmolL(value) : value;
 
@@ -142,6 +161,7 @@ export function evaluateBhutaniRisk(params: {
   if (gestationalAgeWeeks < 35) {
     return {
       postnatalAgeHours: ageHours,
+      binnedPostnatalAgeHours,
       valueMgDl,
       valueUmolL,
       zone: 'ineligible',
@@ -149,14 +169,14 @@ export function evaluateBhutaniRisk(params: {
       zoneColor: COLORS.bhutaniIneligible,
       zoneBgColor: '#F1F5F9',
       percentileApprox: 0,
-      thresholds: getPercentilesAtHour(ageHours),
+      thresholds: getPercentilesAtHour(binnedPostnatalAgeHours),
       isEligible: false,
       ineligibilityReason: `Infant is ${gestationalAgeWeeks}w gestational age (<35w). Bhutani nomogram is only validated for ≥35w. Consult preterm phototherapy charts.`,
       clinicalAction: 'Apply gestational-age-specific preterm curves (AAP 2022 / NICE CG98).',
     };
   }
 
-  const thresholds = getPercentilesAtHour(ageHours);
+  const thresholds = getPercentilesAtHour(binnedPostnatalAgeHours);
 
   let zone: BhutaniZone = 'low';
   let zoneLabel = 'Low Risk Zone (< 40th percentile)';
@@ -195,6 +215,7 @@ export function evaluateBhutaniRisk(params: {
 
   return {
     postnatalAgeHours: ageHours,
+    binnedPostnatalAgeHours,
     valueMgDl,
     valueUmolL,
     zone,

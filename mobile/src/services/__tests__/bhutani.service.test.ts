@@ -1,5 +1,6 @@
 import {
   calculatePostnatalAgeHours,
+  binPostnatalAge12h,
   evaluateBhutaniRisk,
   mgDlToUmolL,
   umolLToMgDl,
@@ -22,6 +23,30 @@ describe('Bhutani Bilirubin Risk Nomogram Service', () => {
       const sampleTime = '2026-11-15T12:00:00';
       const hours = calculatePostnatalAgeHours(dob, exactTime, sampleTime);
       expect(hours).toBe(0);
+    });
+
+    it('automatically bins postnatal age into 12-hour intervals according to clinical rule', () => {
+      // 0 to <= 12 -> 12h
+      expect(binPostnatalAge12h(0)).toBe(12);
+      expect(binPostnatalAge12h(4)).toBe(12);
+      expect(binPostnatalAge12h(12)).toBe(12);
+
+      // 12 to <= 24 -> 24h
+      expect(binPostnatalAge12h(12.1)).toBe(24);
+      expect(binPostnatalAge12h(18)).toBe(24);
+      expect(binPostnatalAge12h(24)).toBe(24);
+
+      // 24 to <= 36 -> 36h
+      expect(binPostnatalAge12h(25)).toBe(36);
+      expect(binPostnatalAge12h(36)).toBe(36);
+
+      // 36 to <= 48 -> 48h
+      expect(binPostnatalAge12h(37)).toBe(48);
+      expect(binPostnatalAge12h(48)).toBe(48);
+
+      // 48 to <= 60 -> 60h
+      expect(binPostnatalAge12h(49)).toBe(60);
+      expect(binPostnatalAge12h(60)).toBe(60);
     });
   });
 

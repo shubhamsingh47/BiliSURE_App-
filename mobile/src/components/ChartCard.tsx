@@ -10,6 +10,7 @@ import {
 import Svg, { Path, Defs, LinearGradient, Stop, Line, Circle, G } from 'react-native-svg';
 import { X as CloseIcon } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
+import { moderateScale, fontScale, SPACING } from '../theme/responsive';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
@@ -453,9 +454,9 @@ export const ChartCard: React.FC<ChartCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 16,
-    marginTop: 16,
+    borderRadius: moderateScale(22),
+    padding: SPACING.lg,
+    marginTop: SPACING.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -466,10 +467,10 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   chartTitle: {
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: 6,
+    marginBottom: SPACING.xs,
     paddingHorizontal: 4,
   },
   chartBox: {
@@ -497,7 +498,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   emptyText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     color: '#94A3B8',
     fontWeight: '500',
     textAlign: 'center',
@@ -522,18 +523,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   tooltipValue: {
-    fontSize: 14,
+    fontSize: fontScale(14),
     fontWeight: '800',
     color: '#FFFFFF',
   },
   tooltipMeta: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     color: '#C7D2FE',
     marginTop: 2,
     fontWeight: '500',
   },
   tooltipSite: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     color: '#A5B4FC',
     marginTop: 1,
     fontWeight: '600',
@@ -541,20 +542,20 @@ const styles = StyleSheet.create({
   filterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 12,
-    paddingHorizontal: 6,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 4,
   },
   rangePill: {
-    paddingVertical: 7,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(14),
+    borderRadius: moderateScale(14),
     backgroundColor: 'transparent',
   },
   rangePillActive: {
     backgroundColor: '#FEF3C7', // soft active amber pill matching BiliSURE theme
   },
   rangeText: {
-    fontSize: 14,
+    fontSize: fontScale(13),
     fontWeight: '600',
     color: '#94A3B8',
   },

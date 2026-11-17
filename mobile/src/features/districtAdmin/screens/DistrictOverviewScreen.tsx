@@ -5,8 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { COLORS } from '../../../theme/colors';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface DistrictOverviewScreenProps {
   onExportPress?: () => void;
@@ -42,7 +41,11 @@ export const DistrictOverviewScreen: React.FC<DistrictOverviewScreenProps> = ({
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: 16 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: insets.bottom + 90 }]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerTop}>

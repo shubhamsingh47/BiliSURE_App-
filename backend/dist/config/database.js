@@ -6,16 +6,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.isMongoConnected = void 0;
 exports.connectDatabase = connectDatabase;
 exports.disconnectDatabase = disconnectDatabase;
-const dns_1 = __importDefault(require("dns"));
 const mongoose_1 = __importDefault(require("mongoose"));
 const env_1 = require("./env");
-// Ensure SRV DNS resolution succeeds on Windows environments
-try {
-    dns_1.default.setServers(['8.8.8.8', '1.1.1.1']);
-}
-catch {
-    // Ignore if custom dns servers cannot be set
-}
 exports.isMongoConnected = false;
 async function connectDatabase() {
     try {
@@ -23,8 +15,8 @@ async function connectDatabase() {
         // Don't buffer commands indefinitely if disconnected
         mongoose_1.default.set('bufferCommands', false);
         await mongoose_1.default.connect(env_1.ENV.MONGODB_URI, {
-            serverSelectionTimeoutMS: 8000,
-            connectTimeoutMS: 8000,
+            serverSelectionTimeoutMS: 2000,
+            connectTimeoutMS: 2000,
         });
         exports.isMongoConnected = true;
         console.log(`[Database] Successfully connected to MongoDB at ${env_1.ENV.MONGODB_URI}`);

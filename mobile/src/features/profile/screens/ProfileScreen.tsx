@@ -70,7 +70,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <View style={styles.safeArea}>
-      <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 10 }]}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 10, paddingBottom: insets.bottom + 90 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Independent Notification Icon (top right, no container card) */}
         {onOpenNotifications && (
           <View style={styles.topBellRow}>

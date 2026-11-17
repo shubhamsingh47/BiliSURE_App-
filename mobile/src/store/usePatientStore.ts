@@ -21,7 +21,13 @@ interface PatientState {
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
   updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
   addReading: (readingData: Partial<BilirubinReading>) => Promise<BilirubinReading>;
-  addObservation: (babyId: string, site: string, bilirubinValue: number, observerName: string) => ClinicalObservation;
+  addObservation: (
+    babyId: string,
+    site: string,
+    bilirubinValue: number,
+    observerName: string,
+    timestamp?: string
+  ) => ClinicalObservation;
   updateObservation: (observationId: string, updates: { site?: string; bilirubinValue?: number }) => void;
 }
 
@@ -224,7 +230,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       unit,
       method,
       sampleTimestamp: readingData.sampleTimestamp || new Date().toISOString(),
-      postnatalAgeHours: bhutaniAssessment.postnatalAgeHours,
+      postnatalAgeHours: bhutaniAssessment.binnedPostnatalAgeHours || bhutaniAssessment.postnatalAgeHours,
       bhutaniZone,
       bhutaniPercentileApprox: bhutaniAssessment.percentileApprox,
       phototherapyPhase: readingData.phototherapyPhase || 'pre_phototherapy',
@@ -272,8 +278,8 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     return newReading;
   },
 
-  addObservation: (babyId, site, bilirubinValue, observerName) => {
-    const now = new Date().toISOString();
+  addObservation: (babyId, site, bilirubinValue, observerName, timestamp) => {
+    const now = timestamp || new Date().toISOString();
     const clientOpId = 'obs_op_' + Date.now();
     const newObservation: ClinicalObservation = {
       id: 'obs_' + Date.now(),

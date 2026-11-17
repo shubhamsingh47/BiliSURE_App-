@@ -6,6 +6,7 @@ import { usePatientStore } from '../../../store/usePatientStore';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { Hospital, ReferralUrgency } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface CreateReferralScreenProps {
   hospital: Hospital;
@@ -27,7 +28,8 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const latestReading = readings[0] || {
+  const babyReadings = readings.filter((r) => !selectedBaby || r.babyId === selectedBaby.id);
+  const latestReading = babyReadings[0] || readings[0] || {
     value: 14.8,
     unit: 'mg/dL',
     postnatalAgeHours: 48,
@@ -77,7 +79,14 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
   const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={[styles.content, { paddingTop: insets.top + 10 }]}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + SPACING.sm, paddingBottom: insets.bottom + 90 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
       {/* Header */}
       <View style={styles.headerRow}>
         <TouchableOpacity onPress={onBack} style={styles.backBtn}>
@@ -92,12 +101,18 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
       {/* Target Hospital Card */}
       <View style={styles.hospBanner}>
         <View style={styles.hospBannerTop}>
-          <Text style={styles.hospBannerName}>{hospital.name}</Text>
+          <Text style={styles.hospBannerName} numberOfLines={2}>
+            {hospital.name}
+          </Text>
           <View style={styles.capacityBadge}>
-            <Text style={styles.capacityBadgeText}>{hospital.availablePTStations} PT Stations Available</Text>
+            <Text style={styles.capacityBadgeText}>
+              {hospital.availablePTStations} PT Stations Available
+            </Text>
           </View>
         </View>
-        <Text style={styles.hospBannerSub}>{hospital.address} • Contact: {hospital.contactNumber}</Text>
+        <Text style={styles.hospBannerSub}>
+          {hospital.address} • Contact: {hospital.contactNumber}
+        </Text>
       </View>
 
       {/* Patient Summary Card */}
@@ -106,15 +121,15 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
           <Text style={styles.cardSectionTitle}>Newborn Patient Details</Text>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Patient Name:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.name}</Text>
+            <Text style={styles.infoValue}>{selectedBaby.parentsName?.trim() || selectedBaby.name}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>UHID:</Text>
             <Text style={styles.infoValue}>{selectedBaby.uhid}</Text>
           </View>
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Parents' Name:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.parentsName}</Text>
+            <Text style={styles.infoLabel}>Mother's Name:</Text>
+            <Text style={styles.infoValue}>{selectedBaby.parentsName?.trim() || selectedBaby.name}</Text>
           </View>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Gestational Age:</Text>
@@ -131,7 +146,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
       <View style={styles.card}>
         <Text style={styles.cardSectionTitle}>Bhutani Bilirubin Risk Assessment</Text>
         <BhutaniNomogramChart
-          readings={readings as any}
+          readings={babyReadings as any}
           gestationalAgeWeeks={selectedBaby?.gestationalAgeWeeks || 38}
           compact={true}
         />
@@ -204,73 +219,80 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SPACING.md,
   },
   backBtn: {
     marginRight: 12,
     padding: 6,
   },
   backBtnText: {
-    fontSize: 22,
+    fontSize: fontScale(20),
     color: '#181829',
     fontWeight: '700',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: fontScale(18),
     fontWeight: '800',
     color: '#181829',
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#64748B',
   },
   hospBanner: {
     backgroundColor: '#F3E8FF',
-    borderRadius: 18,
-    padding: 14,
-    marginBottom: 14,
+    borderRadius: moderateScale(16),
+    padding: SPACING.md,
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: '#7D3BFF',
   },
   hospBannerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    gap: moderateScale(8),
+    marginBottom: moderateScale(6),
   },
   hospBannerName: {
-    fontSize: 15,
+    flex: 1,
+    fontSize: fontScale(15),
     fontWeight: '800',
     color: '#7D3BFF',
+    marginRight: moderateScale(8),
   },
   capacityBadge: {
     backgroundColor: '#00A569',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
+    alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   capacityBadgeText: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '700',
     color: '#FFFFFF',
   },
   hospBannerSub: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     color: '#475569',
+    marginTop: moderateScale(2),
+    lineHeight: fontScale(16),
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: moderateScale(18),
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   cardSectionTitle: {
-    fontSize: 14,
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#181829',
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   infoRow: {
     flexDirection: 'row',
@@ -280,11 +302,11 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F8FAFC',
   },
   infoLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#64748B',
   },
   infoValue: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '600',
     color: '#181829',
   },
@@ -296,13 +318,13 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     marginHorizontal: 4,
   },
   urgencyPillText: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#64748B',
   },
@@ -311,28 +333,28 @@ const styles = StyleSheet.create({
   },
   notesInput: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    fontSize: 12,
+    borderRadius: moderateScale(14),
+    padding: SPACING.md,
+    fontSize: fontScale(12),
     color: '#181829',
     textAlignVertical: 'top',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    minHeight: 80,
+    minHeight: moderateScale(70),
   },
   submitBtn: {
     backgroundColor: '#7D3BFF',
-    borderRadius: 16,
-    height: 56,
+    borderRadius: moderateScale(16),
+    minHeight: moderateScale(50),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 10,
+    marginTop: SPACING.sm,
   },
   submitBtnDisabled: {
     backgroundColor: '#A855F7',
   },
   submitBtnText: {
-    fontSize: 15,
+    fontSize: fontScale(15),
     fontWeight: '800',
     color: '#FFFFFF',
   },
