@@ -14,9 +14,14 @@ import { COLORS } from '../../../theme/colors';
 interface SummaryTotalScreenProps {
   onBack: () => void;
   onExport: () => void;
+  isTab?: boolean;
 }
 
-export const SummaryTotalScreen: React.FC<SummaryTotalScreenProps> = ({ onBack, onExport }) => {
+export const SummaryTotalScreen: React.FC<SummaryTotalScreenProps> = ({
+  onBack,
+  onExport,
+  isTab = false,
+}) => {
   const [activeTab, setActiveTab] = useState<'total' | 'admits'>('total');
   const [period, setPeriod] = useState('Day');
 
@@ -43,9 +48,10 @@ export const SummaryTotalScreen: React.FC<SummaryTotalScreenProps> = ({ onBack, 
   const treatDash = `${circumference * 0.17} ${circumference * 0.83}`;
 
   const insets = useSafeAreaInsets();
+  const dynamicTopPadding = isTab ? 0 : insets.top;
 
   return (
-    <View style={[styles.safeArea, { paddingTop: insets.top }]}>
+    <View style={[styles.safeArea, { paddingTop: dynamicTopPadding }]}>
       {/* Header Bar */}
       <View style={styles.header}>
         <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>

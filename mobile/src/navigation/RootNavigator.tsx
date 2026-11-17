@@ -388,17 +388,19 @@ export const RootNavigator: React.FC = () => {
               <HospitalDirectoryScreen
                 onSelectHospital={(hosp) => {}}
                 onBack={() => setActiveTab('home')}
+                isTab
               />
             );
           }
           if (activeTab === 'tracker') {
-            return <ReferralTrackerScreen onBack={() => setActiveTab('home')} />;
+            return <ReferralTrackerScreen onBack={() => setActiveTab('home')} isTab />;
           }
           if (activeTab === 'report') {
             return (
               <SummaryTotalScreen
                 onBack={() => setActiveTab('home')}
                 onExport={() => setCurrentRoute('export_data')}
+                isTab
               />
             );
           }
@@ -421,17 +423,19 @@ export const RootNavigator: React.FC = () => {
                 setCurrentRoute('create_referral');
               }}
               onBack={() => setActiveTab('home')}
+              isTab
             />
           );
         }
         if (activeTab === 'tracker') {
-          return <ReferralTrackerScreen onBack={() => setActiveTab('home')} />;
+          return <ReferralTrackerScreen onBack={() => setActiveTab('home')} isTab />;
         }
         if (activeTab === 'report') {
           return (
             <SummaryTotalScreen
               onBack={() => setActiveTab('home')}
               onExport={() => setCurrentRoute('export_data')}
+              isTab
             />
           );
         }

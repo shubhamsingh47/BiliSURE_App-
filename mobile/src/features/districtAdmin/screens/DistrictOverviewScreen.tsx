@@ -43,7 +43,7 @@ export const DistrictOverviewScreen: React.FC<DistrictOverviewScreenProps> = ({
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingTop: 16, paddingBottom: insets.bottom + 90 }]}
+      contentContainerStyle={[styles.content, { paddingTop: 8, paddingBottom: insets.bottom + 90 }]}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}

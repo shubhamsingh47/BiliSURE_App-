@@ -10,11 +10,13 @@ import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 interface HospitalDirectoryScreenProps {
   onSelectHospital: (hospital: Hospital) => void;
   onBack?: () => void;
+  isTab?: boolean;
 }
 
 export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = ({
   onSelectHospital,
   onBack,
+  isTab = false,
 }) => {
   const { hospitals } = useNetworkStore();
   const { selectedBaby } = usePatientStore();
@@ -25,11 +27,12 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
   );
 
   const insets = useSafeAreaInsets();
+  const dynamicTopPadding = isTab ? 10 : insets.top + 10;
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, { paddingTop: dynamicTopPadding }]}>
         <View style={styles.headerTop}>
           {onBack && (
             <TouchableOpacity onPress={onBack} style={styles.backBtn}>

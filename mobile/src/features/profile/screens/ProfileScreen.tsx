@@ -16,7 +16,6 @@ import {
 import { COLORS } from '../../../theme/colors';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useNetworkStore } from '../../../store/useNetworkStore';
-import { SyncEngine } from '../../../services/sync.engine';
 
 interface ProfileScreenProps {
   onOpenCalibration: () => void;
@@ -41,14 +40,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const { notifications } = useNetworkStore();
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
-
-  const handleSyncNow = async () => {
-    const res = await SyncEngine.syncPending();
-    Alert.alert(
-      'Synchronization',
-      `Offline sync processed: ${res.syncedCount} records confirmed with hospital backend.`
-    );
-  };
 
   const handleLogoutPress = async () => {
     await logout();
@@ -210,26 +201,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleSyncNow}
-            style={styles.menuItem}
-          >
-            <View style={styles.menuLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
-                <RefreshCw size={18} color="#059669" />
-              </View>
-              <Text style={styles.menuLabel}>Sync Pending Records Now</Text>
-            </View>
-            <ChevronRight size={18} color="#94A3B8" />
-          </TouchableOpacity>
-
           <View style={styles.menuItem}>
             <View style={styles.menuLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
-                <ShieldCheck size={18} color="#D97706" />
+              <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
+                <ShieldCheck size={18} color="#059669" />
               </View>
-              <Text style={styles.menuLabel}>Offline SQLite Cache: Active</Text>
+              <Text style={styles.menuLabel}>Cloud Network: Connected (Online)</Text>
             </View>
           </View>
         </View>

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
-import { ChartCard } from '../../../components/ChartCard';
+import { ChartCard, GraphReading } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { calculatePostnatalAgeHours, binPostnatalAge12h, evaluateBhutaniRisk } from '../../../services/bhutani.service';
 import { usePatientStore } from '../../../store/usePatientStore';
@@ -125,6 +125,48 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const recentObservations = babyObservations.slice(0, 4);
   // Chart points oldest -> newest
   const chartPoints = [...babyObservations].reverse().map((o) => o.bilirubinValue);
+
+  // Real data-driven readings for 24-hour Bilirubin Readings chart
+  const chartReadings: GraphReading[] = React.useMemo(() => {
+    const babyReadings = readings.filter((r) => r.babyId === activeBaby.id);
+    const existingObsIds = new Set(babyObservations.map((o) => o.id));
+
+    const obsList: GraphReading[] = babyObservations.map((o) => {
+      const rawAge = calculatePostnatalAgeHours(
+        activeBaby.dateOfBirth,
+        activeBaby.exactTimeOfBirth || '08:00',
+        o.timestamp
+      );
+      return {
+        id: o.id,
+        value: o.bilirubinValue,
+        timestamp: o.timestamp,
+        site: o.site,
+        postnatalAgeHours: rawAge,
+      };
+    });
+
+    const rdgList: GraphReading[] = babyReadings
+      .filter((r) => !existingObsIds.has(r.id))
+      .map((r) => {
+        const rawAge = calculatePostnatalAgeHours(
+          activeBaby.dateOfBirth,
+          activeBaby.exactTimeOfBirth || '08:00',
+          r.sampleTimestamp || r.timestamp
+        );
+        return {
+          id: r.id,
+          value: r.value,
+          timestamp: r.sampleTimestamp || r.timestamp,
+          site: r.measurementSite || 'Forehead',
+          postnatalAgeHours: r.postnatalAgeHours ?? rawAge,
+        };
+      });
+
+    return [...obsList, ...rdgList].sort(
+      (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+    );
+  }, [babyObservations, readings, activeBaby]);
 
   // Merge baby readings and observations dynamically so Bhutani Nomogram plots every single observation
   const combinedBhutaniReadings: BilirubinReading[] = React.useMemo(() => {
@@ -248,7 +290,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   };
 
   return (
-    <View style={[styles.safeArea, { paddingTop: Math.max(insets.top, 12) }]}>
+    <View style={styles.safeArea}>
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
@@ -528,7 +570,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         <ChartCard
           initialValue={initialVal ?? undefined}
           dischargeValue={dischargeVal ?? undefined}
+          readings={chartReadings}
           points={chartPoints}
+          babyRegistrationTime={activeBaby.registeredAt || activeBaby.createdAt || activeBaby.dateOfBirth}
+          babyDateOfBirth={activeBaby.dateOfBirth}
+          babyExactTimeOfBirth={activeBaby.exactTimeOfBirth}
         />
 
         {/* Referral Action Callout Button */}
@@ -647,13 +693,13 @@ const styles = StyleSheet.create({
   },
   container: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
+    paddingTop: moderateScale(8),
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: SPACING.md,
+    marginBottom: moderateScale(10),
   },
   backBtn: {
     width: moderateScale(42),

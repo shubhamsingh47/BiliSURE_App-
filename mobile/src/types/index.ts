@@ -94,6 +94,8 @@ export interface Baby {
   dischargeValue?: number;
   riskFactors?: string[];
   syncStatus?: SyncStatus;
+  registeredAt?: string;
+  createdAt?: string;
   updatedAt: string;
 }
 

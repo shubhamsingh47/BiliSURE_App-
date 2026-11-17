@@ -9,11 +9,13 @@ import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 interface ReferralTrackerScreenProps {
   onBack?: () => void;
   onSelectReferral?: (referral: Referral) => void;
+  isTab?: boolean;
 }
 
 export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
   onBack,
   onSelectReferral,
+  isTab = false,
 }) => {
   const { referrals } = useNetworkStore();
   const [activeFilter, setActiveFilter] = useState<'all' | ReferralStatus>('all');
@@ -38,11 +40,12 @@ export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
   };
 
   const insets = useSafeAreaInsets();
+  const dynamicTopPadding = isTab ? 10 : insets.top + 10;
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, { paddingTop: dynamicTopPadding }]}>
         <View style={styles.headerRow}>
           {onBack && (
             <TouchableOpacity onPress={onBack} style={styles.backBtn}>

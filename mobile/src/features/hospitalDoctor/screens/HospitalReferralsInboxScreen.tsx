@@ -259,11 +259,11 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 16,
+    paddingTop: 10,
     paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingBottom: 14,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: {
     fontSize: 22,
