@@ -19,6 +19,7 @@ import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { calculatePostnatalAgeHours, binPostnatalAge12h, evaluateBhutaniRisk } from '../../../services/bhutani.service';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Baby, ClinicalObservation, BilirubinReading } from '../../../types';
 import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
@@ -41,7 +42,23 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
   const { user } = useAuthStore();
+  const { referrals, admissions } = useNetworkStore();
   const activeBaby: Baby = selectedBaby || babies[0];
+
+  const activeReferral = referrals.find(
+    (r) =>
+      (r.babyUhid === activeBaby?.uhid || r.babyId === activeBaby?.id) &&
+      r.status !== 'rejected' &&
+      r.status !== 'completed'
+  );
+
+  const activeAdmission = admissions.find(
+    (a) =>
+      (a.babyUhid === activeBaby?.uhid || a.babyId === activeBaby?.id) &&
+      a.admissionStatus !== 'discharged'
+  );
+
+  const isPhototherapyActive = !!activeAdmission || !!activeReferral;
   const [showBabyDropdown, setShowBabyDropdown] = useState(false);
 
   // Observation add/edit state
@@ -531,15 +548,40 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           points={chartPoints}
         />
 
-        {/* Referral Action Callout Button */}
+        {/* Referral Action Callout Button / In-Progress Status */}
         {onOpenReferral && (
-          <TouchableOpacity
-            onPress={onOpenReferral}
-            style={[styles.referralCalloutBtn, { marginTop: 16 }]}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
-          </TouchableOpacity>
+          isPhototherapyActive ? (
+            <View style={[styles.referralActiveStatusCard, { marginTop: 16 }]}>
+              <View style={styles.referralActiveHeader}>
+                <View style={styles.referralActivePulseDot} />
+                <Text style={styles.referralActiveTitle}>
+                  {activeAdmission?.admissionStatus === 'under_treatment'
+                    ? 'Phototherapy in Progress'
+                    : activeReferral?.status === 'accepted' || activeReferral?.status === 'arrived'
+                    ? 'Referral Accepted • Admitted'
+                    : 'Phototherapy Referral Active'}
+                </Text>
+              </View>
+              <Text style={styles.referralActiveSub}>
+                {activeAdmission?.ptStationName
+                  ? `Station: ${activeAdmission.ptStationName} at ${activeAdmission.hospitalName || 'Receiving Hospital'}`
+                  : activeReferral?.receivingHospitalName
+                  ? `Destination: ${activeReferral.receivingHospitalName} (${(activeReferral.status || '').toUpperCase()})`
+                  : 'Referral is currently active under hospital review.'}
+              </Text>
+              <Text style={styles.referralActiveHint}>
+                A new referral can only be initiated after previous phototherapy is completed.
+              </Text>
+            </View>
+          ) : (
+            <TouchableOpacity
+              onPress={onOpenReferral}
+              style={[styles.referralCalloutBtn, { marginTop: 16 }]}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
+            </TouchableOpacity>
+          )
         )}
 
         {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section (last) */}
@@ -860,6 +902,43 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '800',
     color: '#FFFFFF',
+  },
+  referralActiveStatusCard: {
+    backgroundColor: '#F5F3FF',
+    borderRadius: moderateScale(14),
+    padding: moderateScale(14),
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    marginBottom: SPACING.md,
+  },
+  referralActiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  referralActivePulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#7D3BFF',
+    marginRight: 8,
+  },
+  referralActiveTitle: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#6D28D9',
+  },
+  referralActiveSub: {
+    fontSize: fontScale(12),
+    color: '#4C1D95',
+    fontWeight: '600',
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  referralActiveHint: {
+    fontSize: fontScale(11),
+    color: '#7C3AED',
+    fontStyle: 'italic',
   },
   obsHeaderRow: {
     flexDirection: 'row',

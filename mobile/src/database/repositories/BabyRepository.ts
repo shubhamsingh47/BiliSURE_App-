@@ -5,10 +5,17 @@ export class BabyRepository {
   static async getAll(): Promise<Baby[]> {
     const db = await getDatabase();
     if (isInMemoryFallback) {
+      memoryTables.local_babies = (memoryTables.local_babies || []).filter(
+        b => !['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes((b.name || '').trim().toLowerCase()) &&
+             !['baby 1', 'baby 2', 'baby1', 'baby2'].includes((b.parentsName || '').trim().toLowerCase())
+      );
       return [...memoryTables.local_babies];
     }
 
     try {
+      await db.executeSql(
+        "DELETE FROM local_babies WHERE LOWER(TRIM(name)) IN ('baby 1', 'baby 2', 'baby') OR LOWER(TRIM(parents_name)) IN ('baby 1', 'baby 2');"
+      ).catch(() => {});
       const [results] = await db.executeSql('SELECT * FROM local_babies ORDER BY updated_at DESC');
       const items: Baby[] = [];
       for (let i = 0; i < results.rows.length; i++) {

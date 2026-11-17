@@ -54,10 +54,10 @@ class AnalyticsService {
     static async generateExportCsv(dataType = 'All', dateRange = 'Last 30 days') {
         const headers = 'UHID,Name,DOB,AssignedDoctor,SeverityState,LatestBilirubin,Unit,Status,Timestamp\n';
         const rows = [
-            'M1A2N3S4I5,Baby 1,2026-11-15,Dr. XYZ,critical,18.0,mg/dL,under_treatment,2026-11-16 10:00:00',
-            'B2C3D4E5F6,Baby 2,2026-11-14,Dr. XYZ,normal,8.5,mg/dL,in_observation,2026-11-16 10:00:00',
-            'G7H8I9J0K1,Baby 3,2026-11-15,Dr. XYZ,critical,12.5,mg/dL,under_treatment,2026-11-16 07:30:00',
-            'D4E5F6G7H8,Baby 4,2026-11-10,Dr. ABC,discharged,5.0,mg/dL,discharged,2026-11-15 14:00:00',
+            'BS-IN-972612,Sunita Devi,2026-11-15,Dr. Priya Sharma,critical,18.0,mg/dL,under_treatment,2026-11-16 10:00:00',
+            'BS-IN-656522,Pooja Sharma,2026-11-14,Dr. Priya Sharma,normal,8.5,mg/dL,in_observation,2026-11-16 10:00:00',
+            'BS-IN-508424,Geeta Verma,2026-11-15,Dr. Priya Sharma,critical,12.5,mg/dL,under_treatment,2026-11-16 07:30:00',
+            'BS-IN-203247,Ananya Joshi,2026-11-10,Dr. Priya Sharma,discharged,5.0,mg/dL,discharged,2026-11-15 14:00:00',
         ];
         return headers + rows.join('\n');
     }

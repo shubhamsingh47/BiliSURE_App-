@@ -7,8 +7,14 @@ import { Referral } from '../../../types';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { COLORS } from '../../../theme/colors';
 
-export const HospitalReferralsInboxScreen: React.FC = () => {
-  const { referrals, acceptReferral, rejectReferral, stations, hospitals } = useNetworkStore();
+interface HospitalReferralsInboxScreenProps {
+  onOpenNotifications?: () => void;
+}
+
+export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreenProps> = ({
+  onOpenNotifications,
+}) => {
+  const { referrals, acceptReferral, rejectReferral, notifications } = useNetworkStore();
   const { user } = useAuthStore();
 
   const [selectedReferral, setSelectedReferral] = useState<Referral | null>(null);
@@ -17,31 +23,7 @@ export const HospitalReferralsInboxScreen: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
 
   const pendingReferrals = referrals.filter((r) => r.status === 'pending');
-
-  // Derive live, true station availability for doctor
-  const currentHospital =
-    hospitals.find(
-      (h) =>
-        h.id === user.facilityId ||
-        h._id === user.facilityId ||
-        (user.facility && h.name.toLowerCase().includes(user.facility.toLowerCase())) ||
-        h.type === 'receiving_hospital'
-    ) || hospitals[0];
-
-  const hospitalStations = stations.filter(
-    (s) => s.hospitalId === currentHospital?.id || s.hospitalId === currentHospital?._id
-  );
-
-  const liveTotal = hospitalStations.length > 0 ? hospitalStations.length : (currentHospital?.totalPTStations || 0);
-  const liveOccupied = hospitalStations.length > 0
-    ? hospitalStations.filter((s) => s.operationalStatus === 'occupied').length
-    : (currentHospital?.occupiedPTStations || 0);
-  const liveCleaning = hospitalStations.length > 0
-    ? hospitalStations.filter((s) => s.operationalStatus === 'cleaning_prep').length
-    : 0;
-  const liveAvailable = hospitalStations.length > 0
-    ? hospitalStations.filter((s) => s.operationalStatus === 'available').length
-    : (currentHospital?.availablePTStations || 0);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleAccept = async (referral: Referral) => {
     setIsProcessing(true);
@@ -49,7 +31,7 @@ export const HospitalReferralsInboxScreen: React.FC = () => {
       await acceptReferral(referral.referralId, user.name);
       Alert.alert(
         'Referral Accepted',
-        `Baby ${referral.babyName} (${referral.babyUhid}) accepted. Referring centre and nursing unit notified to prepare arrival.`
+        `${referral.babyName} (${referral.babyUhid}) accepted. Referring centre and nursing unit notified to prepare arrival.`
       );
     } catch {
       Alert.alert('Error', 'Failed to accept referral');
@@ -84,55 +66,27 @@ export const HospitalReferralsInboxScreen: React.FC = () => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Incoming Referrals</Text>
-        <Text style={styles.headerSubtitle}>
-          {pendingReferrals.length} Pending Review • {user.facility}
-        </Text>
-
-        {/* Live Phototherapy Station Availability for Doctor */}
-        <View style={styles.liveCard}>
-          <View style={styles.liveTopRow}>
-            <View style={styles.liveIndicatorGroup}>
-              <View style={[styles.liveDot, liveAvailable > 0 ? styles.liveDotGreen : styles.liveDotRed]} />
-              <Text style={styles.liveStatusTitle}>Live PT Station Availability</Text>
-            </View>
-            <View style={[styles.capacityPill, liveAvailable > 0 ? styles.capacityPillAvail : styles.capacityPillFull]}>
-              <Text style={styles.capacityPillText}>
-                {liveAvailable > 0 ? `${liveAvailable} Available` : 'Full Capacity'}
-              </Text>
-            </View>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Incoming Referrals</Text>
+            <Text style={styles.headerSubtitle}>
+              {pendingReferrals.length} Pending Review • {user.facility}
+            </Text>
           </View>
-
-          <View style={styles.stationGrid}>
-            <View style={styles.stationCol}>
-              <Text style={[styles.stationVal, { color: '#00E676' }]}>{liveAvailable}</Text>
-              <Text style={styles.stationLbl}>Available</Text>
-            </View>
-            <View style={styles.gridDivider} />
-            <View style={styles.stationCol}>
-              <Text style={[styles.stationVal, { color: '#FF8A80' }]}>{liveOccupied}</Text>
-              <Text style={styles.stationLbl}>Occupied</Text>
-            </View>
-            <View style={styles.gridDivider} />
-            <View style={styles.stationCol}>
-              <Text style={[styles.stationVal, { color: '#FFD54F' }]}>{liveCleaning}</Text>
-              <Text style={styles.stationLbl}>Sanitizing</Text>
-            </View>
-            <View style={styles.gridDivider} />
-            <View style={styles.stationCol}>
-              <Text style={styles.stationVal}>{liveTotal}</Text>
-              <Text style={styles.stationLbl}>Total Fleet</Text>
-            </View>
-          </View>
-
-          {liveAvailable === 0 && (
-            <View style={styles.capacityWarning}>
-              <Text style={styles.capacityWarningText}>
-                ⚠️ NICU Phototherapy capacity is full. Triage required before admitting.
-              </Text>
-            </View>
-          )}
+          <TouchableOpacity
+            onPress={onOpenNotifications}
+            style={styles.notifBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badgeDot}>
+                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -259,11 +213,19 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 16,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    paddingRight: 12,
   },
   headerTitle: {
     fontSize: 22,
@@ -275,101 +237,36 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
-  liveCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 16,
-    padding: 12,
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.25)',
-  },
-  liveTopRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
     alignItems: 'center',
-    marginBottom: 10,
+    justifyContent: 'center',
+    position: 'relative',
   },
-  liveIndicatorGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+  bellIcon: {
+    fontSize: 18,
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  liveDotGreen: {
-    backgroundColor: '#00E676',
-  },
-  liveDotRed: {
-    backgroundColor: '#FF5252',
-  },
-  liveStatusTitle: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  capacityPill: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  capacityPillAvail: {
-    backgroundColor: '#00A569',
-  },
-  capacityPillFull: {
+  badgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
     backgroundColor: '#FC3949',
-  },
-  capacityPillText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  stationGrid: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-  },
-  stationCol: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  stationVal: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  stationLbl: {
-    fontSize: 9,
-    fontWeight: '600',
-    color: 'rgba(255, 255, 255, 0.85)',
-    marginTop: 1,
-  },
-  gridDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  capacityWarning: {
-    backgroundColor: 'rgba(252, 57, 73, 0.2)',
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    marginTop: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7D3BFF',
   },
-  capacityWarningText: {
-    fontSize: 10,
-    color: '#FFE4E6',
-    fontWeight: '700',
-    textAlign: 'center',
+  badgeDotText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   listContent: {
     padding: 16,

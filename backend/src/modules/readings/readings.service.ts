@@ -113,7 +113,7 @@ export class ReadingsService {
     } catch {}
 
     const matched = mockReadings.filter(
-      (r) => r.babyId === babyId || r.babyUhid === babyId || babyId === 'Baby 1' || babyId === 'M1A2N3S4I5'
+      (r) => r.babyId === babyId || r.babyUhid === babyId || babyId === 'Sunita Devi' || babyId === 'BS-IN-972612'
     );
     return this.filterByTimeRange(matched.length > 0 ? matched : mockReadings, timeRange);
   }

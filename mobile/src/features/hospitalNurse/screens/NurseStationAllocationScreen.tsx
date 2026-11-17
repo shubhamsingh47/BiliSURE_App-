@@ -8,13 +8,16 @@ import { COLORS } from '../../../theme/colors';
 
 interface NurseStationAllocationScreenProps {
   onBack?: () => void;
+  onOpenNotifications?: () => void;
 }
 
 export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreenProps> = ({
   onBack,
+  onOpenNotifications,
 }) => {
-  const { stations, admissions, allocateStation } = useNetworkStore();
+  const { stations, admissions, allocateStation, updateStationStatus, notifications } = useNetworkStore();
   const { user } = useAuthStore();
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Check if a baby (by UHID or ID) is already occupying an active station
   const isBabyAlreadyAllocated = (babyUhid?: string, babyId?: string) => {
@@ -108,6 +111,23 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     }
   };
 
+  const handleMarkSanitized = async (station: PTStation) => {
+    setIsProcessing(true);
+    try {
+      await updateStationStatus(station.id || station.stationId, 'available', {
+        notes: `Sanitized and inspected ready for neonatal admission by ${user.name}`,
+      });
+      Alert.alert(
+        'Station Ready',
+        `Station ${station.name} (${station.stationId}) has returned to the Available Pool. Hospital capacity updated.`
+      );
+    } catch {
+      Alert.alert('Error', 'Failed to update station readiness');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const getStationBadge = (status: string) => {
     switch (status) {
       case 'available':
@@ -130,17 +150,31 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={styles.headerRow}>
-          {onBack && (
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-              <Text style={styles.backBtnText}>←</Text>
-            </TouchableOpacity>
-          )}
-          <View>
-            <Text style={styles.headerTitle}>PT Station Allocation</Text>
-            <Text style={styles.headerSubtitle}>Real-time Station Bay Management</Text>
+          <View style={styles.headerTitleGroup}>
+            {onBack && (
+              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                <Text style={styles.backBtnText}>←</Text>
+              </TouchableOpacity>
+            )}
+            <View>
+              <Text style={styles.headerTitle}>PT Station Allocation</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            onPress={onOpenNotifications}
+            style={styles.notifBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badgeDot}>
+                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* Live Fleet Capacity Strip */}
@@ -167,7 +201,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
         </View>
 
         {/* Admitted Patient Selector Banner */}
-        {pendingAdmissions.length > 0 ? (
+        {pendingAdmissions.length > 0 && (
           <View style={styles.patientSelectBox}>
             <Text style={styles.selectLabel}>Select Patient for Bed Assignment:</Text>
             <View style={styles.pillList}>
@@ -186,10 +220,6 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
                 );
               })}
             </View>
-          </View>
-        ) : (
-          <View style={styles.noPendingBanner}>
-            <Text style={styles.noPendingText}>All currently admitted patients have active PT stations.</Text>
           </View>
         )}
       </View>
@@ -215,7 +245,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
               </View>
 
               <Text style={styles.stationName}>{item.name}</Text>
-              <Text style={styles.stationLocation}>📍 {item.location} • Type: {item.type.replace('_', ' ').toUpperCase()}</Text>
+              <Text style={styles.stationLocation}>📍 {item.location}</Text>
 
               {item.operationalStatus === 'occupied' && (
                 <View style={styles.occupantBanner}>
@@ -228,37 +258,32 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
                 <Text style={styles.notesText}>Note: {item.notes}</Text>
               ) : null}
 
-              {/* Allocate Button / Station Status */}
-              {isAvail ? (
-                selectedAdmission ? (
+              {/* Bottom Right Action for Allocation */}
+              {isAvail && selectedAdmission && (
+                <View style={styles.cardBottomRow}>
                   <TouchableOpacity
                     onPress={() => handleAllocate(item)}
-                    style={[styles.allocateBtn, isProcessing && styles.allocateBtnDisabled]}
+                    style={[styles.compactAllocateBtn, isProcessing && styles.allocateBtnDisabled]}
                     disabled={isProcessing}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.allocateBtnText}>
-                      Allocate to {selectedAdmission.babyName} ({selectedAdmission.babyUhid}) →
+                    <Text style={styles.compactAllocateBtnText}>Allocate →</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {item.operationalStatus === 'cleaning_prep' && (
+                <View style={styles.cardBottomRow}>
+                  <TouchableOpacity
+                    onPress={() => handleMarkSanitized(item)}
+                    style={styles.compactSanitizeBtn}
+                    disabled={isProcessing}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.compactSanitizeBtnText}>
+                      ✨ Mark Ready
                     </Text>
                   </TouchableOpacity>
-                ) : (
-                  <View style={styles.availableUnassignedBox}>
-                    <Text style={styles.availableUnassignedText}>
-                      {pendingAdmissions.length === 0
-                        ? '✓ Station Available • No Patients Awaiting Bed'
-                        : 'Select Admitted Patient Above to Allocate'}
-                    </Text>
-                  </View>
-                )
-              ) : (
-                <View style={styles.unavailableRow}>
-                  <Text style={styles.unavailableText}>
-                    {item.operationalStatus === 'occupied'
-                      ? 'Station Busy (Locked)'
-                      : item.operationalStatus === 'cleaning_prep'
-                      ? 'Sanitization Required'
-                      : 'Under Service'}
-                  </Text>
                 </View>
               )}
             </View>
@@ -276,7 +301,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 16,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
@@ -285,7 +309,14 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: 8,
+  },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 12,
   },
   backBtn: {
     marginRight: 12,
@@ -305,6 +336,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+  },
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 18,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: '#FC3949',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7D3BFF',
+  },
+  badgeDotText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   fleetStatusCard: {
     flexDirection: 'row',
@@ -371,17 +433,6 @@ const styles = StyleSheet.create({
   },
   patientPillTextActive: {
     color: '#FFFFFF',
-  },
-  noPendingBanner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 4,
-  },
-  noPendingText: {
-    fontSize: 11,
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontStyle: 'italic',
   },
   listContent: {
     padding: 16,
@@ -457,47 +508,43 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748B',
     fontStyle: 'italic',
-    marginBottom: 10,
+    marginBottom: 6,
   },
-  allocateBtn: {
+  cardBottomRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  compactAllocateBtn: {
     backgroundColor: '#00A569',
-    height: 46,
-    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  compactAllocateBtnText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   allocateBtnDisabled: {
     backgroundColor: '#94A3B8',
   },
-  allocateBtnText: {
-    fontSize: 13,
+  compactSanitizeBtn: {
+    backgroundColor: '#059669',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  compactSanitizeBtnText: {
+    fontSize: 11,
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  availableUnassignedBox: {
-    backgroundColor: '#F1F5F9',
-    borderRadius: 14,
-    paddingVertical: 12,
-    paddingHorizontal: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  availableUnassignedText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  unavailableRow: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  unavailableText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
 });
+

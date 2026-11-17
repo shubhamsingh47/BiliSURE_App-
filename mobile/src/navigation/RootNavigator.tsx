@@ -334,13 +334,18 @@ export const RootNavigator: React.FC = () => {
             return (
               <NurseArrivalsScreen
                 onArrivalConfirmed={(admId) => setActiveTab('allocation')}
+                onOpenNotifications={() => setCurrentRoute('notifications')}
               />
             );
           }
 
           // Tab 2: Incoming Referrals
           if (activeTab === 'inbox') {
-            return <HospitalReferralsInboxScreen />;
+            return (
+              <HospitalReferralsInboxScreen
+                onOpenNotifications={() => setCurrentRoute('notifications')}
+              />
+            );
           }
 
           // Tab 3: Phototherapy Tracking
@@ -351,13 +356,18 @@ export const RootNavigator: React.FC = () => {
                   setReadingVal(12.4);
                   setCurrentRoute('present_bilirubin');
                 }}
+                onOpenNotifications={() => setCurrentRoute('notifications')}
               />
             );
           }
 
           // Tab 4: PT Station Allocation
           if (activeTab === 'allocation') {
-            return <NurseStationAllocationScreen />;
+            return (
+              <NurseStationAllocationScreen
+                onOpenNotifications={() => setCurrentRoute('notifications')}
+              />
+            );
           }
 
           // Tab 5: Profile
@@ -451,7 +461,8 @@ export const RootNavigator: React.FC = () => {
 
   const showBottomNav = currentRoute === 'main' || currentRoute === 'trends';
   const showRoleSwitcher =
-    (currentRoute === 'main' && activeTab !== 'profile') || currentRoute === 'trends';
+    ((currentRoute === 'main' && activeTab !== 'profile') || currentRoute === 'trends') &&
+    primaryRole !== 'receiving_hospital';
 
   return (
     <View style={styles.rootContainer}>

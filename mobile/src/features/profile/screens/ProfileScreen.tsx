@@ -42,6 +42,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  const isReceivingHospital =
+    primaryRole === 'receiving_hospital' ||
+    activeRole === 'hospital_doctor' ||
+    activeRole === 'hospital_nurse' ||
+    activeRole === 'hospital_admin';
+
   const handleSyncNow = async () => {
     const res = await SyncEngine.syncPending();
     Alert.alert(
@@ -132,7 +138,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          {onOpenFacilitySelection && (
+          {!isReceivingHospital && onOpenFacilitySelection && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onOpenFacilitySelection}
@@ -194,7 +200,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
 
-          {onOpenOtp && (
+          {!isReceivingHospital && onOpenOtp && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onOpenOtp}
@@ -210,28 +216,32 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleSyncNow}
-            style={styles.menuItem}
-          >
-            <View style={styles.menuLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
-                <RefreshCw size={18} color="#059669" />
+          {!isReceivingHospital && (
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={handleSyncNow}
+              style={styles.menuItem}
+            >
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#D1FAE5' }]}>
+                  <RefreshCw size={18} color="#059669" />
+                </View>
+                <Text style={styles.menuLabel}>Sync Pending Records Now</Text>
               </View>
-              <Text style={styles.menuLabel}>Sync Pending Records Now</Text>
-            </View>
-            <ChevronRight size={18} color="#94A3B8" />
-          </TouchableOpacity>
+              <ChevronRight size={18} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
 
-          <View style={styles.menuItem}>
-            <View style={styles.menuLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
-                <ShieldCheck size={18} color="#D97706" />
+          {!isReceivingHospital && (
+            <View style={styles.menuItem}>
+              <View style={styles.menuLeft}>
+                <View style={[styles.iconBox, { backgroundColor: '#FEF3C7' }]}>
+                  <ShieldCheck size={18} color="#D97706" />
+                </View>
+                <Text style={styles.menuLabel}>Offline SQLite Cache: Active</Text>
               </View>
-              <Text style={styles.menuLabel}>Offline SQLite Cache: Active</Text>
             </View>
-          </View>
+          )}
         </View>
 
         <TouchableOpacity
