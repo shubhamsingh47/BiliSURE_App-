@@ -4,16 +4,20 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
 const getBackendBaseUrl = (): string => {
-  // If running via Expo development server on a physical device, resolve host machine's LAN IP
-  const hostUri = Constants.expoConfig?.hostUri;
-  if (hostUri) {
-    const hostIp = hostUri.split(':')[0];
-    return `http://${hostIp}:5000/api/v1`;
-  }
+  try {
+    // If running via Expo development server on a physical device, resolve host machine's LAN IP
+    const hostUri = Constants?.expoConfig?.hostUri;
+    if (hostUri) {
+      const hostIp = hostUri.split(':')[0];
+      return `http://${hostIp}:5000/api/v1`;
+    }
 
-  // Android Virtual Device (AVD) emulator alias
-  if (Platform.OS === 'android') {
-    return 'http://10.0.2.2:5000/api/v1';
+    // Android Virtual Device (AVD) emulator alias
+    if (typeof Platform !== 'undefined' && Platform?.OS === 'android') {
+      return 'http://10.0.2.2:5000/api/v1';
+    }
+  } catch {
+    // Fallback if native runtime constants are not ready during initial module evaluation
   }
 
   return 'http://localhost:5000/api/v1';

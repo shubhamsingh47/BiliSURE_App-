@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "scheme": "bilisure",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "android": {
       "package": "com.bilisure",
       "adaptiveIcon": {
