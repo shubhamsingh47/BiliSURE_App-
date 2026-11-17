@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   User,
   Cpu,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { useNetworkStore } from '../../../store/useNetworkStore';
 import { SyncEngine } from '../../../services/sync.engine';
 
 interface ProfileScreenProps {
@@ -36,6 +38,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   onOpenOtp,
 }) => {
   const { user, logout, activeRole, primaryRole, activeHospitalProfile, hasPermission } = useAuthStore();
+  const { notifications } = useNetworkStore();
+  const insets = useSafeAreaInsets();
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleSyncNow = async () => {
     const res = await SyncEngine.syncPending();
@@ -65,10 +70,25 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   return (
     <View style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Clinician Profile</Text>
-        </View>
+      <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 10 }]}>
+        {/* Independent Notification Icon (top right, no container card) */}
+        {onOpenNotifications && (
+          <View style={styles.topBellRow}>
+            <TouchableOpacity
+              onPress={onOpenNotifications}
+              style={styles.independentNotifBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Text style={styles.bellEmoji}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeDotText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         <View style={styles.userCard}>
           <View style={styles.avatar}>
@@ -230,13 +250,48 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  header: {
-    marginBottom: 16,
+  topBellRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  title: {
-    fontSize: 22,
+  independentNotifBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  bellEmoji: {
+    fontSize: 18,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#FC3949',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  badgeDotText: {
+    color: '#FFFFFF',
+    fontSize: 10,
     fontWeight: '800',
-    color: COLORS.textPrimary,
   },
   userCard: {
     flexDirection: 'row',

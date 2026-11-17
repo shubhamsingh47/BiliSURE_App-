@@ -19,6 +19,8 @@ interface PatientState {
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
   updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
   addReading: (readingData: Partial<BilirubinReading>) => Promise<BilirubinReading>;
+  addObservation: (babyId: string, site: string, bilirubinValue: number, observerName: string) => ClinicalObservation;
+  updateObservation: (observationId: string, updates: { site?: string; bilirubinValue?: number }) => void;
 }
 
 export const usePatientStore = create<PatientState>((set, get) => ({
@@ -28,7 +30,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       serverId: '651a00010000000000000001',
       uhid: 'M1A2N3S4I5',
       bilisureId: 'BS-2026-0041',
-      name: 'Baby 1',
+      name: 'Sarah Jenkins',
       parentsName: 'Sarah Jenkins',
       dateOfBirth: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
       exactTimeOfBirth: '08:00',
@@ -42,7 +44,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       status: 'under_treatment',
       referralStatus: 'accepted',
       initialValue: 10.0,
-      dischargeValue: 5.0,
+      dischargeValue: 0,
       updatedAt: new Date().toISOString(),
     },
     {
@@ -50,7 +52,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       serverId: '651a00010000000000000002',
       uhid: 'B2C3D4E5F6',
       bilisureId: 'BS-2026-0042',
-      name: 'Baby 2',
+      name: 'Emily Watson',
       parentsName: 'Emily Watson',
       dateOfBirth: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
       exactTimeOfBirth: '14:30',
@@ -72,7 +74,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       serverId: '651a00010000000000000003',
       uhid: 'G7H8I9J0K1',
       bilisureId: 'BS-2026-0043',
-      name: 'Baby 3',
+      name: 'Maria Rodriguez',
       parentsName: 'Maria Rodriguez',
       dateOfBirth: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
       exactTimeOfBirth: '10:15',
@@ -184,7 +186,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       id: 'baby_' + Date.now(),
       uhid: babyData.uhid || `UHID_${Date.now().toString().slice(-6)}`,
       bilisureId: `BS-2026-${Math.floor(1000 + Math.random() * 9000)}`,
-      name: babyData.name || 'New Baby',
+      name: babyData.name || 'New Patient',
       parentsName: babyData.parentsName || '',
       dateOfBirth: babyData.dateOfBirth || new Date().toISOString(),
       exactTimeOfBirth: babyData.exactTimeOfBirth || '09:00',
@@ -330,5 +332,30 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     SyncEngine.syncPending().catch(() => {});
 
     return newReading;
+  },
+
+  addObservation: (babyId, site, bilirubinValue, observerName) => {
+    const now = new Date().toISOString();
+    const newObservation: ClinicalObservation = {
+      id: 'obs_' + Date.now(),
+      clientOperationId: 'obs_op_' + Date.now(),
+      babyId,
+      site,
+      observerName,
+      clinicalNotes: '',
+      bilirubinValue,
+      timestamp: now,
+      syncStatus: 'pending',
+    };
+    set((state) => ({ observations: [newObservation, ...state.observations] }));
+    return newObservation;
+  },
+
+  updateObservation: (observationId, updates) => {
+    set((state) => ({
+      observations: state.observations.map((o) =>
+        o.id === observationId ? { ...o, ...updates } : o
+      ),
+    }));
   },
 }));

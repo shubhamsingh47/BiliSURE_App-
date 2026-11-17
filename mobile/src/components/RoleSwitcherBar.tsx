@@ -6,9 +6,13 @@ import { useNetworkStore } from '../store/useNetworkStore';
 
 interface RoleSwitcherBarProps {
   onOpenNotifications?: () => void;
+  showOnlyBell?: boolean;
 }
 
-export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({ onOpenNotifications }) => {
+export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
+  onOpenNotifications,
+  showOnlyBell = false,
+}) => {
   const { user, primaryRole } = useAuthStore();
   const { notifications } = useNetworkStore();
   const [showNotifModal, setShowNotifModal] = useState(false);
@@ -35,17 +39,19 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({ onOpenNotifica
   return (
     <View style={[styles.wrapper, { paddingTop: insets.top }]}>
       {/* User & Facility Active Identity Banner */}
-      <View style={styles.identityRow}>
-        <View style={styles.identityLeft}>
-          <Text style={styles.userNameText} numberOfLines={1}>
-            {displayName}
-          </Text>
-          <Text style={styles.facilityText} numberOfLines={1}>
-            {isReceiving
-              ? 'District Civil Hospital • Neonatal Intensive Care & PT Unit'
-              : `${user.facility} • ${user.department}`}
-          </Text>
-        </View>
+      <View style={[styles.identityRow, showOnlyBell && { justifyContent: 'flex-end' }]}>
+        {!showOnlyBell && (
+          <View style={styles.identityLeft}>
+            <Text style={styles.userNameText} numberOfLines={1}>
+              {displayName}
+            </Text>
+            <Text style={styles.facilityText} numberOfLines={1}>
+              {isReceiving
+                ? 'District Civil Hospital • Neonatal Intensive Care & PT Unit'
+                : `${user.facility} • ${user.department}`}
+            </Text>
+          </View>
+        )}
 
         <View style={styles.identityRight}>
           {/* Preserved Notification Bell with unread badge */}

@@ -8,12 +8,14 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 interface ChartCardProps {
   initialValue?: number;
   dischargeValue?: number;
+  points?: number[]; // observation values, oldest -> newest (0-30 mg/dL)
   onRangeChange?: (range: string) => void;
 }
 
 export const ChartCard: React.FC<ChartCardProps> = ({
   initialValue = 10.0,
   dischargeValue = 5.0,
+  points,
   onRangeChange,
 }) => {
   const [selectedRange, setSelectedRange] = useState('1hr');
@@ -29,7 +31,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   const height = 150;
 
   // Spline wave matching frame 27
-  const pathD = `
+  let pathD = `
     M 0 60
     C ${width * 0.15} 65, ${width * 0.22} 125, ${width * 0.28} 125
     C ${width * 0.35} 125, ${width * 0.45} 60, ${width * 0.55} 60
@@ -37,6 +39,26 @@ export const ChartCard: React.FC<ChartCardProps> = ({
     C ${width * 0.78} 80, ${width * 0.82} 45, ${width * 0.86} 45
     C ${width * 0.92} 45, ${width * 0.96} 70, ${width} 60
   `;
+
+  // Data-driven curve when observation values are available
+  if (points && points.length > 0) {
+    const pad = 14;
+    const toY = (v: number) =>
+      height - pad - (Math.max(0, Math.min(30, v)) / 30) * (height - pad * 2);
+    if (points.length === 1) {
+      const y = toY(points[0]);
+      pathD = `M 0 ${y} L ${width} ${y}`;
+    } else {
+      const step = width / (points.length - 1);
+      pathD = `M 0 ${toY(points[0])}`;
+      for (let i = 1; i < points.length; i++) {
+        const x0 = (i - 1) * step;
+        const x1 = i * step;
+        const mid = (x0 + x1) / 2;
+        pathD += ` C ${mid} ${toY(points[i - 1])}, ${mid} ${toY(points[i])}, ${x1} ${toY(points[i])}`;
+      }
+    }
+  }
 
   const fillD = `${pathD} L ${width} ${height} L 0 ${height} Z`;
 

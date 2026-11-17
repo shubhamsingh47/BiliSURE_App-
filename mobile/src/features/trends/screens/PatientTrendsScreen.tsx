@@ -9,12 +9,15 @@ import {
   TextInput,
   Alert,
 } from 'react-native';
-import { ChevronDown, ArrowLeft, Check, Edit3, X } from 'lucide-react-native';
+import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { ChartCard } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
-import { Baby } from '../../../types';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { Baby, ClinicalObservation } from '../../../types';
+
+const OBS_SITES = ['Forehead', 'Sternum'];
 
 interface PatientTrendsScreenProps {
   onBackToDashboard: () => void;
@@ -29,9 +32,17 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   onSeeAllObservations,
   onOpenReferral,
 }) => {
-  const { babies, selectedBaby, selectBaby, updateBaby, observations, readings } = usePatientStore();
+  const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
+  const { user } = useAuthStore();
   const activeBaby: Baby = selectedBaby || babies[0];
   const [showBabyDropdown, setShowBabyDropdown] = useState(false);
+
+  // Observation add/edit state
+  const [showObsModal, setShowObsModal] = useState(false);
+  const [editingObs, setEditingObs] = useState<ClinicalObservation | null>(null);
+  const [obsValue, setObsValue] = useState('');
+  const [obsSite, setObsSite] = useState(OBS_SITES[0]);
+  const [obsError, setObsError] = useState('');
 
   // Edit Patient State
   const [showEditModal, setShowEditModal] = useState(false);
@@ -47,8 +58,9 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenEdit = () => {
-    setEditName(activeBaby.name);
-    setEditParentsName(activeBaby.parentsName || '');
+    const mName = activeBaby.parentsName?.trim() || activeBaby.name;
+    setEditName(mName);
+    setEditParentsName(mName);
     setEditGestationalAge(
       activeBaby.gestationalAgeWeeks ? String(activeBaby.gestationalAgeWeeks) : '38'
     );
@@ -59,7 +71,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   const handleSaveEdit = async () => {
     if (!editName.trim()) {
-      Alert.alert('Required', 'Patient name cannot be empty');
+      Alert.alert('Required', "Mother's name cannot be empty");
       return;
     }
 
@@ -67,13 +79,13 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     try {
       await updateBaby(activeBaby.id, {
         name: editName.trim(),
-        parentsName: editParentsName.trim(),
+        parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
         severityState: editSeverity,
       });
       setShowEditModal(false);
-      Alert.alert('Updated', `Patient ${editName.trim()} has been updated.`);
+      Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
     } catch {
       Alert.alert('Error', 'Failed to update patient details');
     } finally {
@@ -81,8 +93,76 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     }
   };
 
-  const initialVal = activeBaby.initialValue || 10.0;
-  const dischargeVal = activeBaby.dischargeValue || 5.0;
+  // Initial = first value entered for this baby; Discharge = set via Discharge button
+  const babyObservations = observations
+    .filter((o) => o.babyId === activeBaby.id)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  const initialVal: number | null =
+    babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
+  const isDischarged = activeBaby.status === 'discharged';
+  const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
+
+  const handleDischarge = async () => {
+    if (babyObservations.length === 0) {
+      Alert.alert('No readings', 'Add an observation before discharging.');
+      return;
+    }
+    const lastVal = babyObservations[0].bilirubinValue;
+    await updateBaby(activeBaby.id, {
+      status: 'discharged',
+      dischargeValue: lastVal,
+    });
+    Alert.alert('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
+  };
+
+  const recentObservations = babyObservations.slice(0, 4);
+  // Chart points oldest -> newest
+  const chartPoints = [...babyObservations].reverse().map((o) => o.bilirubinValue);
+
+  const handleOpenAddObs = () => {
+    setEditingObs(null);
+    setObsValue('');
+    setObsSite(OBS_SITES[0]);
+    setObsError('');
+    setShowObsModal(true);
+  };
+
+  const handleOpenEditObs = (obs: ClinicalObservation) => {
+    setEditingObs(obs);
+    setObsValue(String(obs.bilirubinValue));
+    setObsSite(obs.site);
+    setObsError('');
+    setShowObsModal(true);
+  };
+
+  const handleObsValueChange = (t: string) => {
+    const cleaned = t.replace(/[^0-9.]/g, '');
+    setObsValue(cleaned);
+    if (cleaned === '') {
+      setObsError('');
+      return;
+    }
+    const num = parseFloat(cleaned);
+    if (isNaN(num) || num < 0 || num > 30) {
+      setObsError('Enter a value between 0 and 30');
+    } else {
+      setObsError('');
+    }
+  };
+
+  const handleSaveObs = () => {
+    const num = parseFloat(obsValue);
+    if (obsValue.trim() === '' || isNaN(num) || num < 0 || num > 30) {
+      setObsError('Enter a value between 0 and 30');
+      return;
+    }
+    if (editingObs) {
+      updateObservation(editingObs.id, { bilirubinValue: num, site: obsSite });
+    } else {
+      addObservation(activeBaby.id, obsSite, num, user?.name || 'Nurse A');
+    }
+    setShowObsModal(false);
+  };
 
   return (
     <View style={styles.safeArea}>
@@ -105,7 +185,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             accessibilityLabel="Select Patient Dropdown"
           >
             <ChevronDown size={18} color="#7D3BFF" />
-            <Text style={styles.babyDropdownText}>{activeBaby.name}</Text>
+            <Text style={styles.babyDropdownText}>{activeBaby.parentsName || activeBaby.name}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -148,7 +228,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                     >
                       <View style={styles.babyOptionInfo}>
                         <Text style={[styles.dropdownOptionText, isSelected && styles.dropdownOptionTextActive]}>
-                          {baby.name}
+                          {baby.parentsName || baby.name}
                         </Text>
                         <Text style={styles.babySubText}>
                           UHID: {baby.uhid} • Gestation: {baby.gestationalAgeWeeks || 38}w
@@ -178,20 +258,12 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
               </View>
 
               <ScrollView style={styles.editModalBody} showsVerticalScrollIndicator={false}>
-                <Text style={styles.inputLabel}>Patient's Full Name *</Text>
+                <Text style={styles.inputLabel}>Mother's Name *</Text>
                 <TextInput
                   style={styles.textInput}
                   value={editName}
                   onChangeText={setEditName}
-                  placeholder="e.g. Baby 1"
-                />
-
-                <Text style={styles.inputLabel}>Parent / Mother's Name</Text>
-                <TextInput
-                  style={styles.textInput}
-                  value={editParentsName}
-                  onChangeText={setEditParentsName}
-                  placeholder="e.g. Sarah Jenkins"
+                  placeholder="Mother's name"
                 />
 
                 <View style={styles.inputRow}>
@@ -277,25 +349,109 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           {/* Initial Value Card (Green) */}
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => onOpenReadingDetail(initialVal, 'Palms and soles')}
+            onPress={() => initialVal !== null && onOpenReadingDetail(initialVal, 'Palms and soles')}
             style={[styles.statCard, { backgroundColor: '#00A569' }]}
           >
             <Text style={styles.statCardLabel}>Initial Value</Text>
-            <Text style={styles.statCardValue}>{initialVal.toFixed(1)}mg/dL</Text>
+            <Text style={styles.statCardValue}>{initialVal !== null ? `${initialVal.toFixed(1)}mg/dL` : '--'}</Text>
           </TouchableOpacity>
 
           {/* Discharge Value Card (Red/Coral) */}
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => onOpenReadingDetail(dischargeVal, 'Forehead')}
+            onPress={() => dischargeVal !== null && onOpenReadingDetail(dischargeVal, 'Forehead')}
             style={[styles.statCard, { backgroundColor: '#FC3949' }]}
           >
             <Text style={styles.statCardLabel}>Discharge Value</Text>
-            <Text style={styles.statCardValue}>{dischargeVal.toFixed(1)}mg/dL</Text>
+            <Text style={styles.statCardValue}>{dischargeVal !== null ? `${dischargeVal.toFixed(1)}mg/dL` : '--'}</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section */}
+        {/* Recent Observations Table */}
+        <View style={styles.obsHeaderRow}>
+          <Text style={styles.obsSectionTitle}>Recent Observations</Text>
+          <View style={styles.obsHeaderActions}>
+            {!isDischarged && (
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={handleOpenAddObs}
+                style={styles.addObsPill}
+                accessibilityLabel="Add Observation"
+              >
+                <Plus size={14} color="#FFFFFF" />
+                <Text style={styles.addObsText}>Add</Text>
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={onSeeAllObservations}
+              style={styles.seeAllPill}
+            >
+              <Text style={styles.seeAllText}>See All</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={styles.obsTable}>
+          <View style={styles.obsTableHead}>
+            <Text style={[styles.obsHeadText, { flex: 1.2 }]}>Site</Text>
+            <Text style={[styles.obsHeadText, { flex: 1 }]}>Value</Text>
+            <Text style={[styles.obsHeadText, { flex: 1.6 }]}>Date & Time</Text>
+            <View style={{ width: 28 }} />
+          </View>
+          {recentObservations.length === 0 ? (
+            <Text style={styles.obsEmptyText}>No observations recorded</Text>
+          ) : (
+            recentObservations.map((o) => (
+              <TouchableOpacity
+                key={o.id}
+                activeOpacity={0.8}
+                onPress={() => onOpenReadingDetail(o.bilirubinValue, o.site)}
+                style={styles.obsRowItem}
+              >
+                <Text style={[styles.obsCell, { flex: 1.2 }]} numberOfLines={1}>
+                  {o.site}
+                </Text>
+                <Text style={[styles.obsCell, styles.obsCellVal, { flex: 1 }]}>
+                  {o.bilirubinValue.toFixed(1)}
+                </Text>
+                <Text style={[styles.obsCellTime, { flex: 1.6 }]} numberOfLines={2}>
+                  {new Date(o.timestamp).toLocaleDateString([], { day: '2-digit', month: 'short' })}
+                  {', '}
+                  {new Date(o.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => handleOpenEditObs(o)}
+                  style={styles.obsEditBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Edit Observation"
+                >
+                  <Edit3 size={14} color="#7D3BFF" />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+
+        {/* Bilirubin Readings Spline Chart - driven by observation data */}
+        <ChartCard
+          initialValue={initialVal ?? undefined}
+          dischargeValue={dischargeVal ?? undefined}
+          points={chartPoints}
+        />
+
+        {/* Referral Action Callout Button */}
+        {onOpenReferral && (
+          <TouchableOpacity
+            onPress={onOpenReferral}
+            style={[styles.referralCalloutBtn, { marginTop: 16 }]}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section (last) */}
         <View style={styles.nomogramSection}>
           <BhutaniNomogramChart
             readings={readings as any}
@@ -305,50 +461,74 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           />
         </View>
 
-        {/* Bilirubin Readings Spline Chart (Video Frame 27) */}
-        <ChartCard
-          initialValue={initialVal}
-          dischargeValue={dischargeVal}
-        />
+        {/* Add / Edit Observation Modal */}
+        <Modal visible={showObsModal} transparent animationType="slide">
+          <View style={styles.editModalOverlay}>
+            <View style={styles.editModalContent}>
+              <View style={styles.editModalHeader}>
+                <Text style={styles.editModalTitle}>
+                  {editingObs ? 'Edit Observation' : 'Add Observation'}
+                </Text>
+                <TouchableOpacity onPress={() => setShowObsModal(false)} style={styles.editCloseBtn}>
+                  <X size={20} color="#64748B" />
+                </TouchableOpacity>
+              </View>
 
-        {/* Referral Action Callout Button */}
-        {onOpenReferral && (
+              <Text style={styles.inputLabel}>Bilirubin Value (0 - 30 mg/dL) *</Text>
+              <TextInput
+                style={[styles.textInput, !!obsError && { borderColor: '#FC3949' }]}
+                value={obsValue}
+                onChangeText={handleObsValueChange}
+                keyboardType="decimal-pad"
+                placeholder="e.g. 12.5"
+              />
+              {!!obsError && <Text style={styles.obsErrorText}>{obsError}</Text>}
+
+              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Site</Text>
+              {OBS_SITES.map((s) => {
+                const sel = obsSite === s;
+                return (
+                  <TouchableOpacity
+                    key={s}
+                    activeOpacity={0.7}
+                    onPress={() => setObsSite(s)}
+                    style={styles.radioRow}
+                  >
+                    <View style={[styles.radioOuter, sel && styles.radioOuterActive]}>
+                      {sel && <View style={styles.radioInner} />}
+                    </View>
+                    <Text style={styles.radioLabel}>{s}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+
+              <View style={styles.modalBtnRow}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowObsModal(false)}>
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveObs}>
+                  <Text style={styles.saveBtnText}>{editingObs ? 'Save Changes' : 'Add Observation'}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Discharge Button */}
+        {!isDischarged ? (
           <TouchableOpacity
-            onPress={onOpenReferral}
-            style={styles.referralCalloutBtn}
             activeOpacity={0.8}
+            onPress={handleDischarge}
+            style={styles.dischargeBtn}
+            accessibilityLabel="Discharge"
           >
-            <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
+            <Text style={styles.dischargeBtnText}>Discharge</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={[styles.dischargeBtn, { backgroundColor: '#E2E8F0' }]}>
+            <Text style={[styles.dischargeBtnText, { color: '#64748B' }]}>Patient Discharged</Text>
+          </View>
         )}
-
-        {/* Recent Observations Section */}
-        <View style={styles.obsHeaderRow}>
-          <Text style={styles.obsSectionTitle}>Recent Observations</Text>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={onSeeAllObservations}
-            style={styles.seeAllPill}
-          >
-            <Text style={styles.seeAllText}>See All</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Observation Card from Frame 27 */}
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={() => onOpenReadingDetail(18.0, 'Face')}
-          style={styles.obsCard}
-        >
-          <View>
-            <Text style={styles.obsTitle}>{activeBaby.name}: Face</Text>
-            <Text style={styles.obsSub}>Readings By Nurse A</Text>
-          </View>
-          <View style={styles.obsRight}>
-            <Text style={styles.obsReadingVal}>18.0mg/dL</Text>
-            <Text style={styles.obsTime}>10:00 AM</Text>
-          </View>
-        </TouchableOpacity>
 
         <View style={{ height: 90 }} />
       </ScrollView>
@@ -420,22 +600,146 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    height: 120,
-    borderRadius: 24,
-    padding: 16,
+    height: 72,
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     justifyContent: 'space-between',
     marginHorizontal: 4,
   },
   statCardLabel: {
     color: '#FFFFFF',
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     opacity: 0.9,
   },
   statCardValue: {
     color: '#FFFFFF',
-    fontSize: 26,
+    fontSize: 18,
     fontWeight: '800',
+  },
+  dischargeBtn: {
+    backgroundColor: '#FC3949',
+    borderRadius: 16,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 16,
+  },
+  dischargeBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  obsHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addObsPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7D3BFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 16,
+    gap: 4,
+  },
+  addObsText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  obsTable: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginBottom: 4,
+  },
+  obsTableHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  obsHeadText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+  },
+  obsRowItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F8FAFC',
+  },
+  obsCell: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  obsCellVal: {
+    fontWeight: '800',
+    color: '#7D3BFF',
+  },
+  obsCellTime: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  obsEditBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  obsEmptyText: {
+    fontSize: 13,
+    color: '#94A3B8',
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  obsErrorText: {
+    fontSize: 12,
+    color: '#FC3949',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+  radioRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  radioOuter: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  radioOuterActive: {
+    borderColor: '#7D3BFF',
+  },
+  radioInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#7D3BFF',
+  },
+  radioLabel: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '600',
   },
   nomogramSection: {
     marginVertical: 10,

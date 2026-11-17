@@ -1,7 +1,6 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
 
 const getBackendBaseUrl = (): string => {
   try {
@@ -13,7 +12,8 @@ const getBackendBaseUrl = (): string => {
     }
 
     // Android Virtual Device (AVD) emulator alias
-    if (typeof Platform !== 'undefined' && Platform?.OS === 'android') {
+    const { Platform } = require('react-native');
+    if (Platform?.OS === 'android') {
       return 'http://10.0.2.2:5000/api/v1';
     }
   } catch {

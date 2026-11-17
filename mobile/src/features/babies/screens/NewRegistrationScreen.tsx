@@ -36,8 +36,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   onSuccess,
 }) => {
   const { user } = useAuthStore();
-  const [patientName, setPatientName] = useState('');
-  const [parentsName, setParentsName] = useState('');
+  const [motherName, setMotherName] = useState('');
   const [dob, setDob] = useState(formatCurrentDateTime());
   const [uhid, setUhid] = useState('');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
@@ -56,8 +55,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   };
 
   const handleContinue = async () => {
-    if (!patientName.trim()) {
-      Alert.alert('Required Field', "Please enter the baby's name");
+    if (!motherName.trim()) {
+      Alert.alert('Required Field', "Please enter the mother's name");
       return;
     }
 
@@ -66,8 +65,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       const now = new Date();
       const finalUhid = uhid.trim() || `BS-${Math.floor(100000 + Math.random() * 900000)}`;
       const created = await registerBaby({
-        name: patientName.trim(),
-        parentsName: parentsName.trim() || 'Parent',
+        name: motherName.trim(),
+        parentsName: motherName.trim(),
         uhid: finalUhid,
         assignedDoctor: doctor,
         facility,
@@ -78,7 +77,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       });
       onSuccess(created.uhid);
     } catch {
-      Alert.alert('Error', 'Failed to register newborn');
+      Alert.alert('Error', 'Failed to register patient');
     } finally {
       setLoading(false);
     }
@@ -99,15 +98,9 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
       <ScrollView contentContainerStyle={styles.contentCard} showsVerticalScrollIndicator={false}>
         <CustomInput
-          placeholder="Patient’s Name"
-          value={patientName}
-          onChangeText={setPatientName}
-        />
-
-        <CustomInput
-          placeholder="Parents’ name"
-          value={parentsName}
-          onChangeText={setParentsName}
+          placeholder="Mother's name"
+          value={motherName}
+          onChangeText={setMotherName}
         />
 
         <CustomInput

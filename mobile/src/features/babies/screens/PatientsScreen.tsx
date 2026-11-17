@@ -64,8 +64,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
 
   const handleOpenEdit = (baby: Baby) => {
     setEditingBaby(baby);
-    setEditName(baby.name);
-    setEditParentsName(baby.parentsName || '');
+    const mName = baby.parentsName?.trim() || baby.name;
+    setEditName(mName);
+    setEditParentsName(mName);
     setEditGestationalAge(baby.gestationalAgeWeeks ? String(baby.gestationalAgeWeeks) : '38');
     setEditWeight(baby.weight ? String(baby.weight) : '3.1');
     setEditHeight(baby.height ? String(baby.height) : '48');
@@ -76,7 +77,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
   const handleSaveEdit = async () => {
     if (!editingBaby) return;
     if (!editName.trim()) {
-      Alert.alert('Required', 'Patient name cannot be empty');
+      Alert.alert('Required', "Mother's name cannot be empty");
       return;
     }
 
@@ -84,7 +85,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
     try {
       await updateBaby(editingBaby.id, {
         name: editName.trim(),
-        parentsName: editParentsName.trim(),
+        parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
         height: parseFloat(editHeight) || 48.0,
@@ -144,7 +145,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         <Search size={18} color="#94A3B8" />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by Baby Name, UHID, Mother..."
+          placeholder="Search by Mother's Name, UHID..."
           placeholderTextColor="#94A3B8"
           value={search}
           onChangeText={setSearch}
@@ -193,27 +194,45 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
             <User size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Patients Found</Text>
             <Text style={styles.emptySub}>
-              No baby records match your search or filter criteria.
+              No patient records match your search or filter criteria.
             </Text>
           </View>
         }
         renderItem={({ item }) => {
           const badge = getSeverityBadge(item.severityState);
+          const motherName = item.parentsName?.trim() || item.name;
           return (
-            <View style={styles.patientCard}>
-              {/* Card Header */}
+            <TouchableOpacity
+              activeOpacity={0.75}
+              onPress={() => onSelectBaby(item)}
+              style={styles.patientCard}
+            >
+              {/* Card Header: Mother Name + UHID on left, Risk Badge + Pencil Edit on right */}
               <View style={styles.cardHeader}>
                 <View style={styles.nameBlock}>
-                  <Text style={styles.babyName}>{item.name}</Text>
+                  <Text style={styles.babyName} numberOfLines={1}>
+                    {motherName}
+                  </Text>
                   <View style={styles.uhidBadge}>
                     <Text style={styles.uhidText}>{item.uhid}</Text>
                   </View>
                 </View>
 
-                <View style={[styles.riskBadge, { backgroundColor: badge.bg }]}>
-                  <Text style={[styles.riskBadgeText, { color: badge.text }]}>
-                    {badge.label}
-                  </Text>
+                <View style={styles.headerRightGroup}>
+                  <View style={[styles.riskBadge, { backgroundColor: badge.bg }]}>
+                    <Text style={[styles.riskBadgeText, { color: badge.text }]}>
+                      {badge.label}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={styles.pencilEditBtn}
+                    onPress={() => handleOpenEdit(item)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel={`Edit ${motherName}`}
+                  >
+                    <Edit3 size={15} color="#7D3BFF" />
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -238,34 +257,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
                   </Text>
                 </View>
               </View>
-
-              {item.parentsName && (
-                <Text style={styles.motherText}>
-                  Mother / Parent: <Text style={styles.motherBold}>{item.parentsName}</Text>
-                </Text>
-              )}
-
-              {/* Card Action Buttons */}
-              <View style={styles.actionRow}>
-                <TouchableOpacity
-                  style={styles.editBtn}
-                  onPress={() => handleOpenEdit(item)}
-                  activeOpacity={0.7}
-                >
-                  <Edit3 size={15} color="#7D3BFF" />
-                  <Text style={styles.editBtnText}>Edit Details</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.trendsBtn}
-                  onPress={() => onSelectBaby(item)}
-                  activeOpacity={0.7}
-                >
-                  <TrendingUp size={15} color="#FFFFFF" />
-                  <Text style={styles.trendsBtnText}>Trends & Nomogram</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />
@@ -288,20 +280,12 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
             </View>
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>Patient's Full Name *</Text>
+              <Text style={styles.inputLabel}>Mother's Name *</Text>
               <TextInput
                 style={styles.textInput}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="e.g. Baby 1"
-              />
-
-              <Text style={styles.inputLabel}>Parent / Mother's Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editParentsName}
-                onChangeText={setEditParentsName}
-                placeholder="e.g. Sarah Jenkins"
+                placeholder="Mother's name"
               />
 
               <View style={styles.inputRow}>
@@ -520,6 +504,19 @@ const styles = StyleSheet.create({
   riskBadgeText: {
     fontSize: 9,
     fontWeight: '800',
+  },
+  headerRightGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pencilEditBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   metaGrid: {
     flexDirection: 'row',

@@ -26,7 +26,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenReportStories,
   onOpenNewRegistration,
 }) => {
-  const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby } = usePatientStore();
+  const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
   const [activeDept, setActiveDept] = useState(selectedDepartment || 'Deppt');
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
 
@@ -41,8 +41,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const handleOpenEdit = (baby: Baby) => {
     setEditingBaby(baby);
-    setEditName(baby.name);
-    setEditParentsName(baby.parentsName || '');
+    const mName = baby.parentsName?.trim() || baby.name;
+    setEditName(mName);
+    setEditParentsName(mName);
     setEditGestationalAge(baby.gestationalAgeWeeks ? String(baby.gestationalAgeWeeks) : '38');
     setEditWeight(baby.weight ? String(baby.weight) : '3.1');
     setEditSeverity(baby.severityState || 'normal');
@@ -51,7 +52,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const handleSaveEdit = async () => {
     if (!editingBaby) return;
     if (!editName.trim()) {
-      Alert.alert('Required', 'Patient name cannot be empty');
+      Alert.alert('Required', "Mother's name cannot be empty");
       return;
     }
 
@@ -59,7 +60,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     try {
       await updateBaby(editingBaby.id, {
         name: editName.trim(),
-        parentsName: editParentsName.trim(),
+        parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
         severityState: editSeverity,
@@ -120,6 +121,48 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const getPillColor = (idx: number) => {
     const colors = [COLORS.pillBeige, COLORS.pillBeige, COLORS.pillPink, COLORS.pillGreen, COLORS.pillBlue];
     return colors[idx % colors.length];
+  };
+
+  const getLatestSample = (babyId: string) => {
+    const babyObs = observations
+      .filter((o) => o.babyId === babyId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const babyRdgs = readings
+      .filter((r) => r.babyId === babyId)
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    const latestObs = babyObs[0];
+    const latestRdg = babyRdgs[0];
+
+    if (latestObs && latestRdg) {
+      if (new Date(latestObs.timestamp).getTime() >= new Date(latestRdg.timestamp).getTime()) {
+        return {
+          value: latestObs.bilirubinValue,
+          timestamp: latestObs.timestamp,
+        };
+      }
+      return {
+        value: latestRdg.value,
+        timestamp: latestRdg.timestamp,
+      };
+    }
+
+    if (latestObs) {
+      return {
+        value: latestObs.bilirubinValue,
+        timestamp: latestObs.timestamp,
+      };
+    }
+
+    if (latestRdg) {
+      return {
+        value: latestRdg.value,
+        timestamp: latestRdg.timestamp,
+      };
+    }
+
+    return null;
   };
 
   return (
@@ -193,6 +236,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <BabyCard
               key={baby.id + '_today_' + idx}
               baby={baby}
+              latestSample={getLatestSample(baby.id)}
               pillColor={getPillColor(idx)}
               onPress={() => onSelectBaby(baby)}
               onEditPress={() => handleOpenEdit(baby)}
@@ -214,6 +258,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <BabyCard
               key={baby.id + '_yesterday_' + idx}
               baby={baby}
+              latestSample={getLatestSample(baby.id)}
               pillColor={getPillColor(idx + 3)}
               onPress={() => onSelectBaby(baby)}
               onEditPress={() => handleOpenEdit(baby)}
@@ -243,20 +288,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             </View>
 
             <ScrollView style={styles.editModalBody} showsVerticalScrollIndicator={false}>
-              <Text style={styles.inputLabel}>Patient's Full Name *</Text>
+              <Text style={styles.inputLabel}>Mother's Name *</Text>
               <TextInput
                 style={styles.textInput}
                 value={editName}
                 onChangeText={setEditName}
-                placeholder="e.g. Baby 1"
-              />
-
-              <Text style={styles.inputLabel}>Parent / Mother's Name</Text>
-              <TextInput
-                style={styles.textInput}
-                value={editParentsName}
-                onChangeText={setEditParentsName}
-                placeholder="e.g. Sarah Jenkins"
+                placeholder="Mother's name"
               />
 
               <View style={styles.inputRow}>

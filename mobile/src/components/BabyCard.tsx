@@ -7,14 +7,49 @@ import { Baby, BilirubinReading } from '../types';
 interface BabyCardProps {
   baby: Baby;
   latestReading?: BilirubinReading;
+  latestSample?: {
+    value?: number;
+    timestamp?: string;
+  } | null;
   onPress: () => void;
   onEditPress?: () => void;
   pillColor?: string;
 }
 
+const formatRegistrationTime = (baby: Baby): string => {
+  if (baby.exactTimeOfBirth) {
+    if (baby.exactTimeOfBirth.includes('AM') || baby.exactTimeOfBirth.includes('PM')) {
+      return baby.exactTimeOfBirth;
+    }
+    const parts = baby.exactTimeOfBirth.split(':');
+    if (parts.length >= 2) {
+      let h = parseInt(parts[0], 10);
+      const m = parts[1];
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      h = h % 12 || 12;
+      return `${h}:${m} ${ampm}`;
+    }
+    return baby.exactTimeOfBirth;
+  }
+  if (baby.dateOfBirth) {
+    const d = new Date(baby.dateOfBirth);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  if (baby.updatedAt) {
+    const d = new Date(baby.updatedAt);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+  }
+  return '';
+};
+
 export const BabyCard: React.FC<BabyCardProps> = ({
   baby,
   latestReading,
+  latestSample,
   onPress,
   onEditPress,
   pillColor = COLORS.pillBeige,
@@ -32,10 +67,12 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   };
 
   const severity = getSeverityInfo(baby.severityState);
-  const readingVal = latestReading?.value ?? baby.initialValue ?? 10.0;
-  const readingTime = latestReading?.timestamp
-    ? new Date(latestReading.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    : baby.exactTimeOfBirth || '10:00 AM';
+  const sample = latestSample !== undefined
+    ? latestSample
+    : latestReading
+    ? { value: latestReading.value, timestamp: latestReading.timestamp }
+    : null;
+  const registrationTime = formatRegistrationTime(baby);
 
   return (
     <TouchableOpacity
@@ -50,14 +87,14 @@ export const BabyCard: React.FC<BabyCardProps> = ({
       <View style={styles.middleSection}>
         <View style={styles.nameRow}>
           <Text style={styles.babyName} numberOfLines={1}>
-            {baby.name}
+            {baby.parentsName?.trim() || baby.name}
           </Text>
           {onEditPress && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onEditPress}
               style={styles.editIconBtn}
-              accessibilityLabel={`Edit ${baby.name}`}
+              accessibilityLabel={`Edit ${baby.parentsName || baby.name}`}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Edit3 size={13} color="#7D3BFF" />
@@ -67,14 +104,17 @@ export const BabyCard: React.FC<BabyCardProps> = ({
         <Text style={[styles.statusText, { color: severity.color }]}>
           {severity.label}
         </Text>
-        <Text style={styles.seeMore}>See more</Text>
       </View>
 
       <View style={styles.rightSection}>
-        <Text style={[styles.readingLabel, { color: severity.color }]}>
-          Bilirubin reading
-        </Text>
-        <Text style={styles.readingTime}>{readingTime}</Text>
+        {sample?.value != null && (
+          <Text style={[styles.sampleValueText, { color: severity.color }]}>
+            {sample.value.toFixed(1)} mg/dL
+          </Text>
+        )}
+        {!!registrationTime && (
+          <Text style={styles.readingTime}>{registrationTime}</Text>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -137,21 +177,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginTop: 2,
   },
-  seeMore: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
-  },
   rightSection: {
     alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingLeft: 8,
   },
-  readingLabel: {
+  sampleValueText: {
     fontSize: 14,
-    fontWeight: '700',
+    fontWeight: '800',
+    marginBottom: 2,
   },
   readingTime: {
     fontSize: 12,
     color: '#64748B',
-    marginTop: 3,
+    fontWeight: '600',
   },
 });

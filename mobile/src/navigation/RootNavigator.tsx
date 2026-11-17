@@ -457,7 +457,8 @@ export const RootNavigator: React.FC = () => {
   };
 
   const showBottomNav = currentRoute === 'main' || currentRoute === 'trends';
-  const showRoleSwitcher = currentRoute === 'main' || currentRoute === 'trends';
+  const showRoleSwitcher =
+    (currentRoute === 'main' && activeTab !== 'profile') || currentRoute === 'trends';
 
   return (
     <View style={styles.rootContainer}>

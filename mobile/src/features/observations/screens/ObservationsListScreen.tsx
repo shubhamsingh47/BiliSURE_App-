@@ -10,12 +10,15 @@ interface ObservationsListScreenProps {
 
 export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ onBack }) => {
   const { observations, selectedBaby } = usePatientStore();
+  const sortedObservations = observations
+    .filter((o) => !selectedBaby || o.babyId === selectedBaby.id)
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <View style={styles.safeArea}>
       <CustomHeader title={`Observations - ${selectedBaby?.name || 'Baby 1'}`} onBack={onBack} />
       <FlatList
-        data={observations}
+        data={sortedObservations}
         keyExtractor={(item) => item.id}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
