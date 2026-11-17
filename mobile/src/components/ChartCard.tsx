@@ -7,58 +7,63 @@ import {
   Dimensions,
   TouchableWithoutFeedback,
 } from 'react-native';
-import Svg, { Path, Defs, LinearGradient, Stop, Line, Circle, G } from 'react-native-svg';
+import Svg, { Path, Defs, LinearGradient, Stop, Line, Circle, G, Text as SvgText } from 'react-native-svg';
 import { X as CloseIcon } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { moderateScale, fontScale, SPACING } from '../theme/responsive';
+import {
+  GraphReading,
+  computeReadingHour,
+  calculateElapsedHoursFromRegistration,
+  generateBilirubinTrendPaths,
+} from '../services/chartTimeline.service';
+
+export type { GraphReading };
+export {
+  computeReadingHour,
+  calculateElapsedHoursFromRegistration,
+  generateBilirubinTrendPaths,
+};
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
-
-export interface GraphReading {
-  id: string;
-  value: number; // in mg/dL
-  timestamp: string | number | Date;
-  site?: string;
-}
 
 interface ChartCardProps {
   initialValue?: number;
   dischargeValue?: number;
   readings?: GraphReading[];
-  points?: number[]; // fallback
+  points?: number[]; // fallback if only numerical points passed
+  babyRegistrationTime?: string | number | Date;
+  babyDateOfBirth?: string | Date;
+  babyExactTimeOfBirth?: string;
   onRangeChange?: (range: string) => void;
 }
 
 export const ChartCard: React.FC<ChartCardProps> = ({
+  initialValue = 0,
   readings,
   points,
-  onRangeChange,
+  babyRegistrationTime,
+  babyDateOfBirth,
+  babyExactTimeOfBirth,
 }) => {
-  const [selectedRange, setSelectedRange] = useState<'1hr' | '8hr' | '16hr' | '24hr'>('24hr');
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 72);
 
-  const ranges: ('1hr' | '8hr' | '16hr' | '24hr')[] = ['1hr', '8hr', '16hr', '24hr'];
+  // Fixed single 24-hour X-axis scale (0h to 24h)
+  const maxHours = 24;
+  const xTicks = [0, 4, 8, 12, 16, 20, 24];
 
-  const handleSelectRange = (r: '1hr' | '8hr' | '16hr' | '24hr') => {
-    setSelectedRange(r);
-    setSelectedPointIndex(null);
-    onRangeChange?.(r);
-  };
-
-  // Fixed internal Y-axis scale: 0 to 24 with intervals of 4
-  // 0, 4, 8, 12, 16, 20, 24
-  // NOTE: These values are strictly internal and never rendered as text numbers.
+  // Fixed internal Y-axis scale: 0 to 24 mg/dL with intervals of 4
   const Y_MIN = 0;
   const Y_MAX = 24;
   const Y_GRID_INTERVALS = [0, 4, 8, 12, 16, 20, 24];
 
   const cardWidth = containerWidth > 0 ? containerWidth : SCREEN_WIDTH - 72;
-  const chartHeight = 160;
-  const paddingTop = 18;
-  const paddingBottom = 18;
-  const paddingLeft = 14;
-  const paddingRight = 14;
+  const chartHeight = 175;
+  const paddingTop = 16;
+  const paddingBottom = 30; // Dedicated space for single clear X-axis
+  const paddingLeft = 24;
+  const paddingRight = 24;
   const plotWidth = Math.max(10, cardWidth - paddingLeft - paddingRight);
   const plotHeight = chartHeight - paddingTop - paddingBottom;
 
@@ -69,197 +74,66 @@ export const ChartCard: React.FC<ChartCardProps> = ({
         (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
       );
     }
-    // Fallback if only points were passed
+    // Fallback if only points (values) were passed
     if (points && points.length > 0) {
       const now = Date.now();
-      const intervalMs = (4 * 3600 * 1000) / Math.max(1, points.length - 1);
       return points.map((val, idx) => ({
         id: `point_${idx}`,
         value: val,
-        timestamp: new Date(now - (points.length - 1 - idx) * intervalMs).toISOString(),
+        timestamp: new Date(now).toISOString(),
         site: 'Forehead',
+        postnatalAgeHours: (idx + 1) * (maxHours / points.length),
       }));
     }
     return [];
-  }, [readings, points]);
+  }, [readings, points, maxHours]);
 
-  // Window calculation in milliseconds
-  const windowMs = useMemo(() => {
-    switch (selectedRange) {
-      case '1hr':
-        return 1 * 60 * 60 * 1000;
-      case '8hr':
-        return 8 * 60 * 60 * 1000;
-      case '16hr':
-        return 16 * 60 * 60 * 1000;
-      case '24hr':
-      default:
-        return 24 * 60 * 60 * 1000;
-    }
-  }, [selectedRange]);
+  // Compute the reading's elapsed hours from baby registration time
+  // e.g. Baby registered at 2:00 PM, Data taken at 4:30 PM -> 2.5 hours
+  const getReadingHour = (r: GraphReading): number => {
+    const regTime = babyRegistrationTime || babyDateOfBirth;
+    return computeReadingHour(r, regTime, maxHours);
+  };
 
-  // Filter actual readings within the selected window relative to the latest record
-  const { filteredReadings, windowStart, windowEnd } = useMemo(() => {
-    if (sortedReadings.length === 0) {
-      const now = Date.now();
-      return { filteredReadings: [], windowStart: now - windowMs, windowEnd: now };
-    }
-
-    const latestMs = new Date(
-      sortedReadings[sortedReadings.length - 1].timestamp
-    ).getTime();
-    const now = Date.now();
-
-    // If latest reading was taken within the last window, anchor to now, otherwise anchor to latest reading
-    const anchorMs = now - latestMs < windowMs ? now : latestMs;
-    const startMs = anchorMs - windowMs;
-
-    const filtered = sortedReadings.filter((r) => {
-      const t = new Date(r.timestamp).getTime();
-      return t >= startMs && t <= anchorMs + 1000;
-    });
-
-    return { filteredReadings: filtered, windowStart: startMs, windowEnd: anchorMs };
-  }, [sortedReadings, windowMs]);
-
-  // Map value (0-24) to Y coordinate (clamped so readings > 24 don't draw outside top)
+  // Map value to Y coordinate
   const getY = (val: number) => {
     const clamped = Math.max(Y_MIN, Math.min(Y_MAX, val));
     return paddingTop + (1 - clamped / Y_MAX) * plotHeight;
   };
 
-  // Precompute plotted points dynamically spanning the card space logically
+  // Map hour (0 to 24h) to X coordinate
+  const getX = (hourVal: number) => {
+    const clamped = Math.max(0, Math.min(maxHours, hourVal));
+    return paddingLeft + (clamped / maxHours) * plotWidth;
+  };
+
+  // Plotted points: placed precisely at their true elapsed hour from registration
   const plottedPoints = useMemo(() => {
-    const total = filteredReadings.length;
-    if (total === 0) return [];
-
-    if (total === 1) {
-      const r = filteredReadings[0];
-      return [{ ...r, x: cardWidth / 2, y: getY(r.value) }];
-    }
-
-    const tFirst = new Date(filteredReadings[0].timestamp).getTime();
-    const tLast = new Date(filteredReadings[total - 1].timestamp).getTime();
-    const timeSpan = tLast - tFirst;
-
-    return filteredReadings.map((r, i) => {
-      let ratio = i / (total - 1);
-      if (timeSpan > 0) {
-        const t = new Date(r.timestamp).getTime();
-        ratio = (t - tFirst) / timeSpan;
-      }
-      const x = paddingLeft + ratio * (cardWidth - paddingLeft - paddingRight);
+    return sortedReadings.map((r) => {
+      const hour = getReadingHour(r);
+      const x = getX(hour);
       const y = getY(r.value);
-      return { ...r, x, y };
+      return {
+        ...r,
+        hour,
+        x,
+        y,
+      };
     });
-  }, [filteredReadings, cardWidth, plotHeight, paddingLeft, paddingRight, paddingTop]);
+  }, [sortedReadings, maxHours, plotWidth, plotHeight, cardWidth, babyRegistrationTime, babyDateOfBirth]);
 
-  // Build SVG path: Monotone cubic spline (PCHIP / Fritsch-Carlson)
-  // Subtle, gently curved line passing through actual readings with no artificial peaks/overshoots
-  const { linePath, areaPath } = useMemo(() => {
-    const baselineY = (paddingTop + plotHeight).toFixed(1);
-
-    if (plottedPoints.length === 0) {
-      return { linePath: '', areaPath: '' };
-    }
-
-    if (plottedPoints.length === 1) {
-      const ptY = plottedPoints[0].y.toFixed(1);
-      const lPath = `M 0 ${ptY} L ${cardWidth.toFixed(1)} ${ptY}`;
-      const aPath = `${lPath} L ${cardWidth.toFixed(1)} ${baselineY} L 0 ${baselineY} Z`;
-      return { linePath: lPath, areaPath: aPath };
-    }
-
-    const n = plottedPoints.length;
-    const firstPt = plottedPoints[0];
-    const lastPt = plottedPoints[n - 1];
-
-    if (n === 2) {
-      // Gentle, subtle curve between 2 points
-      const p0 = plottedPoints[0];
-      const p1 = plottedPoints[1];
-      const dx = p1.x - p0.x;
-      const cp1x = p0.x + dx / 3;
-      const cp1y = p0.y;
-      const cp2x = p1.x - dx / 3;
-      const cp2y = p1.y;
-
-      let lPath = `M 0 ${p0.y.toFixed(1)} L ${p0.x.toFixed(1)} ${p0.y.toFixed(1)}`;
-      lPath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-      lPath += ` L ${cardWidth.toFixed(1)} ${p1.y.toFixed(1)}`;
-
-      const aPath = `${lPath} L ${cardWidth.toFixed(1)} ${baselineY} L 0 ${baselineY} Z`;
-      return { linePath: lPath, areaPath: aPath };
-    }
-
-    // Monotone cubic Hermite spline interpolation (PCHIP / Fritsch-Carlson)
-    const dxs: number[] = [];
-    const deltas: number[] = [];
-    for (let i = 0; i < n - 1; i++) {
-      const dx = plottedPoints[i + 1].x - plottedPoints[i].x;
-      const dy = plottedPoints[i + 1].y - plottedPoints[i].y;
-      dxs.push(dx);
-      deltas.push(dx > 0.001 ? dy / dx : 0);
-    }
-
-    const tangents: number[] = new Array(n).fill(0);
-    tangents[0] = deltas[0];
-    tangents[n - 1] = deltas[n - 2];
-
-    for (let i = 1; i < n - 1; i++) {
-      if (deltas[i - 1] * deltas[i] <= 0) {
-        tangents[i] = 0; // Local extremum: derivative is zero, no artificial overshoot
-      } else {
-        tangents[i] = (2 * deltas[i - 1] * deltas[i]) / (deltas[i - 1] + deltas[i]);
-      }
-    }
-
-    // Fritsch-Carlson monotonicity check & adjustment
-    for (let i = 0; i < n - 1; i++) {
-      const delta = deltas[i];
-      if (Math.abs(delta) < 0.00001) {
-        tangents[i] = 0;
-        tangents[i + 1] = 0;
-      } else {
-        const alpha = tangents[i] / delta;
-        const beta = tangents[i + 1] / delta;
-        const dist = Math.hypot(alpha, beta);
-        if (dist > 3) {
-          const tau = 3 / dist;
-          tangents[i] = tau * alpha * delta;
-          tangents[i + 1] = tau * beta * delta;
-        }
-      }
-    }
-
-    // Connect from left edge to first point
-    let lPath = `M 0 ${firstPt.y.toFixed(1)} L ${firstPt.x.toFixed(1)} ${firstPt.y.toFixed(1)}`;
-
-    for (let i = 0; i < n - 1; i++) {
-      const p0 = plottedPoints[i];
-      const p1 = plottedPoints[i + 1];
-      const h = dxs[i];
-
-      if (h < 0.001) {
-        lPath += ` L ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-        continue;
-      }
-
-      const cp1x = p0.x + h / 3;
-      const cp1y = p0.y + (h / 3) * tangents[i];
-      const cp2x = p1.x - h / 3;
-      const cp2y = p1.y - (h / 3) * tangents[i + 1];
-
-      lPath += ` C ${cp1x.toFixed(1)} ${cp1y.toFixed(1)}, ${cp2x.toFixed(1)} ${cp2y.toFixed(1)}, ${p1.x.toFixed(1)} ${p1.y.toFixed(1)}`;
-    }
-
-    // Connect from last point to right edge
-    lPath += ` L ${cardWidth.toFixed(1)} ${lastPt.y.toFixed(1)}`;
-
-    const aPath = `${lPath} L ${cardWidth.toFixed(1)} ${baselineY} L 0 ${baselineY} Z`;
-
-    return { linePath: lPath, areaPath: aPath };
-  }, [plottedPoints, cardWidth, paddingTop, plotHeight]);
+  // Generate continuous trend spline starting from 0, area fill, and session indicator
+  const { linePath, areaPath, projectionPath, sessionLine } = useMemo(() => {
+    return generateBilirubinTrendPaths({
+      plottedPoints,
+      paddingLeft,
+      paddingRight,
+      cardWidth,
+      paddingTop,
+      plotHeight,
+      initialValue,
+    });
+  }, [plottedPoints, paddingLeft, paddingRight, cardWidth, paddingTop, plotHeight, initialValue]);
 
   const activePoint =
     selectedPointIndex !== null && plottedPoints[selectedPointIndex]
@@ -269,7 +143,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   const formatDate = (ts: string | number | Date) => {
     const d = new Date(ts);
     if (isNaN(d.getTime())) return '';
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   };
 
   const formatTime = (ts: string | number | Date) => {
@@ -280,7 +154,10 @@ export const ChartCard: React.FC<ChartCardProps> = ({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.chartTitle}>BiliSURE Bilirubin Readings</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.chartTitle}>BiliSURE Bilirubin Readings</Text>
+        <Text style={styles.chartSubtitle}>Timeline from Registration (0h – 24h)</Text>
+      </View>
 
       {/* Chart Canvas with tap-away dismissal */}
       <TouchableWithoutFeedback onPress={() => setSelectedPointIndex(null)}>
@@ -301,7 +178,23 @@ export const ChartCard: React.FC<ChartCardProps> = ({
               </LinearGradient>
             </Defs>
 
-            {/* Internal Horizontal Grid Lines corresponding to 0, 4, 8, 12, 16, 20, 24 mg/dL */}
+            {/* Vertical Time Grid Lines for Hour Ticks */}
+            {xTicks.map((tick) => {
+              const tx = getX(tick);
+              return (
+                <Line
+                  key={`vtick_${tick}`}
+                  x1={tx}
+                  y1={paddingTop}
+                  x2={tx}
+                  y2={paddingTop + plotHeight}
+                  stroke="#F8FAFC"
+                  strokeWidth={1}
+                />
+              );
+            })}
+
+            {/* Horizontal Grid Lines corresponding to 0, 4, 8, 12, 16, 20, 24 mg/dL */}
             {Y_GRID_INTERVALS.map((gridVal) => {
               const gy = getY(gridVal);
               return (
@@ -311,29 +204,96 @@ export const ChartCard: React.FC<ChartCardProps> = ({
                   y1={gy}
                   x2={cardWidth - paddingRight}
                   y2={gy}
-                  stroke={gridVal === 0 ? '#E2E8F0' : '#F1F5F9'}
+                  stroke={gridVal === 0 ? '#CBD5E1' : '#F1F5F9'}
                   strokeDasharray={gridVal === 0 ? undefined : '4 4'}
-                  strokeWidth={1}
+                  strokeWidth={gridVal === 0 ? 1.5 : 1}
                 />
               );
             })}
 
-            {/* Subtle Gradient Area Fill beneath gently curved trend line */}
+            {/* Subtle Gradient Area Fill beneath curve */}
             {areaPath.length > 0 && <Path d={areaPath} fill="url(#purpleAreaGradient)" />}
 
-            {/* Gently Curved Trend Line passing through actual readings */}
+            {/* Continuous Trend Line Starting from 0 */}
             {linePath.length > 0 && (
               <Path
                 d={linePath}
                 fill="none"
                 stroke="#7D3BFF"
-                strokeWidth={3}
+                strokeWidth={2.5}
                 strokeLinecap="round"
                 strokeLinejoin="round"
+                opacity={0.9}
               />
             )}
 
-            {/* Plotted Visible Data Points */}
+            {/* Subtle projection line to right edge from latest observation */}
+            {projectionPath.length > 0 && (
+              <Path
+                d={projectionPath}
+                fill="none"
+                stroke="#7D3BFF"
+                strokeWidth={1.5}
+                strokeDasharray="4 4"
+                strokeLinecap="round"
+                opacity={0.35}
+              />
+            )}
+
+            {/* Vertical session indicator when multiple readings exist at the same hour */}
+            {sessionLine && sessionLine.y2 - sessionLine.y1 > 4 && (
+              <Line
+                x1={sessionLine.x}
+                y1={sessionLine.y1}
+                x2={sessionLine.x}
+                y2={sessionLine.y2}
+                stroke="#7D3BFF"
+                strokeWidth={2}
+                strokeDasharray="3 3"
+                opacity={0.8}
+              />
+            )}
+
+            {/* Single Clear X-Axis Baseline */}
+            <Line
+              x1={paddingLeft}
+              y1={paddingTop + plotHeight}
+              x2={cardWidth - paddingRight}
+              y2={paddingTop + plotHeight}
+              stroke="#CBD5E1"
+              strokeWidth={1.5}
+            />
+
+            {/* X-Axis Tick Marks and Labels: 0h, 4h, 8h, 12h, 16h, 20h, 24h */}
+            {xTicks.map((tick) => {
+              const tx = getX(tick);
+              return (
+                <G key={`xaxis_${tick}`}>
+                  {/* Tick notch */}
+                  <Line
+                    x1={tx}
+                    y1={paddingTop + plotHeight}
+                    x2={tx}
+                    y2={paddingTop + plotHeight + 4}
+                    stroke="#94A3B8"
+                    strokeWidth={1.5}
+                  />
+                  {/* Tick label */}
+                  <SvgText
+                    x={tx}
+                    y={paddingTop + plotHeight + 17}
+                    fontSize={11}
+                    fontWeight="700"
+                    fill="#64748B"
+                    textAnchor="middle"
+                  >
+                    {tick}h
+                  </SvgText>
+                </G>
+              );
+            })}
+
+            {/* Plotted Visible Data Points: exactly aligned at their true hour from registration */}
             {plottedPoints.map((pt, idx) => {
               const isSelected = selectedPointIndex === idx;
               return (
@@ -380,11 +340,11 @@ export const ChartCard: React.FC<ChartCardProps> = ({
             />
           ))}
 
-          {/* Empty state overlay when no readings fall in selected time window */}
+          {/* Empty state overlay when no readings exist */}
           {plottedPoints.length === 0 && (
             <View style={styles.emptyOverlay}>
               <Text style={styles.emptyText}>
-                No readings recorded in the last {selectedRange}
+                No readings recorded yet for this patient
               </Text>
             </View>
           )}
@@ -397,7 +357,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
                 {
                   left: Math.max(
                     4,
-                    Math.min(cardWidth - 144, activePoint.x - 70)
+                    Math.min(cardWidth - 148, activePoint.x - 72)
                   ),
                   top: Math.max(
                     4,
@@ -419,7 +379,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
               </View>
 
               <Text style={styles.tooltipMeta}>
-                {formatDate(activePoint.timestamp)} • {formatTime(activePoint.timestamp)}
+                +{activePoint.hour.toFixed(1)}h from Registration • {formatDate(activePoint.timestamp)}, {formatTime(activePoint.timestamp)}
               </Text>
               {!!activePoint.site && (
                 <Text style={styles.tooltipSite}>Site: {activePoint.site}</Text>
@@ -428,25 +388,6 @@ export const ChartCard: React.FC<ChartCardProps> = ({
           )}
         </View>
       </TouchableWithoutFeedback>
-
-      {/* Time Window Filters (1hr, 8hr, 16hr, 24hr) */}
-      <View style={styles.filterRow}>
-        {ranges.map((r) => {
-          const isActive = selectedRange === r;
-          return (
-            <TouchableOpacity
-              key={r}
-              activeOpacity={0.75}
-              onPress={() => handleSelectRange(r)}
-              style={[styles.rangePill, isActive && styles.rangePillActive]}
-            >
-              <Text style={[styles.rangeText, isActive && styles.rangeTextActive]}>
-                {r}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
     </View>
   );
 };
@@ -466,18 +407,27 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
     overflow: 'hidden',
   },
+  titleRow: {
+    marginBottom: SPACING.xs,
+    paddingHorizontal: 4,
+  },
   chartTitle: {
     fontSize: fontScale(17),
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: SPACING.xs,
-    paddingHorizontal: 4,
+  },
+  chartSubtitle: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
   },
   chartBox: {
     width: '100%',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    marginTop: SPACING.xs,
   },
   pointTouchTarget: {
     position: 'absolute',
@@ -505,8 +455,8 @@ const styles = StyleSheet.create({
   },
   tooltipContainer: {
     position: 'absolute',
-    width: 140,
-    backgroundColor: '#1E1B4B', // rich dark purple tooltip
+    width: 148,
+    backgroundColor: '#1E1B4B',
     borderRadius: 10,
     paddingVertical: 7,
     paddingHorizontal: 10,
@@ -538,29 +488,5 @@ const styles = StyleSheet.create({
     color: '#A5B4FC',
     marginTop: 1,
     fontWeight: '600',
-  },
-  filterRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: SPACING.sm,
-    paddingHorizontal: 4,
-  },
-  rangePill: {
-    paddingVertical: moderateScale(6),
-    paddingHorizontal: moderateScale(14),
-    borderRadius: moderateScale(14),
-    backgroundColor: 'transparent',
-  },
-  rangePillActive: {
-    backgroundColor: '#FEF3C7', // soft active amber pill matching BiliSURE theme
-  },
-  rangeText: {
-    fontSize: fontScale(13),
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  rangeTextActive: {
-    color: '#D97706',
-    fontWeight: '700',
   },
 });

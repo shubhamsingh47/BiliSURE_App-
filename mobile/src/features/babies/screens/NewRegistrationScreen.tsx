@@ -74,6 +74,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         severityState: severity,
         dateOfBirth: now.toISOString(),
         exactTimeOfBirth: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        registeredAt: now.toISOString(),
+        createdAt: now.toISOString(),
         updatedAt: now.toISOString(),
       });
       onSuccess(created.uhid);

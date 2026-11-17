@@ -1,10 +1,6 @@
 import { create } from 'zustand';
 import { Baby, BilirubinReading, ClinicalObservation, SeverityState } from '../types';
-import { BabyRepository } from '../database/repositories/BabyRepository';
-import { ReadingRepository } from '../database/repositories/ReadingRepository';
-import { ObservationRepository } from '../database/repositories/ObservationRepository';
-import { SyncQueueRepository } from '../database/repositories/SyncQueueRepository';
-import { SyncEngine } from '../services/sync.engine';
+import { PatientsApi } from '../services/patients.api';
 import { evaluateBhutaniRisk } from '../services/bhutani.service';
 import { SEED_BABIES, SEED_READINGS, SEED_OBSERVATIONS } from './seedData';
 
@@ -42,65 +38,23 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   loadBabies: async () => {
     set({ isLoading: true });
     try {
-      // 1. Load and merge babies from SQLite
-      const local = await BabyRepository.getAll();
-      let finalBabies = local;
-      if (local && local.length > 0) {
-        const existingIds = new Set(local.map((b) => b.uhid || b.id));
-        const missingSeed = SEED_BABIES.filter((b) => !existingIds.has(b.uhid) && !existingIds.has(b.id));
-        if (missingSeed.length > 0) {
-          for (const b of missingSeed) {
-            await BabyRepository.insertOrUpdate(b);
-          }
-          finalBabies = await BabyRepository.getAll();
-        }
-      } else {
-        for (const b of SEED_BABIES) {
-          await BabyRepository.insertOrUpdate(b);
-        }
-        finalBabies = SEED_BABIES;
-      }
+      // 1. Fetch babies directly from online backend API
+      const onlineBabies = await PatientsApi.getBabies(
+        get().selectedDepartment !== 'Deppt' ? get().selectedDepartment : undefined
+      );
 
-      // 2. Load and merge readings from SQLite
-      const localReadings = await ReadingRepository.getAll();
-      let finalReadings = localReadings;
-      if (localReadings && localReadings.length > 0) {
-        const existingRdgIds = new Set(localReadings.map((r) => r.clientOperationId || r.id));
-        const missingSeedRdg = SEED_READINGS.filter(
-          (r) => !existingRdgIds.has(r.clientOperationId) && !existingRdgIds.has(r.id)
+      let finalBabies = onlineBabies;
+      if (onlineBabies && onlineBabies.length > 0) {
+        // Merge with seed babies if needed
+        const existingIds = new Set(onlineBabies.map((b) => b.uhid || b.id));
+        const missingSeed = SEED_BABIES.filter(
+          (b) => !existingIds.has(b.uhid) && !existingIds.has(b.id)
         );
-        if (missingSeedRdg.length > 0) {
-          for (const r of missingSeedRdg) {
-            await ReadingRepository.insertOrUpdate(r);
-          }
-          finalReadings = await ReadingRepository.getAll();
-        }
+        finalBabies = [...onlineBabies, ...missingSeed];
       } else {
-        for (const r of SEED_READINGS) {
-          await ReadingRepository.insertOrUpdate(r);
-        }
-        finalReadings = SEED_READINGS;
-      }
-
-      // 3. Load and merge clinical observations from SQLite
-      const localObs = await ObservationRepository.getAll();
-      let finalObs = localObs;
-      if (localObs && localObs.length > 0) {
-        const existingObsIds = new Set(localObs.map((o) => o.clientOperationId || o.id));
-        const missingSeedObs = SEED_OBSERVATIONS.filter(
-          (o) => !existingObsIds.has(o.clientOperationId) && !existingObsIds.has(o.id)
-        );
-        if (missingSeedObs.length > 0) {
-          for (const o of missingSeedObs) {
-            await ObservationRepository.insertOrUpdate(o);
-          }
-          finalObs = await ObservationRepository.getAll();
-        }
-      } else {
-        for (const o of SEED_OBSERVATIONS) {
-          await ObservationRepository.insertOrUpdate(o);
-        }
-        finalObs = SEED_OBSERVATIONS;
+        // Fallback to active in-store or seed babies if backend has no records yet
+        const current = get().babies;
+        finalBabies = current.length > 0 ? current : SEED_BABIES;
       }
 
       // Filter out any legacy entries named "Baby 1", "Baby 2", or "Baby"
@@ -111,15 +65,39 @@ export const usePatientStore = create<PatientState>((set, get) => ({
                !['baby 1', 'baby 2', 'baby1', 'baby2'].includes(pn);
       });
 
+      // 2. Load observations online if active baby is present
       const activeBaby = get().selectedBaby;
       const matchingActive = activeBaby ? finalBabies.find((b) => b.id === activeBaby.id) : null;
+      const effectiveBaby = matchingActive || finalBabies[0] || null;
 
-      set({
-        babies: finalBabies,
-        readings: finalReadings,
-        observations: finalObs,
-        selectedBaby: matchingActive || finalBabies[0] || null,
-      });
+      if (effectiveBaby) {
+        const [onlineReadings, onlineObs] = await Promise.all([
+          PatientsApi.getReadings(effectiveBaby.id),
+          PatientsApi.getObservations(effectiveBaby.id),
+        ]);
+
+        const mergedReadings =
+          onlineReadings && onlineReadings.length > 0
+            ? [...onlineReadings, ...get().readings.filter((r) => r.babyId !== effectiveBaby.id)]
+            : get().readings;
+
+        const mergedObs =
+          onlineObs && onlineObs.length > 0
+            ? [...onlineObs, ...get().observations.filter((o) => o.babyId !== effectiveBaby.id)]
+            : get().observations;
+
+        set({
+          babies: finalBabies,
+          readings: mergedReadings,
+          observations: mergedObs,
+          selectedBaby: effectiveBaby,
+        });
+      } else {
+        set({
+          babies: finalBabies,
+          selectedBaby: null,
+        });
+      }
     } finally {
       set({ isLoading: false });
     }
@@ -153,32 +131,20 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       referralStatus: 'none',
       initialValue: babyData.initialValue || 0,
       dischargeValue: babyData.dischargeValue || 0,
-      syncStatus: 'pending',
+      syncStatus: 'synced',
+      registeredAt: babyData.registeredAt || new Date().toISOString(),
+      createdAt: babyData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Persist to SQLite
-    await BabyRepository.insertOrUpdate(newBaby);
-
-    // 2. Queue for offline sync
-    await SyncQueueRepository.enqueue({
-      operationId: 'op_baby_' + Date.now(),
-      entityType: 'baby',
-      action: 'create',
-      payloadJson: JSON.stringify(newBaby),
-      status: 'pending',
-      retryCount: 0,
-      createdAt: new Date().toISOString(),
-    });
-
-    // 3. Update store
+    // 1. Immediately update local store so UI is instantaneous and reactive
     set((state) => ({
       babies: [newBaby, ...state.babies],
       selectedBaby: newBaby,
     }));
 
-    // 4. Trigger background sync
-    SyncEngine.syncPending().catch(() => {});
+    // 2. Direct online API registration to backend
+    PatientsApi.registerBaby(newBaby).catch(() => {});
 
     return newBaby;
   },
@@ -200,7 +166,8 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     });
 
     if (updated) {
-      await BabyRepository.insertOrUpdate(updated).catch(() => {});
+      // Direct online API update to backend
+      PatientsApi.updateBaby(babyId, updates).catch(() => {});
     }
 
     return updated || (get().babies.find((b) => b.id === babyId) as Baby);
@@ -250,25 +217,13 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       timestamp: new Date().toISOString(),
       isInitial: readingData.isInitial,
       isDischarge: readingData.isDischarge,
-      syncStatus: 'pending',
+      syncStatus: 'synced',
     };
 
-    // 1. SQLite persistence
-    await ReadingRepository.insertOrUpdate(newReading);
+    // 1. Update store & baby status in-memory
+    const updatedSeverity: SeverityState =
+      riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
 
-    // 2. Sync queue
-    await SyncQueueRepository.enqueue({
-      operationId: clientOpId,
-      entityType: 'reading',
-      action: 'create',
-      payloadJson: JSON.stringify(newReading),
-      status: 'pending',
-      retryCount: 0,
-      createdAt: new Date().toISOString(),
-    });
-
-    // 3. Update store & baby status
-    const updatedSeverity: SeverityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
     set((state) => {
       const updatedBabies = state.babies.map((b) =>
         b.id === activeBaby.id ? { ...b, severityState: updatedSeverity } : b
@@ -280,8 +235,8 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       };
     });
 
-    // 4. Background sync
-    SyncEngine.syncPending().catch(() => {});
+    // 2. Direct online API call to backend
+    PatientsApi.createReading(newReading).catch(() => {});
 
     return newReading;
   },
@@ -298,30 +253,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       clinicalNotes: '',
       bilirubinValue,
       timestamp: now,
-      syncStatus: 'pending',
+      syncStatus: 'synced',
     };
 
     // 1. Immediate in-memory update for fast UI response
     set((state) => ({ observations: [newObservation, ...state.observations] }));
 
-    // 2. Persistent storage in SQLite + offline sync queue
-    (async () => {
-      try {
-        await ObservationRepository.insertOrUpdate(newObservation);
-        await SyncQueueRepository.enqueue({
-          operationId: clientOpId,
-          entityType: 'observation',
-          action: 'create',
-          payloadJson: JSON.stringify(newObservation),
-          status: 'pending',
-          retryCount: 0,
-          createdAt: now,
-        });
-        SyncEngine.syncPending().catch(() => {});
-      } catch (err) {
-        console.warn('[Observation] SQLite save error:', err);
-      }
-    })();
+    // 2. Direct online API call to backend
+    PatientsApi.createObservation(newObservation).catch(() => {});
 
     return newObservation;
   },
@@ -331,30 +270,11 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     if (!existing) return;
     const updatedObs = { ...existing, ...updates };
 
-    // 1. Immediate in-memory update
+    // Immediate in-memory update
     set((state) => ({
       observations: state.observations.map((o) =>
         o.id === observationId ? updatedObs : o
       ),
     }));
-
-    // 2. Persistent storage in SQLite + offline sync queue
-    (async () => {
-      try {
-        await ObservationRepository.insertOrUpdate(updatedObs);
-        await SyncQueueRepository.enqueue({
-          operationId: 'obs_upd_' + Date.now(),
-          entityType: 'observation',
-          action: 'update',
-          payloadJson: JSON.stringify(updatedObs),
-          status: 'pending',
-          retryCount: 0,
-          createdAt: new Date().toISOString(),
-        });
-        SyncEngine.syncPending().catch(() => {});
-      } catch (err) {
-        console.warn('[Observation] SQLite update error:', err);
-      }
-    })();
   },
 }));

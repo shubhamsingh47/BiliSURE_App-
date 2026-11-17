@@ -164,15 +164,15 @@ const styles = StyleSheet.create({
   },
   topSafeArea: {
     backgroundColor: '#7D3BFF',
-    paddingBottom: 20,
+    paddingBottom: moderateScale(12),
   },
   header: {
-    minHeight: moderateScale(56),
+    minHeight: moderateScale(48),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.xs,
+    paddingVertical: 2,
   },
   backBtn: {
     padding: 4,
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   readingHero: {
     paddingHorizontal: SPACING.lg,
-    marginTop: SPACING.sm,
+    marginTop: moderateScale(4),
   },
   heroTopRow: {
     flexDirection: 'row',
