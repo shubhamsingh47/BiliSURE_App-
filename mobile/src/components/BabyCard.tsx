@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Edit3 } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { Baby, BilirubinReading } from '../types';
+import { moderateScale, fontScale, SPACING } from '../theme/responsive';
 
 interface BabyCardProps {
   baby: Baby;
@@ -123,10 +124,11 @@ export const BabyCard: React.FC<BabyCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    marginBottom: 12,
+    borderRadius: moderateScale(18),
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(14),
+    marginBottom: moderateScale(10),
+    minHeight: moderateScale(68),
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -138,57 +140,61 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   uhidPill: {
-    width: 66,
-    height: 50,
-    borderRadius: 16,
+    width: moderateScale(62),
+    height: moderateScale(46),
+    borderRadius: moderateScale(14),
     alignItems: 'center',
     justifyContent: 'center',
   },
   uhidText: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '800',
     color: '#334155',
     letterSpacing: 0.5,
   },
   middleSection: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: moderateScale(12),
+    minWidth: 0,
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
   },
   babyName: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '800',
     color: '#0F172A',
+    flexShrink: 1,
   },
   editIconBtn: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    marginLeft: moderateScale(6),
   },
   statusText: {
-    fontSize: 13,
+    fontSize: fontScale(12),
     fontWeight: '600',
-    marginTop: 2,
+    marginTop: moderateScale(2),
   },
   rightSection: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingLeft: 8,
+    paddingLeft: moderateScale(8),
+    minWidth: moderateScale(68),
   },
   sampleValueText: {
-    fontSize: 14,
+    fontSize: fontScale(13),
     fontWeight: '800',
-    marginBottom: 2,
+    marginBottom: moderateScale(2),
   },
   readingTime: {
-    fontSize: 12,
+    fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '600',
   },

@@ -123,7 +123,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
       <FlatList
         data={stations}
         keyExtractor={(item) => item.id || item.stationId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         renderItem={({ item }) => {
           const badge = getStationBadge(item.operationalStatus);
           const isAvail = item.operationalStatus === 'available';

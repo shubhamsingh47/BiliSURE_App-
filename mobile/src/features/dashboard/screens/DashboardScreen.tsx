@@ -8,12 +8,15 @@ import {
   Modal,
   TextInput,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
-import { ChevronDown, ChevronRight, Check, X } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { ChevronDown, ChevronRight, Check, X, Search, User } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { BabyCard } from '../../../components/BabyCard';
 import { usePatientStore } from '../../../store/usePatientStore';
-import { Baby } from '../../../types';
+import { Baby, SeverityState } from '../../../types';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface DashboardScreenProps {
   onSelectBaby: (baby: Baby) => void;
@@ -29,6 +32,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
   const [activeDept, setActiveDept] = useState(selectedDepartment || 'Deppt');
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
+  const [search, setSearch] = useState('');
+  const [severityFilter, setSeverityFilter] = useState<'all' | SeverityState>('all');
+  const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
 
   // Edit Baby Modal State
   const [editingBaby, setEditingBaby] = useState<Baby | null>(null);
@@ -101,10 +108,19 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-  // Filter by selected department if not 'Deppt'
+  // Filter by selected department, search keyword, and clinical severity
   const filteredBabies = babies.filter((b) => {
-    if (!activeDept || activeDept === 'Deppt') return true;
-    return b.department === activeDept;
+    const matchesDept = !activeDept || activeDept === 'Deppt' || b.department === activeDept;
+    const s = search.trim().toLowerCase();
+    const matchesSearch =
+      !s ||
+      b.name.toLowerCase().includes(s) ||
+      b.uhid.toLowerCase().includes(s) ||
+      (b.parentsName && b.parentsName.toLowerCase().includes(s));
+    const matchesSeverity =
+      severityFilter === 'all' || b.severityState === severityFilter;
+
+    return matchesDept && matchesSearch && matchesSeverity;
   });
 
   // Sort newest first by date and time
@@ -167,7 +183,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   return (
     <View style={styles.safeArea}>
-      {/* Top Header Bar */}
+      {/* Top Header Bar with Department Filter & Live Census Badge */}
       <View style={styles.headerBar}>
         <TouchableOpacity
           activeOpacity={0.7}
@@ -178,6 +194,13 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <Text style={styles.deptText}>{activeDept}</Text>
           <ChevronDown size={16} color="#7C3AED" style={{ marginLeft: 6 }} />
         </TouchableOpacity>
+
+        {/* Live Census Count Badge */}
+        <View style={styles.patientCountBadge}>
+          <Text style={styles.patientCountText}>
+            {filteredBabies.length} {filteredBabies.length === 1 ? 'Patient' : 'Patients'}
+          </Text>
+        </View>
       </View>
 
       {/* Department Dropdown Modal */}
@@ -215,7 +238,63 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         </TouchableOpacity>
       </Modal>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: insets.bottom + 85 },
+        ]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Search Bar - scrolls smoothly with content */}
+        <View style={styles.searchWrapper}>
+          <Search size={18} color="#94A3B8" />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search by Mother's Name, UHID..."
+            placeholderTextColor="#94A3B8"
+            value={search}
+            onChangeText={setSearch}
+          />
+          {search.length > 0 && (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <X size={16} color="#94A3B8" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Severity Filter Chips (Horizontal Scroll prevents wrapping & vertical collisions) */}
+        <View style={styles.filterContainer}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterScroll}
+          >
+            {(['all', 'critical', 'moderate', 'normal'] as const).map((filter) => {
+              const isActive = severityFilter === filter;
+              return (
+                <TouchableOpacity
+                  key={filter}
+                  onPress={() => setSeverityFilter(filter)}
+                  style={[styles.filterPill, isActive && styles.filterPillActive]}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.filterPillText,
+                      isActive && styles.filterPillTextActive,
+                    ]}
+                  >
+                    {filter === 'all'
+                      ? 'All Patients'
+                      : filter.charAt(0).toUpperCase() + filter.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+
         {/* "See Report >" Banner Card */}
         <TouchableOpacity
           activeOpacity={0.8}
@@ -226,48 +305,60 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <ChevronRight size={20} color="#7C3AED" />
         </TouchableOpacity>
 
-        {/* Section: Today */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Today</Text>
-        </View>
-
-        {todayBabies.length > 0 ? (
-          todayBabies.map((baby, idx) => (
-            <BabyCard
-              key={baby.id + '_today_' + idx}
-              baby={baby}
-              latestSample={getLatestSample(baby.id)}
-              pillColor={getPillColor(idx)}
-              onPress={() => onSelectBaby(baby)}
-              onEditPress={() => handleOpenEdit(baby)}
-            />
-          ))
-        ) : (
-          <View style={styles.emptySection}>
-            <Text style={styles.emptySectionText}>No patients registered today</Text>
+        {filteredBabies.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <User size={36} color="#CBD5E1" />
+            <Text style={styles.emptyTitle}>No Patients Found</Text>
+            <Text style={styles.emptySub}>
+              No patient records match "{search || severityFilter}".
+            </Text>
           </View>
-        )}
-
-        {/* Section: Yesterday */}
-        <View style={[styles.sectionHeader, { marginTop: 18 }]}>
-          <Text style={styles.sectionTitle}>Yesterday</Text>
-        </View>
-
-        {yesterdayBabies.length > 0 ? (
-          yesterdayBabies.map((baby, idx) => (
-            <BabyCard
-              key={baby.id + '_yesterday_' + idx}
-              baby={baby}
-              latestSample={getLatestSample(baby.id)}
-              pillColor={getPillColor(idx + 3)}
-              onPress={() => onSelectBaby(baby)}
-              onEditPress={() => handleOpenEdit(baby)}
-            />
-          ))
         ) : (
-          <View style={styles.emptySection}>
-            <Text style={styles.emptySectionText}>No previous patient records</Text>
-          </View>
+          <>
+            {/* Section: Today */}
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Today</Text>
+            </View>
+
+            {todayBabies.length > 0 ? (
+              todayBabies.map((baby, idx) => (
+                <BabyCard
+                  key={baby.id + '_today_' + idx}
+                  baby={baby}
+                  latestSample={getLatestSample(baby.id)}
+                  pillColor={getPillColor(idx)}
+                  onPress={() => onSelectBaby(baby)}
+                  onEditPress={() => handleOpenEdit(baby)}
+                />
+              ))
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No patients registered today</Text>
+              </View>
+            )}
+
+            {/* Section: Yesterday */}
+            <View style={[styles.sectionHeader, { marginTop: 18 }]}>
+              <Text style={styles.sectionTitle}>Yesterday</Text>
+            </View>
+
+            {yesterdayBabies.length > 0 ? (
+              yesterdayBabies.map((baby, idx) => (
+                <BabyCard
+                  key={baby.id + '_yesterday_' + idx}
+                  baby={baby}
+                  latestSample={getLatestSample(baby.id)}
+                  pillColor={getPillColor(idx + 3)}
+                  onPress={() => onSelectBaby(baby)}
+                  onEditPress={() => handleOpenEdit(baby)}
+                />
+              ))
+            ) : (
+              <View style={styles.emptySection}>
+                <Text style={styles.emptySectionText}>No previous patient records</Text>
+              </View>
+            )}
+          </>
         )}
 
         <View style={{ height: 90 }} />
@@ -378,64 +469,146 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    backgroundColor: '#FAFAFA',
   },
   deptDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 20,
+    paddingVertical: moderateScale(7),
+    paddingHorizontal: moderateScale(14),
+    borderRadius: moderateScale(18),
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
   deptText: {
-    fontSize: 15,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#1E1B4B',
-    marginLeft: 6,
+    marginLeft: moderateScale(4),
+  },
+  patientCountBadge: {
+    backgroundColor: '#F3E8FF',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(6),
+    borderRadius: moderateScale(14),
+  },
+  patientCountText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#7D3BFF',
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.xs,
+    paddingBottom: SPACING.xxl,
+  },
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    marginTop: SPACING.xs,
+    marginBottom: SPACING.sm,
+    paddingHorizontal: moderateScale(12),
+    minHeight: moderateScale(44),
+    borderRadius: moderateScale(14),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: moderateScale(8),
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontScale(14),
+    color: '#0F172A',
+    paddingVertical: moderateScale(6),
+  },
+  filterContainer: {
+    marginBottom: SPACING.md,
+  },
+  filterScroll: {
+    flexDirection: 'row',
+    gap: moderateScale(8),
+    paddingVertical: moderateScale(2),
+  },
+  filterPill: {
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    minHeight: moderateScale(34),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterPillActive: {
+    backgroundColor: '#7D3BFF',
+    borderColor: '#7D3BFF',
+  },
+  filterPillText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  emptyContainer: {
+    paddingVertical: SPACING.xxl * 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyTitle: {
+    fontSize: fontScale(16),
+    fontWeight: '700',
+    color: '#334155',
+    marginTop: SPACING.sm,
+  },
+  emptySub: {
+    fontSize: fontScale(13),
+    color: '#94A3B8',
+    marginTop: SPACING.xs,
+    textAlign: 'center',
+    paddingHorizontal: SPACING.xl,
   },
   reportBanner: {
     backgroundColor: '#F3E8FF',
-    height: 56,
-    borderRadius: 18,
+    minHeight: moderateScale(52),
+    borderRadius: moderateScale(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
   reportBannerText: {
     color: '#7C3AED',
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
   },
   sectionHeader: {
-    marginBottom: 14,
+    marginBottom: SPACING.sm,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: fontScale(18),
     fontWeight: '800',
     color: '#0F172A',
   },
   emptySection: {
-    paddingVertical: 18,
-    paddingHorizontal: 16,
+    paddingVertical: moderateScale(16),
+    paddingHorizontal: SPACING.lg,
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     borderWidth: 1,
     borderColor: '#F1F5F9',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: SPACING.sm,
   },
   emptySectionText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     color: '#94A3B8',
     fontWeight: '600',
   },

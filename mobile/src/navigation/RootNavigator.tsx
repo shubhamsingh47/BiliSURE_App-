@@ -412,15 +412,7 @@ export const RootNavigator: React.FC = () => {
           );
         }
 
-        // Primary Role: Doctor / Referring Centre (Default)
-        if (activeTab === 'admitted') {
-          return (
-            <PatientsScreen
-              onSelectBaby={handleSelectBaby}
-              onRegisterNew={() => setCurrentRoute('new_registration')}
-            />
-          );
-        }
+        // Primary Role: Doctor / Referring Centre (Strategy A: Unified Census & Hospital Capacity)
         if (activeTab === 'phototherapy') {
           return (
             <HospitalDirectoryScreen
@@ -446,6 +438,7 @@ export const RootNavigator: React.FC = () => {
         if (activeTab === 'profile') {
           return renderProfile();
         }
+        // Unified Patients Census screen for 'home' and 'admitted'
         return (
           <DashboardScreen
             onSelectBaby={handleSelectBaby}
@@ -491,6 +484,5 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
-    paddingBottom: 70, // reserve space for bottom tab bar
   },
 });

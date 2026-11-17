@@ -15,6 +15,7 @@ import {
 } from 'lucide-react-native';
 import { useAuthStore } from '../store/useAuthStore';
 import { PrimaryUserRole } from '../types';
+import { moderateScale, fontScale } from '../theme/responsive';
 
 export type TabName =
   | 'home'
@@ -50,22 +51,22 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
   const renderRoleTabs = () => {
     switch (primaryRole) {
-      // 1. Doctor / Referring Centre
-      // Tabs: Home | Patients | Add Baby (FAB) | Referrals | Profile
+      // 1. Doctor / Referring Centre (Strategy A: Unified Census & Direct Hospital Capacity)
+      // Tabs: Patients | Hospitals | Add Baby (FAB) | Referrals | Profile
       case 'doctor_referring':
         return (
           <>
             <TouchableOpacity onPress={() => onTabPress('home')} style={styles.tabItem}>
-              <Home size={22} color={activeTab === 'home' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-                Home
+              <Bed size={22} color={activeTab === 'home' || activeTab === 'admitted' ? '#7D3BFF' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, (activeTab === 'home' || activeTab === 'admitted') && styles.tabLabelActive]}>
+                Patients
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => onTabPress('admitted')} style={styles.tabItem}>
-              <Bed size={22} color={activeTab === 'admitted' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'admitted' && styles.tabLabelActive]}>
-                Patients
+            <TouchableOpacity onPress={() => onTabPress('phototherapy')} style={styles.tabItem}>
+              <Hospital size={22} color={activeTab === 'phototherapy' ? '#7D3BFF' : '#94A3B8'} />
+              <Text style={[styles.tabLabel, activeTab === 'phototherapy' && styles.tabLabelActive]}>
+                Hospitals
               </Text>
             </TouchableOpacity>
 
@@ -206,7 +207,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
       style={[
         styles.tabBarContainer,
         {
-          height: 65 + insets.bottom,
+          minHeight: moderateScale(62) + insets.bottom,
           paddingBottom: insets.bottom > 0 ? insets.bottom : 6,
         },
       ]}
@@ -218,7 +219,6 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
 
 const styles = StyleSheet.create({
   tabBarContainer: {
-    height: 70,
     backgroundColor: '#FFFFFF',
     flexDirection: 'row',
     alignItems: 'center',
@@ -229,7 +229,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 6,
+    paddingTop: 6,
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -3 },
@@ -240,10 +240,10 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
+    paddingVertical: 4,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '600',
     color: '#94A3B8',
     marginTop: 3,
@@ -253,21 +253,21 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   hospitalTabLabel: {
-    fontSize: 9,
+    fontSize: fontScale(8.5),
     textAlign: 'center',
-    lineHeight: 11,
+    lineHeight: fontScale(10.5),
     paddingHorizontal: 1,
   },
   fabWrapper: {
-    width: 64,
+    width: moderateScale(60),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: -24,
+    marginTop: -moderateScale(22),
   },
   fabButton: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+    width: moderateScale(52),
+    height: moderateScale(52),
+    borderRadius: moderateScale(26),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { COLORS } from '../theme/colors';
-
-const SCREEN_WIDTH = Dimensions.get('window').width;
+import { moderateScale, fontScale, SPACING } from '../theme/responsive';
 
 interface ChartCardProps {
   initialValue?: number;
@@ -18,6 +17,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   points,
   onRangeChange,
 }) => {
+  const { width: windowWidth } = useWindowDimensions();
   const [selectedRange, setSelectedRange] = useState('1hr');
   const ranges = ['1hr', '8hr', '16hr', '24hr'];
 
@@ -27,8 +27,8 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   };
 
   // SVG curved path representing the wave trend in the video
-  const width = SCREEN_WIDTH - 48;
-  const height = 150;
+  const width = Math.max(260, Math.min(windowWidth - 48, 560));
+  const height = moderateScale(140);
 
   // Spline wave matching frame 27
   let pathD = `
@@ -111,9 +111,9 @@ export const ChartCard: React.FC<ChartCardProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 20,
-    marginTop: 16,
+    borderRadius: moderateScale(22),
+    padding: SPACING.lg,
+    marginTop: SPACING.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -123,33 +123,33 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   chartTitle: {
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: SPACING.xs,
   },
   chartBox: {
     alignItems: 'center',
     justifyContent: 'center',
-    marginVertical: 10,
+    marginVertical: SPACING.xs,
   },
   filterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 14,
-    paddingHorizontal: 8,
+    marginTop: SPACING.sm,
+    paddingHorizontal: 4,
   },
   rangePill: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 16,
+    paddingVertical: moderateScale(6),
+    paddingHorizontal: moderateScale(14),
+    borderRadius: moderateScale(14),
     backgroundColor: 'transparent',
   },
   rangePillActive: {
     backgroundColor: '#FEF3C7', // soft beige active pill from video
   },
   rangeText: {
-    fontSize: 14,
+    fontSize: fontScale(13),
     fontWeight: '600',
     color: '#94A3B8',
   },

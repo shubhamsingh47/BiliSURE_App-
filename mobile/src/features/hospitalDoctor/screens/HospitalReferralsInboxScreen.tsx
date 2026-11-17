@@ -70,7 +70,7 @@ export const HospitalReferralsInboxScreen: React.FC = () => {
       <FlatList
         data={pendingReferrals}
         keyExtractor={(item) => item.id || item.referralId}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🎉</Text>

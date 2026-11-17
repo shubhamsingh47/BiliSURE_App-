@@ -5,6 +5,7 @@ import { useNetworkStore } from '../../../store/useNetworkStore';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Hospital } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
 
 interface HospitalDirectoryScreenProps {
   onSelectHospital: (hospital: Hospital) => void;
@@ -64,7 +65,7 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
       <FlatList
         data={receivingHospitals}
         keyExtractor={(item) => item.id || item.code}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
         renderItem={({ item }) => {
           const isFull = item.availablePTStations === 0;
 
@@ -149,72 +150,72 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingTop: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: SPACING.lg,
+    borderBottomLeftRadius: moderateScale(24),
+    borderBottomRightRadius: moderateScale(24),
   },
   headerTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: SPACING.sm,
   },
   backBtn: {
     marginRight: 12,
     padding: 6,
   },
   backBtnText: {
-    fontSize: 22,
+    fontSize: fontScale(20),
     color: '#FFFFFF',
     fontWeight: '700',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: fontScale(20),
     fontWeight: '800',
     color: '#FFFFFF',
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
   },
   patientBanner: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginBottom: 12,
+    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    marginBottom: SPACING.sm,
     flexDirection: 'row',
     alignItems: 'center',
   },
   patientBannerLabel: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     color: 'rgba(255, 255, 255, 0.75)',
     marginRight: 6,
   },
   patientBannerName: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#FFFFFF',
   },
   searchBar: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    height: 46,
-    paddingHorizontal: 16,
-    fontSize: 13,
+    borderRadius: moderateScale(14),
+    minHeight: moderateScale(44),
+    paddingHorizontal: SPACING.lg,
+    fontSize: fontScale(13),
     color: '#181829',
   },
   listContent: {
-    padding: 16,
+    padding: SPACING.lg,
     paddingBottom: 40,
   },
   hospitalCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
+    borderRadius: moderateScale(20),
+    padding: SPACING.lg,
+    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     shadowColor: '#000',
@@ -227,35 +228,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 12,
+    marginBottom: SPACING.sm,
   },
   hospInfo: {
     flex: 1,
     paddingRight: 12,
   },
   hospitalName: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     fontWeight: '700',
     color: '#181829',
     marginBottom: 4,
   },
   hospitalAddress: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     color: '#64748B',
     marginBottom: 4,
   },
   hospitalContact: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     color: '#7D3BFF',
     fontWeight: '600',
   },
   capacityPill: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 14,
-    minWidth: 70,
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(8),
+    borderRadius: moderateScale(14),
+    minWidth: moderateScale(68),
   },
   capacityPillAvailable: {
     backgroundColor: '#F2FDEF',
@@ -268,11 +269,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   capacityPillNumber: {
-    fontSize: 20,
+    fontSize: fontScale(19),
     fontWeight: '800',
   },
   capacityPillSub: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '700',
   },
   capacityPillTextAvailable: {
@@ -285,27 +286,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-around',
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    paddingVertical: 10,
-    marginBottom: 14,
+    borderRadius: moderateScale(12),
+    paddingVertical: moderateScale(10),
+    marginBottom: SPACING.md,
   },
   metricItem: {
     alignItems: 'center',
   },
   metricVal: {
-    fontSize: 15,
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#181829',
   },
   metricLbl: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     color: '#94A3B8',
     marginTop: 2,
   },
   referBtn: {
     backgroundColor: '#7D3BFF',
-    borderRadius: 14,
-    height: 48,
+    borderRadius: moderateScale(14),
+    minHeight: moderateScale(46),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#CBD5E1',
   },
   referBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#FFFFFF',
   },
