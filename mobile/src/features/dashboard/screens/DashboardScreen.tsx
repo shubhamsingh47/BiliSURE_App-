@@ -100,6 +100,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfYesterday = startOfToday - 24 * 3600 * 1000;
 
   // Filter by selected department if not 'Deppt'
   const filteredBabies = babies.filter((b) => {
@@ -112,11 +113,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     (a, b) => getBabyTimestamp(b) - getBabyTimestamp(a)
   );
 
-  // Split strictly by date and time:
-  // Today = registered/born on or after start of today
-  // Yesterday = registered/born before start of today
+  // Split strictly by date:
+  // Today = registered on or after start of today
+  // Yesterday = registered between start of yesterday and start of today
+  // Earlier = registered before start of yesterday
   const todayBabies = sortedBabies.filter((b) => getBabyTimestamp(b) >= startOfToday);
-  const yesterdayBabies = sortedBabies.filter((b) => getBabyTimestamp(b) < startOfToday);
+  const yesterdayBabies = sortedBabies.filter(
+    (b) => getBabyTimestamp(b) >= startOfYesterday && getBabyTimestamp(b) < startOfToday
+  );
+  const earlierBabies = sortedBabies.filter((b) => getBabyTimestamp(b) < startOfYesterday);
 
   const getPillColor = (idx: number) => {
     const colors = [COLORS.pillBeige, COLORS.pillBeige, COLORS.pillPink, COLORS.pillGreen, COLORS.pillBlue];
@@ -270,6 +275,26 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           </View>
         )}
 
+        {/* Section: Earlier Records */}
+        {earlierBabies.length > 0 && (
+          <>
+            <View style={[styles.sectionHeader, { marginTop: 18 }]}>
+              <Text style={styles.sectionTitle}>Earlier Records</Text>
+            </View>
+
+            {earlierBabies.map((baby, idx) => (
+              <BabyCard
+                key={baby.id + '_earlier_' + idx}
+                baby={baby}
+                latestSample={getLatestSample(baby.id)}
+                pillColor={getPillColor(idx + 6)}
+                onPress={() => onSelectBaby(baby)}
+                onEditPress={() => handleOpenEdit(baby)}
+              />
+            ))}
+          </>
+        )}
+
         <View style={{ height: 90 }} />
       </ScrollView>
 
@@ -287,7 +312,11 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.editModalBody} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={styles.editModalBody}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+            >
               <Text style={styles.inputLabel}>Mother's Name *</Text>
               <TextInput
                 style={styles.textInput}

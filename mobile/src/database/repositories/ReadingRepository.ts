@@ -2,6 +2,48 @@ import { getDatabase, memoryTables, isInMemoryFallback } from '../sqlite';
 import { BilirubinReading } from '../../types';
 
 export class ReadingRepository {
+  static async getAll(): Promise<BilirubinReading[]> {
+    const db = await getDatabase();
+    if (isInMemoryFallback) {
+      return memoryTables.local_readings || [];
+    }
+
+    try {
+      const [results] = await db.executeSql(
+        'SELECT * FROM local_readings ORDER BY timestamp DESC'
+      );
+      const items: BilirubinReading[] = [];
+      for (let i = 0; i < results.rows.length; i++) {
+        const row = results.rows.item(i);
+        items.push({
+          id: row.id,
+          serverId: row.server_id,
+          clientOperationId: row.client_operation_id,
+          babyId: row.baby_id,
+          value: row.value,
+          unit: row.unit || 'mg/dL',
+          method: row.method || 'TSB',
+          sampleTimestamp: row.sample_timestamp || row.timestamp,
+          postnatalAgeHours: row.postnatal_age_hours || 24,
+          bhutaniZone: row.bhutani_zone || 'low',
+          phototherapyPhase: row.phototherapy_phase || 'pre_phototherapy',
+          measurementSite: row.measurement_site,
+          source: row.source,
+          operatorName: row.operator_name,
+          symptoms: row.symptoms,
+          riskLevel: row.risk_level || 'low',
+          timestamp: row.timestamp,
+          isInitial: row.is_initial === 1,
+          isDischarge: row.is_discharge === 1,
+          syncStatus: row.sync_status,
+        });
+      }
+      return items;
+    } catch {
+      return memoryTables.local_readings || [];
+    }
+  }
+
   static async getByBabyId(babyId: string): Promise<BilirubinReading[]> {
     const db = await getDatabase();
     if (isInMemoryFallback) {

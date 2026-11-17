@@ -8,10 +8,13 @@ import {
   Modal,
   TextInput,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
-import { ChartCard } from '../../../components/ChartCard';
+import { ChartCard, GraphReading } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -97,27 +100,58 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const babyObservations = observations
     .filter((o) => o.babyId === activeBaby.id)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  const initialVal: number | null =
-    babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
+  const babyReadings = readings
+    .filter((r) => r.babyId === activeBaby.id)
+    .sort((a, b) => new Date(b.sampleTimestamp || b.timestamp).getTime() - new Date(a.sampleTimestamp || a.timestamp).getTime());
+
+  const initialObs = babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
+  const initialRdg = babyReadings.length > 0 ? babyReadings[babyReadings.length - 1].value : null;
+  const initialVal: number | null = initialObs ?? initialRdg ?? activeBaby.initialValue ?? null;
+
   const isDischarged = activeBaby.status === 'discharged';
   const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
 
   const handleDischarge = async () => {
-    if (babyObservations.length === 0) {
-      Alert.alert('No readings', 'Add an observation before discharging.');
+    const lastObs = babyObservations.length > 0 ? babyObservations[0].bilirubinValue : null;
+    const lastRdg = babyReadings.length > 0 ? babyReadings[0].value : null;
+    const lastVal = lastObs ?? lastRdg;
+
+    if (lastVal === null) {
+      Alert.alert('No readings', 'Add an observation or reading before discharging.');
       return;
     }
-    const lastVal = babyObservations[0].bilirubinValue;
     await updateBaby(activeBaby.id, {
       status: 'discharged',
       dischargeValue: lastVal,
     });
-    Alert.alert('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
+    Alert.alert(
+      'Discharged',
+      `${activeBaby.parentsName || activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`
+    );
   };
 
   const recentObservations = babyObservations.slice(0, 4);
-  // Chart points oldest -> newest
-  const chartPoints = [...babyObservations].reverse().map((o) => o.bilirubinValue);
+
+  // Unified list of actual readings for data-driven graph (oldest -> newest)
+  const graphReadings: GraphReading[] = [
+    ...babyObservations.map((o) => ({
+      id: o.id,
+      value: o.bilirubinValue,
+      timestamp: o.timestamp,
+      site: o.site,
+    })),
+    ...babyReadings
+      .filter((r) => !babyObservations.some((o) => o.id === r.id))
+      .map((r) => ({
+        id: r.id,
+        value: r.value,
+        timestamp: r.sampleTimestamp || r.timestamp,
+        site: r.measurementSite,
+      })),
+  ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+  // Chart points oldest -> newest (for backwards compatibility fallback)
+  const chartPoints = graphReadings.map((g) => g.value);
 
   const handleOpenAddObs = () => {
     setEditingObs(null);
@@ -151,6 +185,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   };
 
   const handleSaveObs = () => {
+    Keyboard.dismiss();
     const num = parseFloat(obsValue);
     if (obsValue.trim() === '' || isNaN(num) || num < 0 || num > 30) {
       setObsError('Enter a value between 0 and 30');
@@ -166,7 +201,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   return (
     <View style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="always"
+      >
         {/* Top Header Row */}
         <View style={styles.headerRow}>
           <TouchableOpacity
@@ -257,7 +296,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.editModalBody} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.editModalBody}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="always"
+              >
                 <Text style={styles.inputLabel}>Mother's Name *</Text>
                 <TextInput
                   style={styles.textInput}
@@ -433,10 +476,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           )}
         </View>
 
-        {/* Bilirubin Readings Spline Chart - driven by observation data */}
+        {/* Bilirubin Readings Data-Driven Graph - straight lines connecting actual readings */}
         <ChartCard
           initialValue={initialVal ?? undefined}
           dischargeValue={dischargeVal ?? undefined}
+          readings={graphReadings}
           points={chartPoints}
         />
 
@@ -454,7 +498,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section (last) */}
         <View style={styles.nomogramSection}>
           <BhutaniNomogramChart
-            readings={readings as any}
+            readings={babyReadings as any}
             gestationalAgeWeeks={activeBaby.gestationalAgeWeeks || 38}
             compact={false}
             height={260}
@@ -463,55 +507,68 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
         {/* Add / Edit Observation Modal */}
         <Modal visible={showObsModal} transparent animationType="slide">
-          <View style={styles.editModalOverlay}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            style={styles.editModalOverlay}
+          >
             <View style={styles.editModalContent}>
-              <View style={styles.editModalHeader}>
-                <Text style={styles.editModalTitle}>
-                  {editingObs ? 'Edit Observation' : 'Add Observation'}
-                </Text>
-                <TouchableOpacity onPress={() => setShowObsModal(false)} style={styles.editCloseBtn}>
-                  <X size={20} color="#64748B" />
-                </TouchableOpacity>
-              </View>
-
-              <Text style={styles.inputLabel}>Bilirubin Value (0 - 30 mg/dL) *</Text>
-              <TextInput
-                style={[styles.textInput, !!obsError && { borderColor: '#FC3949' }]}
-                value={obsValue}
-                onChangeText={handleObsValueChange}
-                keyboardType="decimal-pad"
-                placeholder="e.g. 12.5"
-              />
-              {!!obsError && <Text style={styles.obsErrorText}>{obsError}</Text>}
-
-              <Text style={[styles.inputLabel, { marginTop: 14 }]}>Site</Text>
-              {OBS_SITES.map((s) => {
-                const sel = obsSite === s;
-                return (
-                  <TouchableOpacity
-                    key={s}
-                    activeOpacity={0.7}
-                    onPress={() => setObsSite(s)}
-                    style={styles.radioRow}
-                  >
-                    <View style={[styles.radioOuter, sel && styles.radioOuterActive]}>
-                      {sel && <View style={styles.radioInner} />}
-                    </View>
-                    <Text style={styles.radioLabel}>{s}</Text>
+              <ScrollView
+                keyboardShouldPersistTaps="always"
+                showsVerticalScrollIndicator={false}
+                bounces={false}
+              >
+                <View style={styles.editModalHeader}>
+                  <Text style={styles.editModalTitle}>
+                    {editingObs ? 'Edit Observation' : 'Add Observation'}
+                  </Text>
+                  <TouchableOpacity onPress={() => setShowObsModal(false)} style={styles.editCloseBtn}>
+                    <X size={20} color="#64748B" />
                   </TouchableOpacity>
-                );
-              })}
+                </View>
 
-              <View style={styles.modalBtnRow}>
-                <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowObsModal(false)}>
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.saveBtn} onPress={handleSaveObs}>
-                  <Text style={styles.saveBtnText}>{editingObs ? 'Save Changes' : 'Add Observation'}</Text>
-                </TouchableOpacity>
-              </View>
+                <Text style={styles.inputLabel}>Bilirubin Value (0 - 30 mg/dL) *</Text>
+                <TextInput
+                  style={[styles.textInput, !!obsError && { borderColor: '#FC3949' }]}
+                  value={obsValue}
+                  onChangeText={handleObsValueChange}
+                  keyboardType="decimal-pad"
+                  placeholder="e.g. 12.5"
+                />
+                {!!obsError && <Text style={styles.obsErrorText}>{obsError}</Text>}
+
+                <Text style={[styles.inputLabel, { marginTop: 14 }]}>Site</Text>
+                {OBS_SITES.map((s) => {
+                  const sel = obsSite === s;
+                  return (
+                    <TouchableOpacity
+                      key={s}
+                      activeOpacity={0.7}
+                      onPress={() => setObsSite(s)}
+                      style={styles.radioRow}
+                    >
+                      <View style={[styles.radioOuter, sel && styles.radioOuterActive]}>
+                        {sel && <View style={styles.radioInner} />}
+                      </View>
+                      <Text style={styles.radioLabel}>{s}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <View style={styles.modalBtnRow}>
+                  <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowObsModal(false)}>
+                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.saveBtn}
+                    onPress={handleSaveObs}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.saveBtnText}>{editingObs ? 'Save Changes' : 'Add Observation'}</Text>
+                  </TouchableOpacity>
+                </View>
+              </ScrollView>
             </View>
-          </View>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Discharge Button */}

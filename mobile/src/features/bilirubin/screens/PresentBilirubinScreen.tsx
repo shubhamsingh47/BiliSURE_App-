@@ -35,6 +35,9 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
   const [showNomogram, setShowNomogram] = useState(true);
   const { readings, selectedBaby } = usePatientStore();
   const insets = useSafeAreaInsets();
+  const babyReadings = selectedBaby
+    ? readings.filter((r) => r.babyId === selectedBaby.id || r.babyUhid === selectedBaby.uhid)
+    : readings;
 
   const formattedDate = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date().toLocaleDateString();
 
@@ -99,7 +102,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
 
           {showNomogram && (
             <BhutaniNomogramChart
-              readings={readings as any}
+              readings={babyReadings as any}
               gestationalAgeWeeks={selectedBaby?.gestationalAgeWeeks || 38}
               compact={false}
               height={220}

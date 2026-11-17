@@ -2,9 +2,11 @@ import { create } from 'zustand';
 import { Baby, BilirubinReading, ClinicalObservation, SeverityState } from '../types';
 import { BabyRepository } from '../database/repositories/BabyRepository';
 import { ReadingRepository } from '../database/repositories/ReadingRepository';
+import { ObservationRepository } from '../database/repositories/ObservationRepository';
 import { SyncQueueRepository } from '../database/repositories/SyncQueueRepository';
 import { SyncEngine } from '../services/sync.engine';
 import { evaluateBhutaniRisk } from '../services/bhutani.service';
+import { SEED_BABIES, SEED_READINGS, SEED_OBSERVATIONS } from './seedData';
 
 interface PatientState {
   babies: Baby[];
@@ -24,150 +26,86 @@ interface PatientState {
 }
 
 export const usePatientStore = create<PatientState>((set, get) => ({
-  babies: [
-    {
-      id: 'baby_1',
-      serverId: '651a00010000000000000001',
-      uhid: 'M1A2N3S4I5',
-      bilisureId: 'BS-2026-0041',
-      name: 'Sarah Jenkins',
-      parentsName: 'Sarah Jenkins',
-      dateOfBirth: new Date(Date.now() - 48 * 3600 * 1000).toISOString(),
-      exactTimeOfBirth: '08:00',
-      gestationalAgeWeeks: 38,
-      weight: 3.1,
-      height: 48.0,
-      assignedDoctor: 'Dr. Priya Sharma',
-      facility: 'North Community Health Centre (CHC)',
-      department: 'Deppt',
-      severityState: 'critical',
-      status: 'under_treatment',
-      referralStatus: 'accepted',
-      initialValue: 10.0,
-      dischargeValue: 0,
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'baby_2',
-      serverId: '651a00010000000000000002',
-      uhid: 'B2C3D4E5F6',
-      bilisureId: 'BS-2026-0042',
-      name: 'Emily Watson',
-      parentsName: 'Emily Watson',
-      dateOfBirth: new Date(Date.now() - 36 * 3600 * 1000).toISOString(),
-      exactTimeOfBirth: '14:30',
-      gestationalAgeWeeks: 37,
-      weight: 2.9,
-      height: 47.5,
-      assignedDoctor: 'Dr. Priya Sharma',
-      facility: 'East Primary Health Centre (PHC)',
-      department: 'Deppt',
-      severityState: 'critical',
-      status: 'admitted',
-      referralStatus: 'pending',
-      initialValue: 17.5,
-      dischargeValue: 0,
-      updatedAt: new Date().toISOString(),
-    },
-    {
-      id: 'baby_3',
-      serverId: '651a00010000000000000003',
-      uhid: 'G7H8I9J0K1',
-      bilisureId: 'BS-2026-0043',
-      name: 'Maria Rodriguez',
-      parentsName: 'Maria Rodriguez',
-      dateOfBirth: new Date(Date.now() - 3 * 3600 * 1000).toISOString(),
-      exactTimeOfBirth: '10:15',
-      gestationalAgeWeeks: 39,
-      weight: 3.4,
-      height: 50.0,
-      assignedDoctor: 'Dr. Priya Sharma',
-      facility: 'North Community Health Centre (CHC)',
-      department: 'Deppt',
-      severityState: 'normal',
-      status: 'in_observation',
-      referralStatus: 'none',
-      initialValue: 7.2,
-      dischargeValue: 0,
-      updatedAt: new Date().toISOString(),
-    },
-  ],
-  selectedBaby: null,
-  readings: [
-    {
-      id: 'rdg_1',
-      clientOperationId: 'op_seed_001',
-      babyId: 'baby_1',
-      babyUhid: 'M1A2N3S4I5',
-      value: 10.0,
-      unit: 'mg/dL',
-      method: 'TSB',
-      sampleTimestamp: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-      postnatalAgeHours: 24,
-      bhutaniZone: 'low_intermediate',
-      bhutaniPercentileApprox: 60,
-      phototherapyPhase: 'pre_phototherapy',
-      measurementSite: 'palms_and_soles',
-      source: 'manual_entry',
-      operatorName: 'Nurse A',
-      symptoms: '',
-      riskLevel: 'low',
-      timestamp: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
-      isInitial: true,
-      syncStatus: 'synced',
-    },
-    {
-      id: 'rdg_2',
-      clientOperationId: 'op_seed_002',
-      babyId: 'baby_1',
-      babyUhid: 'M1A2N3S4I5',
-      value: 14.8,
-      unit: 'mg/dL',
-      method: 'TSB',
-      sampleTimestamp: new Date().toISOString(),
-      postnatalAgeHours: 48,
-      bhutaniZone: 'high_intermediate',
-      bhutaniPercentileApprox: 88,
-      phototherapyPhase: 'pre_phototherapy',
-      measurementSite: 'sternum',
-      source: 'manual_entry',
-      operatorName: 'Dr. Priya Sharma',
-      symptoms: 'Icterus extended to palms and soles',
-      riskLevel: 'intermediate',
-      timestamp: new Date().toISOString(),
-      isInitial: false,
-      syncStatus: 'synced',
-    },
-  ],
-  observations: [
-    {
-      id: 'obs_1',
-      clientOperationId: 'obs_op_1',
-      babyId: 'baby_1',
-      site: 'Face',
-      observerName: 'Nurse A',
-      clinicalNotes: 'Facial sclera icterus',
-      bilirubinValue: 18.0,
-      timestamp: new Date().toISOString(),
-      syncStatus: 'synced',
-    },
-  ],
+  babies: SEED_BABIES,
+  selectedBaby: SEED_BABIES[0] || null,
+  readings: SEED_READINGS,
+  observations: SEED_OBSERVATIONS,
   selectedDepartment: 'Deppt',
   isLoading: false,
 
   loadBabies: async () => {
     set({ isLoading: true });
     try {
+      // 1. Load and merge babies from SQLite
       const local = await BabyRepository.getAll();
+      let finalBabies = local;
       if (local && local.length > 0) {
-        set({ babies: local, selectedBaby: local[0] });
+        const existingIds = new Set(local.map((b) => b.uhid || b.id));
+        const missingSeed = SEED_BABIES.filter((b) => !existingIds.has(b.uhid) && !existingIds.has(b.id));
+        if (missingSeed.length > 0) {
+          for (const b of missingSeed) {
+            await BabyRepository.insertOrUpdate(b);
+          }
+          finalBabies = await BabyRepository.getAll();
+        }
       } else {
-        const stateBabies = get().babies;
-        for (const b of stateBabies) {
+        for (const b of SEED_BABIES) {
           await BabyRepository.insertOrUpdate(b);
         }
-        set({ selectedBaby: stateBabies[0] });
+        finalBabies = SEED_BABIES;
       }
+
+      // 2. Load and merge readings from SQLite
+      const localReadings = await ReadingRepository.getAll();
+      let finalReadings = localReadings;
+      if (localReadings && localReadings.length > 0) {
+        const existingRdgIds = new Set(localReadings.map((r) => r.clientOperationId || r.id));
+        const missingSeedRdg = SEED_READINGS.filter(
+          (r) => !existingRdgIds.has(r.clientOperationId) && !existingRdgIds.has(r.id)
+        );
+        if (missingSeedRdg.length > 0) {
+          for (const r of missingSeedRdg) {
+            await ReadingRepository.insertOrUpdate(r);
+          }
+          finalReadings = await ReadingRepository.getAll();
+        }
+      } else {
+        for (const r of SEED_READINGS) {
+          await ReadingRepository.insertOrUpdate(r);
+        }
+        finalReadings = SEED_READINGS;
+      }
+
+      // 3. Load and merge clinical observations from SQLite
+      const localObs = await ObservationRepository.getAll();
+      let finalObs = localObs;
+      if (localObs && localObs.length > 0) {
+        const existingObsIds = new Set(localObs.map((o) => o.clientOperationId || o.id));
+        const missingSeedObs = SEED_OBSERVATIONS.filter(
+          (o) => !existingObsIds.has(o.clientOperationId) && !existingObsIds.has(o.id)
+        );
+        if (missingSeedObs.length > 0) {
+          for (const o of missingSeedObs) {
+            await ObservationRepository.insertOrUpdate(o);
+          }
+          finalObs = await ObservationRepository.getAll();
+        }
+      } else {
+        for (const o of SEED_OBSERVATIONS) {
+          await ObservationRepository.insertOrUpdate(o);
+        }
+        finalObs = SEED_OBSERVATIONS;
+      }
+
+      const activeBaby = get().selectedBaby;
+      const matchingActive = activeBaby ? finalBabies.find((b) => b.id === activeBaby.id) : null;
+
+      set({
+        babies: finalBabies,
+        readings: finalReadings,
+        observations: finalObs,
+        selectedBaby: matchingActive || finalBabies[0] || null,
+      });
     } finally {
       set({ isLoading: false });
     }
@@ -336,9 +274,10 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
   addObservation: (babyId, site, bilirubinValue, observerName) => {
     const now = new Date().toISOString();
+    const clientOpId = 'obs_op_' + Date.now();
     const newObservation: ClinicalObservation = {
       id: 'obs_' + Date.now(),
-      clientOperationId: 'obs_op_' + Date.now(),
+      clientOperationId: clientOpId,
       babyId,
       site,
       observerName,
@@ -347,15 +286,61 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       timestamp: now,
       syncStatus: 'pending',
     };
+
+    // 1. Immediate in-memory update for fast UI response
     set((state) => ({ observations: [newObservation, ...state.observations] }));
+
+    // 2. Persistent storage in SQLite + offline sync queue
+    (async () => {
+      try {
+        await ObservationRepository.insertOrUpdate(newObservation);
+        await SyncQueueRepository.enqueue({
+          operationId: clientOpId,
+          entityType: 'observation',
+          action: 'create',
+          payloadJson: JSON.stringify(newObservation),
+          status: 'pending',
+          retryCount: 0,
+          createdAt: now,
+        });
+        SyncEngine.syncPending().catch(() => {});
+      } catch (err) {
+        console.warn('[Observation] SQLite save error:', err);
+      }
+    })();
+
     return newObservation;
   },
 
   updateObservation: (observationId, updates) => {
+    const existing = get().observations.find((o) => o.id === observationId);
+    if (!existing) return;
+    const updatedObs = { ...existing, ...updates };
+
+    // 1. Immediate in-memory update
     set((state) => ({
       observations: state.observations.map((o) =>
-        o.id === observationId ? { ...o, ...updates } : o
+        o.id === observationId ? updatedObs : o
       ),
     }));
+
+    // 2. Persistent storage in SQLite + offline sync queue
+    (async () => {
+      try {
+        await ObservationRepository.insertOrUpdate(updatedObs);
+        await SyncQueueRepository.enqueue({
+          operationId: 'obs_upd_' + Date.now(),
+          entityType: 'observation',
+          action: 'update',
+          payloadJson: JSON.stringify(updatedObs),
+          status: 'pending',
+          retryCount: 0,
+          createdAt: new Date().toISOString(),
+        });
+        SyncEngine.syncPending().catch(() => {});
+      } catch (err) {
+        console.warn('[Observation] SQLite update error:', err);
+      }
+    })();
   },
 }));

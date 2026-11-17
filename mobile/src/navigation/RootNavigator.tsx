@@ -6,7 +6,6 @@ import { LoginScreen } from '../features/authentication/screens/LoginScreen';
 import { DashboardScreen } from '../features/dashboard/screens/DashboardScreen';
 import { PatientTrendsScreen } from '../features/trends/screens/PatientTrendsScreen';
 import { NewRegistrationScreen } from '../features/babies/screens/NewRegistrationScreen';
-import { PatientsScreen } from '../features/babies/screens/PatientsScreen';
 import { RegistrationSuccessScreen } from '../features/babies/screens/RegistrationSuccessScreen';
 import { PresentBilirubinScreen } from '../features/bilirubin/screens/PresentBilirubinScreen';
 import { RiskScreen } from '../features/recommendations/screens/RiskScreen';
@@ -413,14 +412,6 @@ export const RootNavigator: React.FC = () => {
         }
 
         // Primary Role: Doctor / Referring Centre (Default)
-        if (activeTab === 'admitted') {
-          return (
-            <PatientsScreen
-              onSelectBaby={handleSelectBaby}
-              onRegisterNew={() => setCurrentRoute('new_registration')}
-            />
-          );
-        }
         if (activeTab === 'phototherapy') {
           return (
             <HospitalDirectoryScreen

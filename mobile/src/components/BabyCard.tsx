@@ -16,34 +16,42 @@ interface BabyCardProps {
   pillColor?: string;
 }
 
-const formatRegistrationTime = (baby: Baby): string => {
+const formatRegistrationDateTime = (baby: Baby): string => {
+  const dateObj = baby.dateOfBirth
+    ? new Date(baby.dateOfBirth)
+    : baby.updatedAt
+    ? new Date(baby.updatedAt)
+    : null;
+
+  const dateStr =
+    dateObj && !isNaN(dateObj.getTime())
+      ? dateObj.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+      : '';
+
+  let timeStr = '';
   if (baby.exactTimeOfBirth) {
     if (baby.exactTimeOfBirth.includes('AM') || baby.exactTimeOfBirth.includes('PM')) {
-      return baby.exactTimeOfBirth;
+      timeStr = baby.exactTimeOfBirth;
+    } else {
+      const parts = baby.exactTimeOfBirth.split(':');
+      if (parts.length >= 2) {
+        let h = parseInt(parts[0], 10);
+        const m = parts[1];
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        timeStr = `${h}:${m} ${ampm}`;
+      } else {
+        timeStr = baby.exactTimeOfBirth;
+      }
     }
-    const parts = baby.exactTimeOfBirth.split(':');
-    if (parts.length >= 2) {
-      let h = parseInt(parts[0], 10);
-      const m = parts[1];
-      const ampm = h >= 12 ? 'PM' : 'AM';
-      h = h % 12 || 12;
-      return `${h}:${m} ${ampm}`;
-    }
-    return baby.exactTimeOfBirth;
+  } else if (dateObj && !isNaN(dateObj.getTime())) {
+    timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
-  if (baby.dateOfBirth) {
-    const d = new Date(baby.dateOfBirth);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
+
+  if (dateStr && timeStr) {
+    return `${dateStr}, ${timeStr}`;
   }
-  if (baby.updatedAt) {
-    const d = new Date(baby.updatedAt);
-    if (!isNaN(d.getTime())) {
-      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    }
-  }
-  return '';
+  return dateStr || timeStr;
 };
 
 export const BabyCard: React.FC<BabyCardProps> = ({
@@ -72,7 +80,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     : latestReading
     ? { value: latestReading.value, timestamp: latestReading.timestamp }
     : null;
-  const registrationTime = formatRegistrationTime(baby);
+  const registrationDateTime = formatRegistrationDateTime(baby);
 
   return (
     <TouchableOpacity
@@ -101,9 +109,16 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             </TouchableOpacity>
           )}
         </View>
-        <Text style={[styles.statusText, { color: severity.color }]}>
-          {severity.label}
-        </Text>
+        <View style={styles.statusRow}>
+          <Text style={[styles.statusText, { color: severity.color }]}>
+            {severity.label}
+          </Text>
+          {baby.status === 'discharged' && (
+            <View style={styles.dischargedBadge}>
+              <Text style={styles.dischargedBadgeText}>DISCHARGED</Text>
+            </View>
+          )}
+        </View>
       </View>
 
       <View style={styles.rightSection}>
@@ -112,8 +127,8 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             {sample.value.toFixed(1)} mg/dL
           </Text>
         )}
-        {!!registrationTime && (
-          <Text style={styles.readingTime}>{registrationTime}</Text>
+        {!!registrationDateTime && (
+          <Text style={styles.readingTime}>{registrationDateTime}</Text>
         )}
       </View>
     </TouchableOpacity>
@@ -172,10 +187,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginLeft: 8,
   },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
   statusText: {
     fontSize: 13,
     fontWeight: '600',
-    marginTop: 2,
+  },
+  dischargedBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  dischargedBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.5,
   },
   rightSection: {
     alignItems: 'flex-end',

@@ -51,23 +51,18 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   const renderRoleTabs = () => {
     switch (primaryRole) {
       // 1. Doctor / Referring Centre
-      // Tabs: Home | Patients | Add Baby (FAB) | Referrals | Profile
+      // Tabs: Home | Add Baby (FAB) | Referrals | Profile (Patient Directory removed)
       case 'doctor_referring':
         return (
           <>
-            <TouchableOpacity onPress={() => onTabPress('home')} style={styles.tabItem}>
-              <Home size={22} color={activeTab === 'home' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
-                Home
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => onTabPress('admitted')} style={styles.tabItem}>
-              <Bed size={22} color={activeTab === 'admitted' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'admitted' && styles.tabLabelActive]}>
-                Patients
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.sideGroup}>
+              <TouchableOpacity onPress={() => onTabPress('home')} style={styles.tabItem}>
+                <Home size={22} color={activeTab === 'home' ? '#7D3BFF' : '#94A3B8'} />
+                <Text style={[styles.tabLabel, activeTab === 'home' && styles.tabLabelActive]}>
+                  Home
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <View style={styles.fabWrapper}>
               <TouchableOpacity
@@ -79,19 +74,21 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity onPress={() => onTabPress('tracker')} style={styles.tabItem}>
-              <Share2 size={22} color={activeTab === 'tracker' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'tracker' && styles.tabLabelActive]}>
-                Referrals
-              </Text>
-            </TouchableOpacity>
+            <View style={styles.sideGroup}>
+              <TouchableOpacity onPress={() => onTabPress('tracker')} style={styles.tabItem}>
+                <Share2 size={22} color={activeTab === 'tracker' ? '#7D3BFF' : '#94A3B8'} />
+                <Text style={[styles.tabLabel, activeTab === 'tracker' && styles.tabLabelActive]}>
+                  Referrals
+                </Text>
+              </TouchableOpacity>
 
-            <TouchableOpacity onPress={() => onTabPress('profile')} style={styles.tabItem}>
-              <User size={22} color={activeTab === 'profile' ? '#7D3BFF' : '#94A3B8'} />
-              <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>
-                Profile
-              </Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={() => onTabPress('profile')} style={styles.tabItem}>
+                <User size={22} color={activeTab === 'profile' ? '#7D3BFF' : '#94A3B8'} />
+                <Text style={[styles.tabLabel, activeTab === 'profile' && styles.tabLabelActive]}>
+                  Profile
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         );
 
@@ -241,6 +238,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
+  },
+  sideGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
   },
   tabLabel: {
     fontSize: 10,

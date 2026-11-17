@@ -1,5 +1,13 @@
+import dns from 'dns';
 import mongoose from 'mongoose';
 import { ENV } from './env';
+
+// Ensure SRV DNS resolution succeeds on Windows environments
+try {
+  dns.setServers(['8.8.8.8', '1.1.1.1']);
+} catch {
+  // Ignore if custom dns servers cannot be set
+}
 
 export let isMongoConnected = false;
 
@@ -10,8 +18,8 @@ export async function connectDatabase(): Promise<void> {
     mongoose.set('bufferCommands', false);
     
     await mongoose.connect(ENV.MONGODB_URI, {
-      serverSelectionTimeoutMS: 2000,
-      connectTimeoutMS: 2000,
+      serverSelectionTimeoutMS: 8000,
+      connectTimeoutMS: 8000,
     });
     isMongoConnected = true;
     console.log(`[Database] Successfully connected to MongoDB at ${ENV.MONGODB_URI}`);
