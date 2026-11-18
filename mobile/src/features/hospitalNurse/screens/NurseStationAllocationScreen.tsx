@@ -3,19 +3,25 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { PTStation, Admission } from '../../../types';
+import { PTStation, Admission, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 
 interface NurseStationAllocationScreenProps {
   onBack?: () => void;
   onOpenNotifications?: () => void;
+  embedded?: boolean;
+  selectedBaby?: Baby | null;
+  onBabyAllocated?: (baby: Baby, station: PTStation) => void;
 }
 
 export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreenProps> = ({
   onBack,
   onOpenNotifications,
+  embedded = false,
+  selectedBaby = null,
+  onBabyAllocated,
 }) => {
-  const { stations, admissions, allocateStation, updateStationStatus, notifications } = useNetworkStore();
+  const { stations, admissions, allocateStation, allocateBabyToStation, updateStationStatus, notifications } = useNetworkStore();
   const { user } = useAuthStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -58,18 +64,25 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAllocate = async (station: PTStation) => {
-    if (!selectedAdmission) {
-      Alert.alert('Select Patient', 'Please select an admitted patient above to allocate.');
+    const targetBaby: Baby | null = selectedBaby || (selectedAdmission ? {
+      id: selectedAdmission.babyId || selectedAdmission.id,
+      uhid: selectedAdmission.babyUhid,
+      name: selectedAdmission.babyName,
+      parentsName: selectedAdmission.babyName,
+      initialValue: selectedAdmission.initialAdmissionBilirubin || 14.5,
+    } as Baby : null);
+
+    if (!targetBaby) {
+      Alert.alert('Select Patient', 'Please select a baby to send to phototherapy first.');
       return;
     }
 
     // STRICT CHECK: Ensure patient is not already allocated anywhere
-    if (isBabyAlreadyAllocated(selectedAdmission.babyUhid, selectedAdmission.babyId)) {
+    if (isBabyAlreadyAllocated(targetBaby.uhid, targetBaby.id)) {
       Alert.alert(
         'Patient Already Allocated',
-        `Patient ${selectedAdmission.babyName} (${selectedAdmission.babyUhid}) is already assigned to an active phototherapy station. A patient cannot occupy more than one station.`
+        `Patient ${targetBaby.parentsName || targetBaby.name} (${targetBaby.uhid}) is already assigned to an active phototherapy station.`
       );
-      setSelectedAdmissionId(pendingAdmissions[0]?.admissionId || null);
       return;
     }
 
@@ -89,21 +102,16 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     }
 
     setIsProcessing(true);
-    const babyName = selectedAdmission.babyName;
-    const babyUhid = selectedAdmission.babyUhid;
+    const babyName = targetBaby.parentsName || targetBaby.name;
+    const babyUhid = targetBaby.uhid;
     try {
-      await allocateStation(selectedAdmission.id || selectedAdmission.admissionId, station.id || station.stationId, user.name);
+      await allocateBabyToStation(targetBaby, station.stationId || station.id, user.name);
       
-      // Auto-select next unallocated patient if any
-      const nextPending = pendingAdmissions.filter(
-        (a) => a.admissionId !== selectedAdmission.admissionId && a.id !== selectedAdmission.id
-      );
-      setSelectedAdmissionId(nextPending[0]?.admissionId || nextPending[0]?.id || null);
-
       Alert.alert(
         'Station Allocated!',
-        `${babyName} (${babyUhid}) successfully placed in ${station.name} (${station.stationId}). Phototherapy treatment can now begin.`
+        `${babyName} (${babyUhid}) placed in ${station.name} (${station.stationId}). Phototherapy treatment has begun!`
       );
+      onBabyAllocated?.(targetBaby, station);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to allocate station');
     } finally {
@@ -149,86 +157,123 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTitleGroup}>
-            {onBack && (
-              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                <Text style={styles.backBtnText}>←</Text>
-              </TouchableOpacity>
-            )}
-            <View>
-              <Text style={styles.headerTitle}>PT Station Allocation</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={onOpenNotifications}
-            style={styles.notifBtn}
-            activeOpacity={0.7}
-            accessibilityLabel="Notifications"
-          >
-            <Text style={styles.bellIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badgeDot}>
-                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+      {/* Standalone Header (only when not embedded) */}
+      {!embedded && (
+        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitleGroup}>
+              {onBack && (
+                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                  <Text style={styles.backBtnText}>←</Text>
+                </TouchableOpacity>
+              )}
+              <View>
+                <Text style={styles.headerTitle}>PT Station Allocation</Text>
               </View>
-            )}
-          </TouchableOpacity>
-        </View>
+            </View>
+            <TouchableOpacity
+              onPress={onOpenNotifications}
+              style={styles.notifBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeDotText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
 
-        {/* Live Fleet Capacity Strip */}
-        <View style={styles.fleetStatusCard}>
-          <View style={styles.fleetStatusCol}>
-            <Text style={[styles.fleetStatusVal, { color: '#00A569' }]}>{availableCount}</Text>
-            <Text style={styles.fleetStatusLbl}>Available</Text>
-          </View>
-          <View style={styles.fleetDivider} />
-          <View style={styles.fleetStatusCol}>
-            <Text style={[styles.fleetStatusVal, { color: '#FC3949' }]}>{occupiedCount}</Text>
-            <Text style={styles.fleetStatusLbl}>Occupied</Text>
-          </View>
-          <View style={styles.fleetDivider} />
-          <View style={styles.fleetStatusCol}>
-            <Text style={[styles.fleetStatusVal, { color: '#D97706' }]}>{cleaningCount}</Text>
-            <Text style={styles.fleetStatusLbl}>Sanitizing</Text>
-          </View>
-          <View style={styles.fleetDivider} />
-          <View style={styles.fleetStatusCol}>
-            <Text style={styles.fleetStatusVal}>{stations.length}</Text>
-            <Text style={styles.fleetStatusLbl}>Total</Text>
-          </View>
-        </View>
-
-        {/* Admitted Patient Selector Banner */}
-        {pendingAdmissions.length > 0 && (
-          <View style={styles.patientSelectBox}>
-            <Text style={styles.selectLabel}>Select Patient for Bed Assignment:</Text>
-            <View style={styles.pillList}>
-              {pendingAdmissions.map((adm) => {
-                const isSel = selectedAdmission?.admissionId === adm.admissionId || selectedAdmission?.id === adm.id;
-                return (
-                  <TouchableOpacity
-                    key={adm.admissionId || adm.id}
-                    onPress={() => setSelectedAdmissionId(adm.admissionId || adm.id)}
-                    style={[styles.patientPill, isSel && styles.patientPillActive]}
-                  >
-                    <Text style={[styles.patientPillText, isSel && styles.patientPillTextActive]}>
-                      {adm.babyName} ({adm.babyUhid})
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+          {/* Live Fleet Capacity Strip (Standalone) */}
+          <View style={styles.fleetStatusCard}>
+            <View style={styles.fleetStatusCol}>
+              <Text style={[styles.fleetStatusVal, { color: '#00A569' }]}>{availableCount}</Text>
+              <Text style={styles.fleetStatusLbl}>Available</Text>
+            </View>
+            <View style={styles.fleetDivider} />
+            <View style={styles.fleetStatusCol}>
+              <Text style={[styles.fleetStatusVal, { color: '#FC3949' }]}>{occupiedCount}</Text>
+              <Text style={styles.fleetStatusLbl}>Occupied</Text>
+            </View>
+            <View style={styles.fleetDivider} />
+            <View style={styles.fleetStatusCol}>
+              <Text style={[styles.fleetStatusVal, { color: '#D97706' }]}>{cleaningCount}</Text>
+              <Text style={styles.fleetStatusLbl}>Sanitizing</Text>
+            </View>
+            <View style={styles.fleetDivider} />
+            <View style={styles.fleetStatusCol}>
+              <Text style={styles.fleetStatusVal}>{stations.length}</Text>
+              <Text style={styles.fleetStatusLbl}>Total</Text>
             </View>
           </View>
-        )}
-      </View>
+        </View>
+      )}
+
+      {/* Embedded Live Fleet Capacity Strip (Clean White Card on Slate Background) */}
+      {embedded && (
+        <View style={styles.embeddedFleetCard}>
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.embeddedFleetVal, { color: '#00A569' }]}>{availableCount}</Text>
+            <Text style={styles.embeddedFleetLbl}>Available</Text>
+          </View>
+          <View style={styles.embeddedDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.embeddedFleetVal, { color: '#FC3949' }]}>{occupiedCount}</Text>
+            <Text style={styles.embeddedFleetLbl}>Occupied</Text>
+          </View>
+          <View style={styles.embeddedDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.embeddedFleetVal, { color: '#D97706' }]}>{cleaningCount}</Text>
+            <Text style={styles.embeddedFleetLbl}>Sanitizing</Text>
+          </View>
+          <View style={styles.embeddedDivider} />
+          <View style={styles.fleetStatusCol}>
+            <Text style={[styles.embeddedFleetVal, { color: '#181829' }]}>{stations.length}</Text>
+            <Text style={styles.embeddedFleetLbl}>Total Units</Text>
+          </View>
+        </View>
+      )}
+
+      {/* Admitted Patient Selector Banner */}
+      {pendingAdmissions.length > 0 && (
+        <View style={embedded ? styles.embeddedPatientBox : styles.patientSelectBox}>
+          <Text style={embedded ? styles.embeddedSelectLabel : styles.selectLabel}>
+            Select Admitted Patient to Assign Bed:
+          </Text>
+          <View style={styles.pillList}>
+            {pendingAdmissions.map((adm) => {
+              const isSel = selectedAdmission?.admissionId === adm.admissionId || selectedAdmission?.id === adm.id;
+              return (
+                <TouchableOpacity
+                  key={adm.admissionId || adm.id}
+                  onPress={() => setSelectedAdmissionId(adm.admissionId || adm.id)}
+                  style={[
+                    embedded ? styles.embeddedPatientPill : styles.patientPill,
+                    isSel && (embedded ? styles.embeddedPatientPillActive : styles.patientPillActive),
+                  ]}
+                >
+                  <Text
+                    style={[
+                      embedded ? styles.embeddedPatientPillText : styles.patientPillText,
+                      isSel && (embedded ? styles.embeddedPatientPillTextActive : styles.patientPillTextActive),
+                    ]}
+                  >
+                    {adm.babyName} ({adm.babyUhid})
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {/* Station Cards Grid */}
       <FlatList
         data={stations}
         keyExtractor={(item) => item.id || item.stationId}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         renderItem={({ item }) => {
           const badge = getStationBadge(item.operationalStatus);
           const isAvail = item.operationalStatus === 'available';
@@ -259,15 +304,21 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
               ) : null}
 
               {/* Bottom Right Action for Allocation */}
-              {isAvail && selectedAdmission && (
+              {isAvail && (
                 <View style={styles.cardBottomRow}>
                   <TouchableOpacity
                     onPress={() => handleAllocate(item)}
-                    style={[styles.compactAllocateBtn, isProcessing && styles.allocateBtnDisabled]}
+                    style={[
+                      styles.compactAllocateBtn,
+                      isProcessing && styles.allocateBtnDisabled,
+                      !(selectedBaby || selectedAdmission) && { backgroundColor: '#7D3BFF' },
+                    ]}
                     disabled={isProcessing}
                     activeOpacity={0.8}
                   >
-                    <Text style={styles.compactAllocateBtnText}>Allocate →</Text>
+                    <Text style={styles.compactAllocateBtnText}>
+                      {selectedBaby || selectedAdmission ? 'Send Patient to Station →' : 'Select Baby to Allocate'}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -398,6 +449,77 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: 'rgba(255, 255, 255, 0.85)',
     marginTop: 1,
+  },
+  embeddedFleetCard: {
+    flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 6,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  embeddedFleetVal: {
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  embeddedFleetLbl: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  embeddedDivider: {
+    width: 1,
+    height: 24,
+    backgroundColor: '#E2E8F0',
+  },
+  embeddedPatientBox: {
+    backgroundColor: '#F3E8FF',
+    borderRadius: 14,
+    padding: 10,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  embeddedSelectLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#7D3BFF',
+    marginBottom: 6,
+  },
+  embeddedPatientPill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    marginRight: 6,
+    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  embeddedPatientPillActive: {
+    backgroundColor: '#7D3BFF',
+    borderColor: '#7D3BFF',
+  },
+  embeddedPatientPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#181829',
+  },
+  embeddedPatientPillTextActive: {
+    color: '#FFFFFF',
   },
   patientSelectBox: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',

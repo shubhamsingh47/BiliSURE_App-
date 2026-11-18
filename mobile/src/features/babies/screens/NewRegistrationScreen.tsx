@@ -16,7 +16,7 @@ import { PrimaryButton } from '../../../components/PrimaryButton';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { SeverityState } from '../../../types';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface NewRegistrationScreenProps {
   onBack: () => void;
@@ -106,7 +106,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   return (
     <View style={styles.screen}>
       {/* Coral / Red Header from Frame 12 with Dynamic Camera Inset */}
-      <View style={[styles.headerSafeArea, { paddingTop: insets.top }]}>
+      <View style={[styles.headerSafeArea, { paddingTop: getScreenTopPadding(insets, 4) }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />

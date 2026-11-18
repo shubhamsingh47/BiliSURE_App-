@@ -6,17 +6,20 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Admission, TreatmentSession } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface NurseTreatmentTrackerScreenProps {
   onBack?: () => void;
   onRecordBilirubin?: (babyUhid: string) => void;
   onOpenNotifications?: () => void;
+  embedded?: boolean;
 }
 
 export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenProps> = ({
   onBack,
   onRecordBilirubin,
   onOpenNotifications,
+  embedded = false,
 }) => {
   const { admissions, startTreatmentSession, endTreatmentSession, approveDischarge, notifications } = useNetworkStore();
   const { user } = useAuthStore();
@@ -179,7 +182,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     return (
       <View style={styles.container}>
         {/* Full Page Header */}
-        <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 10) }]}>
           <View style={styles.headerRow}>
             <View style={styles.headerTitleGroup}>
               <TouchableOpacity
@@ -341,40 +344,42 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTitleGroup}>
-            {onBack && (
-              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-                <Text style={styles.backBtnText}>←</Text>
-              </TouchableOpacity>
-            )}
-            <View>
-              <Text style={styles.headerTitle}>Phototherapy Tracking</Text>
-              <Text style={styles.headerSubtitle}>Active Treatment Sessions • {user.facility}</Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            onPress={onOpenNotifications}
-            style={styles.notifBtn}
-            activeOpacity={0.7}
-            accessibilityLabel="Notifications"
-          >
-            <Text style={styles.bellIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badgeDot}>
-                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+      {!embedded && (
+        <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 10) }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitleGroup}>
+              {onBack && (
+                <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                  <Text style={styles.backBtnText}>←</Text>
+                </TouchableOpacity>
+              )}
+              <View>
+                <Text style={styles.headerTitle}>Phototherapy Tracking</Text>
+                <Text style={styles.headerSubtitle}>Active Treatment Sessions • {user.facility}</Text>
               </View>
-            )}
-          </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              onPress={onOpenNotifications}
+              style={styles.notifBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeDotText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Patient Treatment Cards */}
       <FlatList
         data={treatedPatients}
         keyExtractor={(item) => item.id || item.admissionId}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>💡</Text>

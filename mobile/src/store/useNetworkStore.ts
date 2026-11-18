@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Hospital, PTStation, Referral, Admission, InAppNotification, ReferralStatus, ReferralUrgency } from '../types';
+import { Hospital, PTStation, Referral, Admission, InAppNotification, ReferralStatus, ReferralUrgency, Baby } from '../types';
 import { apiClient } from '../services/api.client';
 
 interface NetworkState {
@@ -19,6 +19,7 @@ interface NetworkState {
   rejectReferral: (referralId: string, reason: string, doctorName: string) => Promise<Referral>;
   confirmArrival: (referralId: string, nurseName: string, hospitalId: string) => Promise<Admission>;
   allocateStation: (admissionId: string, stationId: string, nurseName: string) => Promise<void>;
+  allocateBabyToStation: (baby: Baby, stationId: string, nurseName: string) => Promise<void>;
   startTreatmentSession: (admissionId: string, data: { phototherapyType?: string; irradianceMwCm2?: number; nurseName: string; notes?: string }) => Promise<void>;
   endTreatmentSession: (admissionId: string, sessionId: string, nurseName: string, notes?: string) => Promise<void>;
   approveDischarge: (admissionId: string, data: { doctorName: string; dischargeBilirubinValue: number; dischargeNotes?: string; followUpPlan?: string }) => Promise<void>;
@@ -533,6 +534,88 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     });
 
     apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => {});
+  },
+
+  allocateBabyToStation: async (baby, stationId, nurseName) => {
+    const state = get();
+    const targetStation = state.stations.find((s) => s.id === stationId || s.stationId === stationId);
+    if (!targetStation) throw new Error('Station not found');
+    if (targetStation.operationalStatus === 'occupied') {
+      throw new Error(`Station ${targetStation.stationId} is already occupied by ${targetStation.currentBabyName || 'another patient'}`);
+    }
+
+    const babyName = baby.parentsName?.trim() || baby.name;
+    const babyUhid = baby.uhid;
+
+    // Check if baby is already allocated to any active station
+    const alreadyAllocated = state.stations.find(
+      (s) =>
+        s.operationalStatus === 'occupied' &&
+        ((babyUhid && s.currentBabyUhid === babyUhid) || (baby.id && s.currentBabyId === baby.id))
+    );
+    if (alreadyAllocated) {
+      throw new Error(`Patient ${babyName} (${babyUhid}) is already allocated to station ${alreadyAllocated.stationId}`);
+    }
+
+    // Check if there is an existing admission or create one
+    let admission = state.admissions.find(
+      (a) => (babyUhid && a.babyUhid === babyUhid) || (baby.id && a.babyId === baby.id)
+    );
+
+    if (admission) {
+      await state.allocateStation(admission.id || admission.admissionId, stationId, nurseName);
+    } else {
+      const newAdmId = 'adm_' + Date.now();
+      const newAdmCode = 'ADM-' + Math.floor(10000 + Math.random() * 90000);
+      const newAdmission: Admission = {
+        id: newAdmId,
+        admissionId: newAdmCode,
+        babyId: baby.id,
+        babyUhid: baby.uhid,
+        babyName,
+        hospitalId: 'hosp_001',
+        hospitalName: 'Facility Phototherapy Unit',
+        admissionStatus: 'under_treatment',
+        admittedAt: new Date().toISOString(),
+        physicalArrivalConfirmed: true,
+        stationReleased: false,
+        assignedDoctor: 'Attending Pediatrician',
+        primaryNurse: nurseName,
+        ptStationId: stationId,
+        ptStationName: `${targetStation.name} (${targetStation.stationId})`,
+        initialAdmissionBilirubin: baby.initialValue || 14.5,
+        treatmentSessions: [
+          {
+            sessionId: 'sess_' + Date.now(),
+            startTime: new Date().toISOString(),
+            phototherapyType: targetStation.type === 'double_surface' ? 'Double Surface High-Intensity LED' : 'Single Surface Overhead LED',
+            irradianceMwCm2: 35,
+            nurseName,
+            notes: 'Phototherapy session started directly upon bed assignment.',
+            status: 'active',
+          },
+        ],
+      };
+
+      const updatedStations = state.stations.map((s) =>
+        s.id === stationId || s.stationId === stationId
+          ? {
+              ...s,
+              operationalStatus: 'occupied' as const,
+              currentBabyId: baby.id,
+              currentBabyName: babyName,
+              currentBabyUhid: baby.uhid,
+              allocatedAt: new Date().toISOString(),
+            }
+          : s
+      );
+
+      set({
+        admissions: [newAdmission, ...state.admissions],
+        stations: updatedStations,
+        hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
+      });
+    }
   },
 
   startTreatmentSession: async (admissionId, data) => {

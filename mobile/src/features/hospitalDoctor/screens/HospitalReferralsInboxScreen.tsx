@@ -6,13 +6,16 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { COLORS } from '../../../theme/colors';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface HospitalReferralsInboxScreenProps {
   onOpenNotifications?: () => void;
+  embedded?: boolean;
 }
 
 export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreenProps> = ({
   onOpenNotifications,
+  embedded = false,
 }) => {
   const { referrals, acceptReferral, rejectReferral, notifications } = useNetworkStore();
   const { user } = useAuthStore();
@@ -66,35 +69,37 @@ export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreen
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Incoming Referrals</Text>
-            <Text style={styles.headerSubtitle}>
-              {pendingReferrals.length} Pending Review • {user.facility}
-            </Text>
+      {!embedded && (
+        <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 10) }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Incoming Referrals</Text>
+              <Text style={styles.headerSubtitle}>
+                {pendingReferrals.length} Pending Review • {user.facility}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onOpenNotifications}
+              style={styles.notifBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeDotText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={onOpenNotifications}
-            style={styles.notifBtn}
-            activeOpacity={0.7}
-            accessibilityLabel="Notifications"
-          >
-            <Text style={styles.bellIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badgeDot}>
-                <Text style={styles.badgeDotText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
       {/* Referrals List */}
       <FlatList
         data={pendingReferrals}
         keyExtractor={(item) => item.id || item.referralId}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>🎉</Text>

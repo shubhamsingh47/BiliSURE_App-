@@ -6,44 +6,27 @@ import { LoginScreen } from '../features/authentication/screens/LoginScreen';
 import { DashboardScreen } from '../features/dashboard/screens/DashboardScreen';
 import { PatientTrendsScreen } from '../features/trends/screens/PatientTrendsScreen';
 import { NewRegistrationScreen } from '../features/babies/screens/NewRegistrationScreen';
-import { PatientsScreen } from '../features/babies/screens/PatientsScreen';
 import { RegistrationSuccessScreen } from '../features/babies/screens/RegistrationSuccessScreen';
 import { PresentBilirubinScreen } from '../features/bilirubin/screens/PresentBilirubinScreen';
 import { RiskScreen } from '../features/recommendations/screens/RiskScreen';
 import { RecommendationsScreen } from '../features/recommendations/screens/RecommendationsScreen';
-import { StoriesCarouselScreen } from '../features/analytics/screens/StoriesCarouselScreen';
-import { SummaryTotalScreen } from '../features/analytics/screens/SummaryTotalScreen';
+import { ObservationsListScreen } from '../features/observations/screens/ObservationsListScreen';
+import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
 import { CalibrationScreen } from '../features/devices/screens/CalibrationScreen';
 import { CalibrationStatusScreen } from '../features/devices/screens/CalibrationStatusScreen';
 import { DeviceAlertScreen } from '../features/devices/screens/DeviceAlertScreen';
-import { ExportDataScreen } from '../features/reports/screens/ExportDataScreen';
-import { ObservationsListScreen } from '../features/observations/screens/ObservationsListScreen';
-import { ProfileScreen } from '../features/profile/screens/ProfileScreen';
 
-// District & Hospital Network Screens
-import { HospitalDirectoryScreen } from '../features/referrals/screens/HospitalDirectoryScreen';
+// 3-Tab Main Screens
+import { WardStationsScreen } from '../features/ward/screens/WardStationsScreen';
+import { ReferralsHubScreen } from '../features/referrals/screens/ReferralsHubScreen';
 import { CreateReferralScreen } from '../features/referrals/screens/CreateReferralScreen';
 import { ReferralTrackerScreen } from '../features/referrals/screens/ReferralTrackerScreen';
-import { HospitalReferralsInboxScreen } from '../features/hospitalDoctor/screens/HospitalReferralsInboxScreen';
-import { DischargeApprovalScreen } from '../features/hospitalDoctor/screens/DischargeApprovalScreen';
-import { NurseArrivalsScreen } from '../features/hospitalNurse/screens/NurseArrivalsScreen';
-import { NurseStationAllocationScreen } from '../features/hospitalNurse/screens/NurseStationAllocationScreen';
-import { NurseTreatmentTrackerScreen } from '../features/hospitalNurse/screens/NurseTreatmentTrackerScreen';
-import { StationReadinessScreen } from '../features/hospitalNurse/screens/StationReadinessScreen';
-import { AdminStationsManagementScreen } from '../features/hospitalAdmin/screens/AdminStationsManagementScreen';
-import { DistrictOverviewScreen } from '../features/districtAdmin/screens/DistrictOverviewScreen';
-import { FacilityUserManagementScreen } from '../features/districtAdmin/screens/FacilityUserManagementScreen';
-import { StaffManagementScreen } from '../features/hospitalAdmin/screens/StaffManagementScreen';
-import { NotificationsScreen } from '../features/notifications/screens/NotificationsScreen';
-import { FacilitySelectionScreen } from '../features/authentication/screens/FacilitySelectionScreen';
-import { OtpActivationScreen } from '../features/authentication/screens/OtpActivationScreen';
+import { HospitalDirectoryScreen } from '../features/referrals/screens/HospitalDirectoryScreen';
 
 import { BottomTabBar, TabName } from './BottomTabNavigator';
-import { RoleSwitcherBar } from '../components/RoleSwitcherBar';
 import { usePatientStore } from '../store/usePatientStore';
-import { useAuthStore } from '../store/useAuthStore';
 import { useNetworkStore } from '../store/useNetworkStore';
-import { Hospital, Admission, Baby } from '../types';
+import { Hospital, Baby } from '../types';
 
 type ScreenRoute =
   | 'splash'
@@ -56,40 +39,31 @@ type ScreenRoute =
   | 'present_bilirubin'
   | 'risk'
   | 'recommendations'
-  | 'stories_carousel'
-  | 'export_data'
+  | 'create_referral'
+  | 'hospital_directory'
+  | 'referral_tracker'
   | 'observations_list'
+  | 'notifications'
   | 'calibration'
   | 'calibration_status'
-  | 'device_alert'
-  | 'hospital_directory'
-  | 'create_referral'
-  | 'referral_tracker'
-  | 'discharge_approval'
-  | 'notifications'
-  | 'facility_selection'
-  | 'staff_management'
-  | 'facility_user_management'
-  | 'otp';
+  | 'device_alert';
 
 export const RootNavigator: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<ScreenRoute>('splash');
-  const [activeTab, setActiveTab] = useState<TabName>('home');
+  const [activeTab, setActiveTab] = useState<TabName>('babies');
   const [readingVal, setReadingVal] = useState<number>(14.8);
-  const [readingSite, setReadingSite] = useState<string>('Palms and soles');
-  const [registeredUhid, setRegisteredUhid] = useState<string>('M1A2N3S4I5');
+  const [readingSite, setReadingSite] = useState<string>('Forehead');
+  const [registeredUhid, setRegisteredUhid] = useState<string>('BS-IN-100001');
   const [selectedHospitalForReferral, setSelectedHospitalForReferral] = useState<Hospital | null>(null);
   const [referralContextPatient, setReferralContextPatient] = useState<Baby | null>(null);
-  const [selectedAdmissionForDischarge, setSelectedAdmissionForDischarge] = useState<Admission | null>(null);
 
   const { selectBaby, selectedBaby } = usePatientStore();
-  const { activeRole, primaryRole, activeHospitalProfile, hasPermission } = useAuthStore();
-  const { hospitals, admissions } = useNetworkStore();
+  const { hospitals } = useNetworkStore();
 
   const handleSplashFinish = () => setCurrentRoute('onboarding');
   const handleOnboardingContinue = () => setCurrentRoute('login');
   const handleLoginSuccess = () => {
-    setActiveTab('home');
+    setActiveTab('babies');
     setCurrentRoute('main');
   };
 
@@ -102,40 +76,6 @@ export const RootNavigator: React.FC = () => {
     setReadingVal(val);
     setReadingSite(site);
     setCurrentRoute('present_bilirubin');
-  };
-
-  const renderProfile = () => (
-    <ProfileScreen
-      onOpenCalibration={() => setCurrentRoute('calibration')}
-      onLogout={() => {
-        setActiveTab('home');
-        setCurrentRoute('login');
-      }}
-      onOpenNotifications={() => setCurrentRoute('notifications')}
-      onOpenFacilitySelection={() => setCurrentRoute('facility_selection')}
-      onOpenStaffManagement={() => setCurrentRoute('staff_management')}
-      onOpenFacilityManagement={() => setCurrentRoute('facility_user_management')}
-      onOpenOtp={() => setCurrentRoute('otp')}
-    />
-  );
-
-  const handleFabPress = () => {
-    switch (primaryRole) {
-      case 'receiving_hospital':
-        if (hasPermission('enter_bilirubin')) {
-          setCurrentRoute('present_bilirubin');
-        } else {
-          setActiveTab('allocation');
-        }
-        break;
-      case 'district_admin':
-        setCurrentRoute('export_data');
-        break;
-      case 'doctor_referring':
-      default:
-        setCurrentRoute('new_registration');
-        break;
-    }
   };
 
   const renderCurrentScreen = () => {
@@ -164,7 +104,7 @@ export const RootNavigator: React.FC = () => {
         return (
           <RegistrationSuccessScreen
             uhid={registeredUhid}
-            doctor="Dr. Priya Sharma"
+            doctor="Attending Pediatrician"
             onContinue={() => setCurrentRoute('trends')}
           />
         );
@@ -192,7 +132,7 @@ export const RootNavigator: React.FC = () => {
         return (
           <RecommendationsScreen
             onBack={() => setCurrentRoute('risk')}
-            onContinue={() => setCurrentRoute('hospital_directory')}
+            onContinue={() => setCurrentRoute('create_referral')}
           />
         );
 
@@ -219,27 +159,21 @@ export const RootNavigator: React.FC = () => {
         return (
           <CreateReferralScreen
             hospital={selectedHospitalForReferral || hospitals[0]}
-            onSuccess={() => setCurrentRoute('referral_tracker')}
-            onBack={() => setCurrentRoute('hospital_directory')}
+            onSuccess={() => {
+              setActiveTab('referrals');
+              setCurrentRoute('main');
+            }}
+            onBack={() => setCurrentRoute('main')}
           />
         );
 
       case 'referral_tracker':
         return (
           <ReferralTrackerScreen
-            onBack={() => setCurrentRoute('main')}
-          />
-        );
-
-      case 'discharge_approval':
-        return (
-          <DischargeApprovalScreen
-            admission={selectedAdmissionForDischarge || admissions[0]}
-            onSuccess={() => {
-              setActiveTab('admitted');
+            onBack={() => {
+              setActiveTab('referrals');
               setCurrentRoute('main');
             }}
-            onBack={() => setCurrentRoute('main')}
           />
         );
 
@@ -251,68 +185,28 @@ export const RootNavigator: React.FC = () => {
           />
         );
 
-      case 'facility_selection':
-        return (
-          <FacilitySelectionScreen
-            onBack={() => setCurrentRoute('main')}
-            onFacilitySelected={() => setCurrentRoute('main')}
-          />
-        );
-
-      case 'staff_management':
-        return (
-          <StaffManagementScreen
-            onBack={() => setCurrentRoute('main')}
-          />
-        );
-
-      case 'facility_user_management':
-        return (
-          <FacilityUserManagementScreen
-            onBack={() => setCurrentRoute('main')}
-          />
-        );
-
-      case 'otp':
-        return (
-          <OtpActivationScreen
-            onBack={() => setCurrentRoute('main')}
-            onActivateSuccess={() => setCurrentRoute('main')}
-          />
-        );
-
       case 'trends':
         return (
           <PatientTrendsScreen
             onBackToDashboard={() => setCurrentRoute('main')}
             onOpenReadingDetail={handleOpenReadingDetail}
             onSeeAllObservations={() => setCurrentRoute('observations_list')}
-            onOpenReferral={() => {
-              setReferralContextPatient(selectedBaby);
-              setCurrentRoute('hospital_directory');
-            }}
-          />
-        );
-
-      case 'stories_carousel':
-        return (
-          <StoriesCarouselScreen
-            onClose={() => setCurrentRoute('main')}
-            onNavigateAction={(action: string) => {
-              if (action.includes('Discharge')) {
-                setActiveTab('report');
-                setCurrentRoute('main');
-              } else if (action.includes('Reports')) {
-                setCurrentRoute('export_data');
-              } else {
-                setCurrentRoute('main');
+            onSendToPhototherapy={() => {
+              if (selectedBaby) {
+                selectBaby(selectedBaby);
               }
+              setActiveTab('ward_stations');
+              setCurrentRoute('main');
+            }}
+            onOpenReferral={() => {
+              if (selectedBaby) {
+                selectBaby(selectedBaby);
+              }
+              setActiveTab('ward_stations');
+              setCurrentRoute('main');
             }}
           />
         );
-
-      case 'export_data':
-        return <ExportDataScreen onBack={() => setCurrentRoute('main')} />;
 
       case 'observations_list':
         return <ObservationsListScreen onBack={() => setCurrentRoute('trends')} />;
@@ -339,161 +233,50 @@ export const RootNavigator: React.FC = () => {
 
       case 'main':
       default:
-        // Unified 3-Primary-Role views for 'main' route
-        if (primaryRole === 'receiving_hospital') {
-          // Tab 1: Arrivals & Admissions
-          if (activeTab === 'home' || activeTab === 'arrivals') {
+        // 3-Tab Main Navigation
+        switch (activeTab) {
+          case 'ward_stations':
             return (
-              <NurseArrivalsScreen
-                onArrivalConfirmed={(admId) => setActiveTab('allocation')}
+              <WardStationsScreen
                 onOpenNotifications={() => setCurrentRoute('notifications')}
-              />
-            );
-          }
-
-          // Tab 2: Incoming Referrals
-          if (activeTab === 'inbox') {
-            return (
-              <HospitalReferralsInboxScreen
-                onOpenNotifications={() => setCurrentRoute('notifications')}
-              />
-            );
-          }
-
-          // Tab 3: Phototherapy Tracking
-          if (activeTab === 'tracking' || activeTab === 'admitted') {
-            return (
-              <NurseTreatmentTrackerScreen
                 onRecordBilirubin={(uhid) => {
                   setReadingVal(12.4);
                   setCurrentRoute('present_bilirubin');
                 }}
+              />
+            );
+
+          case 'referrals':
+            return (
+              <ReferralsHubScreen
                 onOpenNotifications={() => setCurrentRoute('notifications')}
+                onOpenCreateReferral={() => {
+                  setReferralContextPatient(null);
+                  setCurrentRoute('create_referral');
+                }}
+                onArrivalConfirmed={(admId) => {
+                  setActiveTab('ward_stations');
+                }}
               />
             );
-          }
 
-          // Tab 4: PT Station Allocation
-          if (activeTab === 'allocation') {
+          case 'babies':
+          default:
             return (
-              <NurseStationAllocationScreen
-                onOpenNotifications={() => setCurrentRoute('notifications')}
+              <DashboardScreen
+                onSelectBaby={handleSelectBaby}
+                onOpenReportStories={() => {}}
+                onOpenNewRegistration={() => setCurrentRoute('new_registration')}
               />
             );
-          }
-
-          // Tab 5: Profile
-          if (activeTab === 'profile') {
-            return renderProfile();
-          }
-
-          if (activeTab === 'discharge') {
-            return (
-              <DischargeApprovalScreen
-                admission={admissions[0]}
-                onSuccess={() => setActiveTab('inbox')}
-                onBack={() => setActiveTab('inbox')}
-              />
-            );
-          }
-
-          return (
-            <NurseArrivalsScreen
-              onArrivalConfirmed={(admId) => setActiveTab('allocation')}
-            />
-          );
         }
-
-        if (primaryRole === 'district_admin') {
-          if (activeTab === 'grid') {
-            return (
-              <HospitalDirectoryScreen
-                onSelectHospital={(hosp) => {}}
-                onBack={() => setActiveTab('home')}
-                isTab
-              />
-            );
-          }
-          if (activeTab === 'tracker') {
-            return <ReferralTrackerScreen onBack={() => setActiveTab('home')} isTab />;
-          }
-          if (activeTab === 'report') {
-            return (
-              <SummaryTotalScreen
-                onBack={() => setActiveTab('home')}
-                onExport={() => setCurrentRoute('export_data')}
-                isTab
-              />
-            );
-          }
-          if (activeTab === 'profile') {
-            return renderProfile();
-          }
-          return (
-            <DistrictOverviewScreen
-              onExportPress={() => setCurrentRoute('export_data')}
-            />
-          );
-        }
-
-        // Primary Role: Doctor / Referring Centre (Strategy A: Unified Census & Hospital Capacity)
-        if (activeTab === 'phototherapy') {
-          return (
-            <HospitalDirectoryScreen
-              initialPatient={referralContextPatient}
-              onSelectPatient={(b) => {
-                setReferralContextPatient(b);
-                selectBaby(b);
-              }}
-              onSelectHospital={(hosp) => {
-                setSelectedHospitalForReferral(hosp);
-                setCurrentRoute('create_referral');
-              }}
-              onBack={() => {
-                setReferralContextPatient(null);
-                setActiveTab('home');
-              }}
-              isTab
-            />
-          );
-        }
-        if (activeTab === 'tracker') {
-          return <ReferralTrackerScreen onBack={() => setActiveTab('home')} isTab />;
-        }
-        if (activeTab === 'report') {
-          return (
-            <SummaryTotalScreen
-              onBack={() => setActiveTab('home')}
-              onExport={() => setCurrentRoute('export_data')}
-              isTab
-            />
-          );
-        }
-        if (activeTab === 'profile') {
-          return renderProfile();
-        }
-        // Unified Patients Census screen for 'home' and 'admitted'
-        return (
-          <DashboardScreen
-            onSelectBaby={handleSelectBaby}
-            onOpenReportStories={() => setCurrentRoute('stories_carousel')}
-            onOpenNewRegistration={() => setCurrentRoute('new_registration')}
-          />
-        );
     }
   };
 
-  const showBottomNav = currentRoute === 'main' || currentRoute === 'trends';
-  const showRoleSwitcher =
-    ((currentRoute === 'main' && activeTab !== 'profile') || currentRoute === 'trends') &&
-    primaryRole !== 'receiving_hospital';
+  const showBottomNav = currentRoute === 'main';
 
   return (
     <View style={styles.rootContainer}>
-      {showRoleSwitcher && (
-        <RoleSwitcherBar onOpenNotifications={() => setCurrentRoute('notifications')} />
-      )}
-
       <View style={[styles.screenContainer, !showBottomNav && { paddingBottom: 0 }]}>
         {renderCurrentScreen()}
       </View>
@@ -502,13 +285,9 @@ export const RootNavigator: React.FC = () => {
         <BottomTabBar
           activeTab={activeTab}
           onTabPress={(tab) => {
-            if (tab === 'phototherapy' && activeTab !== 'phototherapy') {
-              setReferralContextPatient(null);
-            }
             setActiveTab(tab);
             if (currentRoute !== 'main') setCurrentRoute('main');
           }}
-          onFabPress={handleFabPress}
         />
       )}
     </View>

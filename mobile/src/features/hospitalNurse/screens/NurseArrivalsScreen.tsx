@@ -5,15 +5,18 @@ import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface NurseArrivalsScreenProps {
   onArrivalConfirmed?: (admissionId: string) => void;
   onOpenNotifications?: () => void;
+  embedded?: boolean;
 }
 
 export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
   onArrivalConfirmed,
   onOpenNotifications,
+  embedded = false,
 }) => {
   const { referrals, confirmArrival, notifications } = useNetworkStore();
   const { user } = useAuthStore();
@@ -49,35 +52,37 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
-        <View style={styles.headerRow}>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Arrivals & Admissions</Text>
-            <Text style={styles.headerSubtitle}>
-              Confirm Physical Patient Arrival • {user.facility}
-            </Text>
+      {!embedded && (
+        <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 10) }]}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerTitleContainer}>
+              <Text style={styles.headerTitle}>Arrivals & Admissions</Text>
+              <Text style={styles.headerSubtitle}>
+                Confirm Physical Patient Arrival • {user.facility}
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={onOpenNotifications}
+              style={styles.notifBtn}
+              activeOpacity={0.7}
+              accessibilityLabel="Notifications"
+            >
+              <Text style={styles.bellIcon}>🔔</Text>
+              {unreadCount > 0 && (
+                <View style={styles.badgeDot}>
+                  <Text style={styles.badgeDotText}>{unreadCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            onPress={onOpenNotifications}
-            style={styles.notifBtn}
-            activeOpacity={0.7}
-            accessibilityLabel="Notifications"
-          >
-            <Text style={styles.bellIcon}>🔔</Text>
-            {unreadCount > 0 && (
-              <View style={styles.badgeDot}>
-                <Text style={styles.badgeDotText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
         </View>
-      </View>
+      )}
 
       {/* Accepted List */}
       <FlatList
         data={incomingAccepted}
         keyExtractor={(item) => item.id || item.referralId}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyIcon}>👶</Text>

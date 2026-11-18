@@ -14,7 +14,7 @@ import { PrimaryButton } from '../../../components/PrimaryButton';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { evaluateBhutaniRisk, mgDlToUmolL } from '../../../services/bhutani.service';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface PresentBilirubinScreenProps {
   onBack: () => void;
@@ -50,7 +50,7 @@ export const PresentBilirubinScreen: React.FC<PresentBilirubinScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.topSafeArea, { paddingTop: insets.top }]}>
+      <View style={[styles.topSafeArea, { paddingTop: getScreenTopPadding(insets, 4) }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />

@@ -19,7 +19,7 @@ import { usePatientStore } from '../../../store/usePatientStore';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { Hospital, ReferralUrgency, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface CreateReferralScreenProps {
   hospital: Hospital;
@@ -109,7 +109,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
       style={styles.container}
       contentContainerStyle={[
         styles.content,
-        { paddingTop: insets.top + SPACING.sm, paddingBottom: insets.bottom + 90 },
+        { paddingTop: getScreenTopPadding(insets, 8), paddingBottom: insets.bottom + 30 },
       ]}
       showsVerticalScrollIndicator={false}
     >

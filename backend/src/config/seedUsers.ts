@@ -1,7 +1,12 @@
 import bcrypt from 'bcryptjs';
 import { UserModel, resolvePermissions } from '../models/User';
+import { isMongoConnected } from './database';
 
 export async function seedDefaultUsers() {
+  if (!isMongoConnected) {
+    console.log('[Database] Skipping user seeding: MongoDB is not connected.');
+    return;
+  }
   try {
     const existing = await UserModel.findOne({ email: 'priya.sharma@chc.district.org' });
     if (existing) return;

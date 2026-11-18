@@ -6,6 +6,7 @@ import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { usePatientStore } from '../../../store/usePatientStore';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface RiskScreenProps {
   onBack: () => void;
@@ -32,7 +33,7 @@ export const RiskScreen: React.FC<RiskScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.contentSafeArea, { paddingTop: insets.top }]}>
+      <View style={[styles.contentSafeArea, { paddingTop: getScreenTopPadding(insets, 4) }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />

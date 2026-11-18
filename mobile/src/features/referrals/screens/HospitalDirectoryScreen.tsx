@@ -22,7 +22,7 @@ import { useNetworkStore } from '../../../store/useNetworkStore';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Hospital, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface HospitalDirectoryScreenProps {
   onSelectHospital: (hospital: Hospital) => void;
@@ -95,7 +95,7 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
   };
 
   const insets = useSafeAreaInsets();
-  const dynamicTopPadding = isTab ? 10 : insets.top + 10;
+  const dynamicTopPadding = isTab ? 10 : getScreenTopPadding(insets, 10);
 
   return (
     <View style={styles.container}>

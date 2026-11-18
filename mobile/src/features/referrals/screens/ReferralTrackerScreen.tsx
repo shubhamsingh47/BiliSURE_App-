@@ -4,18 +4,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { Referral, ReferralStatus } from '../../../types';
 import { COLORS } from '../../../theme/colors';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface ReferralTrackerScreenProps {
   onBack?: () => void;
   onSelectReferral?: (referral: Referral) => void;
   isTab?: boolean;
+  embedded?: boolean;
 }
 
 export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
   onBack,
   onSelectReferral,
   isTab = false,
+  embedded = false,
 }) => {
   const { referrals } = useNetworkStore();
   const [activeFilter, setActiveFilter] = useState<'all' | ReferralStatus>('all');
@@ -40,23 +42,25 @@ export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
   };
 
   const insets = useSafeAreaInsets();
-  const dynamicTopPadding = isTab ? 10 : insets.top + 10;
+  const dynamicTopPadding = embedded ? 4 : isTab ? 10 : getScreenTopPadding(insets, 10);
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={[styles.header, { paddingTop: dynamicTopPadding }]}>
-        <View style={styles.headerRow}>
-          {onBack && (
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-              <Text style={styles.backBtnText}>←</Text>
-            </TouchableOpacity>
-          )}
-          <View>
-            <Text style={styles.headerTitle}>Referral Tracking</Text>
-            <Text style={styles.headerSubtitle}>Status of District Phototherapy Transfers</Text>
+        {!embedded && (
+          <View style={styles.headerRow}>
+            {onBack && (
+              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                <Text style={styles.backBtnText}>←</Text>
+              </TouchableOpacity>
+            )}
+            <View>
+              <Text style={styles.headerTitle}>Referral Tracking</Text>
+              <Text style={styles.headerSubtitle}>Status of District Phototherapy Transfers</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Status Filter Tabs */}
         <View style={styles.filterRow}>
@@ -81,7 +85,7 @@ export const ReferralTrackerScreen: React.FC<ReferralTrackerScreenProps> = ({
       <FlatList
         data={filteredReferrals}
         keyExtractor={(item) => item.id || item.referralId}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No referrals in '{activeFilter}' state.</Text>

@@ -22,7 +22,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Baby, ClinicalObservation, BilirubinReading } from '../../../types';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 const OBS_SITES = ['Forehead', 'Sternum'];
 
@@ -31,6 +31,7 @@ interface PatientTrendsScreenProps {
   onOpenReadingDetail: (readingVal: number, site: string) => void;
   onSeeAllObservations: () => void;
   onOpenReferral?: () => void;
+  onSendToPhototherapy?: () => void;
 }
 
 export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
@@ -38,6 +39,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   onOpenReadingDetail,
   onSeeAllObservations,
   onOpenReferral,
+  onSendToPhototherapy,
 }) => {
   const insets = useSafeAreaInsets();
   const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
@@ -317,9 +319,9 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   };
 
   return (
-    <View style={styles.safeArea}>
+    <View style={[styles.safeArea, { paddingTop: getScreenTopPadding(insets, 8) }]}>
       <ScrollView
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 90 }]}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 30 }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="always"
       >
@@ -340,8 +342,10 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             style={styles.babyDropdownPill}
             accessibilityLabel="Select Patient Dropdown"
           >
-            <ChevronDown size={18} color="#7D3BFF" />
-            <Text style={styles.babyDropdownText}>{activeBaby.parentsName || activeBaby.name}</Text>
+            <ChevronDown size={16} color="#7D3BFF" />
+            <Text style={styles.babyDropdownText} numberOfLines={1} ellipsizeMode="tail">
+              {activeBaby.parentsName || activeBaby.name}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -604,10 +608,14 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           babyExactTimeOfBirth={activeBaby.exactTimeOfBirth}
         />
 
-        {/* Referral Action Callout Button / In-Progress Status */}
-        {onOpenReferral && (
+        {/* Action Button: Send to Phototherapy / Active PT Status */}
+        {(onSendToPhototherapy || onOpenReferral) && (
           isPhototherapyActive ? (
-            <View style={[styles.referralActiveStatusCard, { marginTop: 16 }]}>
+            <TouchableOpacity
+              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy() : onOpenReferral?.())}
+              style={[styles.referralActiveStatusCard, { marginTop: 16 }]}
+              activeOpacity={0.8}
+            >
               <View style={styles.referralActiveHeader}>
                 <View style={styles.referralActivePulseDot} />
                 <Text style={styles.referralActiveTitle}>
@@ -615,27 +623,27 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                     ? 'Phototherapy in Progress'
                     : activeReferral?.status === 'accepted' || activeReferral?.status === 'arrived'
                     ? 'Referral Accepted • Admitted'
-                    : 'Phototherapy Referral Active'}
+                    : 'Phototherapy Active'}
                 </Text>
               </View>
               <Text style={styles.referralActiveSub}>
                 {activeAdmission?.ptStationName
-                  ? `Station: ${activeAdmission.ptStationName} at ${activeAdmission.hospitalName || 'Receiving Hospital'}`
+                  ? `Station: ${activeAdmission.ptStationName} (${activeAdmission.hospitalName || 'Ward Station'})`
                   : activeReferral?.receivingHospitalName
                   ? `Destination: ${activeReferral.receivingHospitalName} (${(activeReferral.status || '').toUpperCase()})`
-                  : 'Referral is currently active under hospital review.'}
+                  : 'Active under phototherapy / hospital care.'}
               </Text>
               <Text style={styles.referralActiveHint}>
-                A new referral can only be initiated after previous phototherapy is completed.
+                Tap to monitor active phototherapy in Ward & Stations →
               </Text>
-            </View>
+            </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              onPress={onOpenReferral}
+              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy() : onOpenReferral?.())}
               style={[styles.referralCalloutBtn, { marginTop: 16 }]}
               activeOpacity={0.8}
             >
-              <Text style={styles.referralCalloutText}>Initiate District Phototherapy Referral →</Text>
+              <Text style={styles.referralCalloutText}>Send to Phototherapy →</Text>
             </TouchableOpacity>
           )
         )}
@@ -767,15 +775,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EDE9FE',
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(7),
     borderRadius: moderateScale(20),
+    maxWidth: '65%',
+    flexShrink: 1,
   },
   babyDropdownText: {
-    fontSize: fontScale(15),
+    fontSize: fontScale(14),
     fontWeight: '700',
     color: '#181829',
-    marginLeft: moderateScale(6),
+    marginLeft: moderateScale(4),
+    flexShrink: 1,
   },
   presentStateContainer: {
     backgroundColor: '#FDF4E5',

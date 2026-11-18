@@ -4,6 +4,7 @@ import { Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface RegistrationSuccessScreenProps {
   uhid?: string;
@@ -19,7 +20,7 @@ export const RegistrationSuccessScreen: React.FC<RegistrationSuccessScreenProps>
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 20 }]}>
+    <View style={[styles.container, { paddingTop: getScreenTopPadding(insets, 16), paddingBottom: insets.bottom + 20 }]}>
       <View style={styles.topInfo}>
         <Text style={styles.mainHeading}>The Kiddo has been registered!!!</Text>
         <Text style={styles.metaText}>UHID: {uhid}</Text>

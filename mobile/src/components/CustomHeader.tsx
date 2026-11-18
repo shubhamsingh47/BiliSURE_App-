@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-nativ
 import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../theme/colors';
+import { getScreenTopPadding } from '../theme/responsive';
 
 interface CustomHeaderProps {
   title: string;
@@ -22,7 +23,7 @@ export const CustomHeader: React.FC<CustomHeaderProps> = ({
   style,
 }) => {
   const insets = useSafeAreaInsets();
-  const dynamicTopPadding = Math.max(insets.top, 12);
+  const dynamicTopPadding = getScreenTopPadding(insets, 4);
 
   return (
     <View

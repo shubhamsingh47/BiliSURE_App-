@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
+import { getScreenTopPadding } from '../../../theme/responsive';
 
 interface RecommendationsScreenProps {
   onBack: () => void;
@@ -26,7 +27,7 @@ export const RecommendationsScreen: React.FC<RecommendationsScreenProps> = ({
 
   return (
     <View style={styles.screen}>
-      <View style={[styles.contentSafeArea, { paddingTop: insets.top }]}>
+      <View style={[styles.contentSafeArea, { paddingTop: getScreenTopPadding(insets, 4) }]}>
         <View style={styles.header}>
           <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backBtn}>
             <ArrowLeft size={24} color={COLORS.white} />

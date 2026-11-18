@@ -11,12 +11,12 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ChevronDown, ChevronRight, Check, X, Search, User } from 'lucide-react-native';
+import { ChevronDown, ChevronRight, Check, X, Search, User, Plus } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { BabyCard } from '../../../components/BabyCard';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Baby, SeverityState } from '../../../types';
-import { moderateScale, fontScale, SPACING } from '../../../theme/responsive';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface DashboardScreenProps {
   onSelectBaby: (baby: Baby) => void;
@@ -180,24 +180,59 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   };
 
   return (
-    <View style={styles.safeArea}>
-      {/* Top Header Bar with Department Filter & Live Census Badge */}
+    <View style={[styles.safeArea, { paddingTop: getScreenTopPadding(insets, 8) }]}>
+      {/* Top Header Bar */}
       <View style={styles.headerBar}>
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => setShowDeptDropdown(true)}
-          style={styles.deptDropdown}
-          accessibilityLabel="Select Department Filter"
-        >
-          <Text style={styles.deptText}>{activeDept}</Text>
-          <ChevronDown size={16} color="#7C3AED" style={{ marginLeft: 6 }} />
-        </TouchableOpacity>
+        {/* Row 1: Screen Title, Patient Count & Register Button */}
+        <View style={styles.headerTopRow}>
+          <View style={styles.headerTitleGroup}>
+            <Text style={styles.screenTitle}>Patients</Text>
+            <View style={styles.patientCountBadge}>
+              <Text style={styles.patientCountText}>
+                {filteredBabies.length} {filteredBabies.length === 1 ? 'Patient' : 'Patients'}
+              </Text>
+            </View>
+          </View>
 
-        {/* Live Census Count Badge */}
-        <View style={styles.patientCountBadge}>
-          <Text style={styles.patientCountText}>
-            {filteredBabies.length} {filteredBabies.length === 1 ? 'Patient' : 'Patients'}
-          </Text>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={onOpenNewRegistration}
+            style={styles.registerBabyBtn}
+            accessibilityLabel="Register New Baby"
+          >
+            <Plus size={15} color="#FFFFFF" strokeWidth={2.5} />
+            <Text style={styles.registerBabyBtnText}>Register Baby</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Row 2: Ward Filter Dropdown & Search Bar */}
+        <View style={styles.headerFilterRow}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowDeptDropdown(true)}
+            style={styles.deptDropdown}
+            accessibilityLabel="Select Department Filter"
+          >
+            <Text style={styles.deptLabel}>Ward: </Text>
+            <Text style={styles.deptText}>{activeDept === 'Deppt' ? 'All' : activeDept}</Text>
+            <ChevronDown size={14} color="#7D3BFF" style={{ marginLeft: 4 }} />
+          </TouchableOpacity>
+
+          <View style={styles.searchWrapper}>
+            <Search size={16} color="#94A3B8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by name, UHID..."
+              placeholderTextColor="#94A3B8"
+              value={search}
+              onChangeText={setSearch}
+            />
+            {search.length > 0 && (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={15} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       </View>
 
@@ -239,29 +274,12 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: insets.bottom + 85 },
+          { paddingBottom: insets.bottom + 24 },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Search Bar - scrolls smoothly with content */}
-        <View style={styles.searchWrapper}>
-          <Search size={18} color="#94A3B8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search by Mother's Name, UHID..."
-            placeholderTextColor="#94A3B8"
-            value={search}
-            onChangeText={setSearch}
-          />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-              <X size={16} color="#94A3B8" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Severity Filter Chips (Horizontal Scroll prevents wrapping & vertical collisions) */}
+        {/* Severity Filter Chips */}
         <View style={styles.filterContainer}>
           <ScrollView
             horizontal
@@ -464,34 +482,76 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   headerBar: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: moderateScale(4),
+    paddingBottom: moderateScale(10),
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    gap: moderateScale(10),
+  },
+  headerTopRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: moderateScale(6),
-    backgroundColor: '#FAFAFA',
+  },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+    gap: 8,
+  },
+  screenTitle: {
+    fontSize: fontScale(22),
+    fontWeight: '800',
+    color: '#181829',
+  },
+  registerBabyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#7D3BFF',
+    paddingHorizontal: moderateScale(12),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(10),
+    gap: 4,
+  },
+  registerBabyBtnText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(12),
+    fontWeight: '700',
+  },
+  headerFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   deptDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingVertical: moderateScale(6),
-    paddingHorizontal: moderateScale(12),
-    borderRadius: moderateScale(16),
+    backgroundColor: '#F8FAFC',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(10),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
+  deptLabel: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    fontWeight: '600',
+  },
   deptText: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(12),
     fontWeight: '700',
-    color: '#1E1B4B',
-    marginLeft: moderateScale(4),
+    color: '#7D3BFF',
   },
   patientCountBadge: {
     backgroundColor: '#F3E8FF',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(5),
-    borderRadius: moderateScale(12),
+    paddingHorizontal: moderateScale(9),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(10),
   },
   patientCountText: {
     fontSize: fontScale(11),
@@ -500,21 +560,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: SPACING.lg,
-    paddingTop: 2,
+    paddingTop: moderateScale(10),
     paddingBottom: SPACING.xxl,
   },
   searchWrapper: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    marginTop: moderateScale(4),
-    marginBottom: moderateScale(6),
-    paddingHorizontal: moderateScale(12),
-    minHeight: moderateScale(42),
-    borderRadius: moderateScale(14),
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: moderateScale(10),
+    height: moderateScale(38),
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    gap: moderateScale(8),
+    gap: 6,
   },
   searchInput: {
     flex: 1,

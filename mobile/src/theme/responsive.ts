@@ -1,4 +1,4 @@
-import { Dimensions, PixelRatio } from 'react-native';
+import { Dimensions, PixelRatio, Platform, StatusBar } from 'react-native';
 
 const guidelineBaseWidth = 375;
 const guidelineBaseHeight = 812;
@@ -52,4 +52,13 @@ export const SPACING = {
   xl: moderateScale(20),
   xxl: moderateScale(24),
   section: moderateScale(28),
+};
+
+/**
+ * Universal safe top padding helper that ensures screens and headers
+ * never render behind device camera cutouts, notches, or translucent status bars.
+ */
+export const getScreenTopPadding = (insets: { top: number }, extraPadding = 8): number => {
+  const androidBar = Platform.OS === 'android' ? (StatusBar.currentHeight || 24) : 0;
+  return Math.max(insets.top || 0, androidBar) + extraPadding;
 };

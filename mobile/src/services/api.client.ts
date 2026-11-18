@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 // PC LAN IP for physical mobile devices connected to the same Wi-Fi network
-const DEV_LAN_IP = '192.168.1.129';
+const DEV_LAN_IP = '192.168.1.103';
 
 const getBackendBaseUrl = (): string => {
   try {
