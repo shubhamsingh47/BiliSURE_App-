@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { Baby, BilirubinReading, ClinicalObservation, SeverityState } from '../types';
 import { PatientsApi } from '../services/patients.api';
 import { evaluateBhutaniRisk } from '../services/bhutani.service';
-import { SEED_BABIES, SEED_READINGS, SEED_OBSERVATIONS } from './seedData';
 
 interface PatientState {
   babies: Baby[];
@@ -23,88 +22,94 @@ interface PatientState {
     bilirubinValue: number,
     observerName: string,
     timestamp?: string
-  ) => ClinicalObservation;
+  ) => Promise<ClinicalObservation>;
   updateObservation: (observationId: string, updates: { site?: string; bilirubinValue?: number }) => void;
 }
 
 export const usePatientStore = create<PatientState>((set, get) => ({
-  babies: SEED_BABIES,
-  selectedBaby: SEED_BABIES[0] || null,
-  readings: SEED_READINGS,
-  observations: SEED_OBSERVATIONS,
+  babies: [],
+  selectedBaby: null,
+  readings: [],
+  observations: [],
   selectedDepartment: 'Deppt',
   isLoading: false,
 
   loadBabies: async () => {
     set({ isLoading: true });
     try {
-      // 1. Fetch babies directly from online backend API
+      const dept = get().selectedDepartment;
       const onlineBabies = await PatientsApi.getBabies(
-        get().selectedDepartment !== 'Deppt' ? get().selectedDepartment : undefined
+        dept !== 'Deppt' && dept !== 'All' ? dept : undefined
       );
 
-      let finalBabies = onlineBabies;
+      // If online babies were fetched, update state
       if (onlineBabies && onlineBabies.length > 0) {
-        // Merge with seed babies if needed
-        const existingIds = new Set(onlineBabies.map((b) => b.uhid || b.id));
-        const missingSeed = SEED_BABIES.filter(
-          (b) => !existingIds.has(b.uhid) && !existingIds.has(b.id)
-        );
-        finalBabies = [...onlineBabies, ...missingSeed];
-      } else {
-        // Fallback to active in-store or seed babies if backend has no records yet
-        const current = get().babies;
-        finalBabies = current.length > 0 ? current : SEED_BABIES;
-      }
+        const finalBabies = onlineBabies;
+        const currentSelected = get().selectedBaby;
+        const activeBaby = currentSelected
+          ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
+          : null;
+        const effectiveBaby = activeBaby || finalBabies[0] || null;
 
-      // Filter out any legacy entries named "Baby 1", "Baby 2", or "Baby"
-      finalBabies = finalBabies.filter((b) => {
-        const n = (b.name || '').trim().toLowerCase();
-        const pn = (b.parentsName || '').trim().toLowerCase();
-        return !['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes(n) &&
-               !['baby 1', 'baby 2', 'baby1', 'baby2'].includes(pn);
-      });
+        if (effectiveBaby) {
+          // Load readings for every baby (so each list card can show its own latest sample)
+          const [readingsPerBaby, allObservations] = await Promise.all([
+            Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
+            PatientsApi.getObservations(),
+          ]);
 
-      // 2. Load observations online if active baby is present
-      const activeBaby = get().selectedBaby;
-      const matchingActive = activeBaby ? finalBabies.find((b) => b.id === activeBaby.id) : null;
-      const effectiveBaby = matchingActive || finalBabies[0] || null;
-
-      if (effectiveBaby) {
-        const [onlineReadings, onlineObs] = await Promise.all([
-          PatientsApi.getReadings(effectiveBaby.id),
-          PatientsApi.getObservations(effectiveBaby.id),
-        ]);
-
-        const mergedReadings =
-          onlineReadings && onlineReadings.length > 0
-            ? [...onlineReadings, ...get().readings.filter((r) => r.babyId !== effectiveBaby.id)]
-            : get().readings;
-
-        const mergedObs =
-          onlineObs && onlineObs.length > 0
-            ? [...onlineObs, ...get().observations.filter((o) => o.babyId !== effectiveBaby.id)]
-            : get().observations;
-
+          set({
+            babies: finalBabies,
+            readings: readingsPerBaby.flat(),
+            observations: allObservations || [],
+            selectedBaby: effectiveBaby,
+          });
+        } else {
+          set({
+            babies: finalBabies,
+            selectedBaby: null,
+            readings: [],
+            observations: [],
+          });
+        }
+      } else if (onlineBabies && onlineBabies.length === 0 && get().babies.length === 0) {
+        // Legitimate empty state
         set({
-          babies: finalBabies,
-          readings: mergedReadings,
-          observations: mergedObs,
-          selectedBaby: effectiveBaby,
-        });
-      } else {
-        set({
-          babies: finalBabies,
+          babies: [],
           selectedBaby: null,
+          readings: [],
+          observations: [],
         });
       }
+    } catch (err) {
+      console.error('Error loading babies from backend:', err);
     } finally {
       set({ isLoading: false });
     }
   },
 
-  selectBaby: (baby) => {
+  selectBaby: async (baby) => {
     set({ selectedBaby: baby });
+    try {
+      const babyIdentifier = baby.id || baby.uhid;
+      const [readings, observations] = await Promise.all([
+        PatientsApi.getReadings(babyIdentifier),
+        PatientsApi.getObservations(babyIdentifier),
+      ]);
+      // Refresh only this baby's entries; keep other babies' data for the list view
+      set((state) => ({
+        readings: [
+          ...(readings || []),
+          ...state.readings.filter((r) => r.babyId !== baby.id && r.babyId !== baby.uhid),
+        ],
+        observations: [
+          ...(observations || []),
+          ...state.observations.filter((o) => o.babyId !== baby.id && o.babyId !== baby.uhid),
+        ],
+      }));
+    } catch (err) {
+      console.error('Error fetching baby readings/observations:', err);
+    }
   },
 
   setSelectedDepartment: (dept) => {
@@ -112,10 +117,9 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   },
 
   registerBaby: async (babyData) => {
-    const newBaby: Baby = {
-      id: 'baby_' + Date.now(),
+    const payload: Partial<Baby> = {
       uhid: babyData.uhid || `UHID_${Date.now().toString().slice(-6)}`,
-      bilisureId: `BS-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+      bilisureId: babyData.bilisureId || `BS-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       name: babyData.name || 'New Patient',
       parentsName: babyData.parentsName || '',
       dateOfBirth: babyData.dateOfBirth || new Date().toISOString(),
@@ -125,56 +129,71 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       height: babyData.height || 48.0,
       assignedDoctor: babyData.assignedDoctor || 'Dr. Priya Sharma',
       facility: babyData.facility || 'North Community Health Centre (CHC)',
-      department: get().selectedDepartment,
+      department: get().selectedDepartment !== 'Deppt' ? get().selectedDepartment : 'NICU',
       severityState: babyData.severityState || 'normal',
       status: babyData.status || 'admitted',
       referralStatus: 'none',
       initialValue: babyData.initialValue || 0,
       dischargeValue: babyData.dischargeValue || 0,
-      syncStatus: 'synced',
       registeredAt: babyData.registeredAt || new Date().toISOString(),
       createdAt: babyData.createdAt || new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    // 1. Immediately update local store so UI is instantaneous and reactive
+    // 1. Send to backend Express -> MongoDB
+    const saved = await PatientsApi.registerBaby(payload);
+    const persistedBaby = saved || ({ ...payload, id: 'baby_' + Date.now() } as Baby);
+
+    // 2. Update Zustand store with the backend response
     set((state) => ({
-      babies: [newBaby, ...state.babies],
-      selectedBaby: newBaby,
+      babies: [persistedBaby, ...state.babies],
+      selectedBaby: persistedBaby,
     }));
 
-    // 2. Direct online API registration to backend
-    PatientsApi.registerBaby(newBaby).catch(() => {});
-
-    return newBaby;
+    return persistedBaby;
   },
 
   updateBaby: async (babyId: string, updates: Partial<Baby>) => {
-    let updated: Baby | null = null;
+    const updated = await PatientsApi.updateBaby(babyId, updates);
+    if (updated) {
+      set((state) => ({
+        babies: state.babies.map((b) => (b.id === babyId || b.uhid === babyId ? updated : b)),
+        selectedBaby:
+          state.selectedBaby && (state.selectedBaby.id === babyId || state.selectedBaby.uhid === babyId)
+            ? updated
+            : state.selectedBaby,
+      }));
+      return updated;
+    }
+
+    // In-memory fallback if network temporary issue
+    let fallbackUpdated: Baby | null = null;
     set((state) => {
       const newBabies = state.babies.map((b) => {
-        if (b.id === babyId) {
-          updated = { ...b, ...updates, updatedAt: new Date().toISOString() };
-          return updated;
+        if (b.id === babyId || b.uhid === babyId) {
+          fallbackUpdated = { ...b, ...updates, updatedAt: new Date().toISOString() };
+          return fallbackUpdated;
         }
         return b;
       });
       return {
         babies: newBabies,
-        selectedBaby: state.selectedBaby?.id === babyId ? updated : state.selectedBaby,
+        selectedBaby:
+          state.selectedBaby && (state.selectedBaby.id === babyId || state.selectedBaby.uhid === babyId)
+            ? fallbackUpdated
+            : state.selectedBaby,
       };
     });
 
-    if (updated) {
-      // Direct online API update to backend
-      PatientsApi.updateBaby(babyId, updates).catch(() => {});
-    }
-
-    return updated || (get().babies.find((b) => b.id === babyId) as Baby);
+    return fallbackUpdated || (get().babies.find((b) => b.id === babyId || b.uhid === babyId) as Baby);
   },
 
   addReading: async (readingData) => {
     const activeBaby = get().selectedBaby || get().babies[0];
+    if (!activeBaby) {
+      throw new Error('No patient selected to record reading');
+    }
+
     const clientOpId = 'op_rdg_' + Date.now();
     const value = readingData.value || 10.0;
     const unit = readingData.unit || 'mg/dL';
@@ -196,12 +215,12 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     if (bhutaniZone === 'high') riskLevel = 'high';
     else if (bhutaniZone === 'high_intermediate' || bhutaniZone === 'low_intermediate') riskLevel = 'intermediate';
 
-    const newReading: BilirubinReading = {
-      id: 'rdg_' + Date.now(),
+    const payload: Partial<BilirubinReading> = {
       clientOperationId: clientOpId,
-      babyId: activeBaby.id,
+      babyId: activeBaby.id || (activeBaby as any)._id,
       babyUhid: activeBaby.uhid,
       value,
+      valueMgDl: unit === 'µmol/L' ? Number((value / 17.1).toFixed(1)) : value,
       unit,
       method,
       sampleTimestamp: readingData.sampleTimestamp || new Date().toISOString(),
@@ -217,35 +236,36 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       timestamp: new Date().toISOString(),
       isInitial: readingData.isInitial,
       isDischarge: readingData.isDischarge,
-      syncStatus: 'synced',
     };
 
-    // 1. Update store & baby status in-memory
+    const savedReading = await PatientsApi.createReading(payload);
+    const readingToStore: BilirubinReading = savedReading || ({
+      ...payload,
+      id: 'rdg_' + Date.now(),
+      syncStatus: 'synced',
+    } as BilirubinReading);
+
     const updatedSeverity: SeverityState =
       riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
 
     set((state) => {
       const updatedBabies = state.babies.map((b) =>
-        b.id === activeBaby.id ? { ...b, severityState: updatedSeverity } : b
+        b.id === activeBaby.id || b.uhid === activeBaby.uhid ? { ...b, severityState: updatedSeverity } : b
       );
       return {
-        readings: [newReading, ...state.readings],
+        readings: [readingToStore, ...state.readings],
         babies: updatedBabies,
         selectedBaby: { ...activeBaby, severityState: updatedSeverity },
       };
     });
 
-    // 2. Direct online API call to backend
-    PatientsApi.createReading(newReading).catch(() => {});
-
-    return newReading;
+    return readingToStore;
   },
 
-  addObservation: (babyId, site, bilirubinValue, observerName, timestamp) => {
+  addObservation: async (babyId, site, bilirubinValue, observerName, timestamp) => {
     const now = timestamp || new Date().toISOString();
     const clientOpId = 'obs_op_' + Date.now();
-    const newObservation: ClinicalObservation = {
-      id: 'obs_' + Date.now(),
+    const payload: Partial<ClinicalObservation> = {
       clientOperationId: clientOpId,
       babyId,
       site,
@@ -253,27 +273,24 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       clinicalNotes: '',
       bilirubinValue,
       timestamp: now,
-      syncStatus: 'synced',
     };
 
-    // 1. Immediate in-memory update for fast UI response
-    set((state) => ({ observations: [newObservation, ...state.observations] }));
+    const savedObs = await PatientsApi.createObservation(payload);
+    const obsToStore: ClinicalObservation = savedObs || ({
+      ...payload,
+      id: 'obs_' + Date.now(),
+      clinicalNotes: '',
+      syncStatus: 'synced',
+    } as ClinicalObservation);
 
-    // 2. Direct online API call to backend
-    PatientsApi.createObservation(newObservation).catch(() => {});
-
-    return newObservation;
+    set((state) => ({ observations: [obsToStore, ...state.observations] }));
+    return obsToStore;
   },
 
   updateObservation: (observationId, updates) => {
-    const existing = get().observations.find((o) => o.id === observationId);
-    if (!existing) return;
-    const updatedObs = { ...existing, ...updates };
-
-    // Immediate in-memory update
     set((state) => ({
       observations: state.observations.map((o) =>
-        o.id === observationId ? updatedObs : o
+        o.id === observationId ? { ...o, ...updates } : o
       ),
     }));
   },

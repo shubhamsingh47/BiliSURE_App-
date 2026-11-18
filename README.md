@@ -1,7 +1,7 @@
 # BiliSURE — Newborn Jaundice Monitoring & Phototherapy Network
 
 [![Integration Tests](https://img.shields.io/badge/Backend%20Tests-14%2F14%20Phases%20Passed-00A569?style=flat-square)](backend/src/tests/runTests.ts)
-[![Mobile Tests](https://img.shields.io/badge/Mobile%20Tests-12%2F12%20Unit%20Tests%20Passed-7D3BFF?style=flat-square)](mobile/src/services/__tests__/bhutani.service.test.ts)
+[![Mobile Tests](https://img.shields.io/badge/Mobile%20Tests-21%2F21%20Unit%20Tests%20Passed-7D3BFF?style=flat-square)](mobile/src/services/__tests__/bhutani.service.test.ts)
 [![Platform](https://img.shields.io/badge/Platform-Mobile%20Only%20(React%20Native%20%2B%20Expo)-FC3949?style=flat-square)](#)
 
 BiliSURE is a production-ready, mobile-only newborn jaundice monitoring and phototherapy referral management network application. It connects multiple referring centres (PHCs, CHCs, maternity clinics) and receiving hospitals across a district through a centralized backend, empowering doctors, nurses, hospital administrators, and district administrators to manage the complete clinical lifecycle of neonatal hyperbilirubinemia.

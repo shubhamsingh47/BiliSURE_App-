@@ -1,186 +1,157 @@
 # BiliSURE — Database Schema & Data Models
 
-## 1. MongoDB Architecture (Central Source of Truth)
+## 1. MongoDB Atlas Architecture (Permanent Source of Truth)
 
-All medical records, user identities, and device associations are persisted in MongoDB with Mongoose schema validation, strict typing, and compound indexes.
+All medical records, patient profiles, bilirubin readings, observations, phototherapy stations, and hospital data are persisted in the MongoDB Atlas database `BiliSURE` via Mongoose schema validation, strict typing, and compound indexes.
 
-### Collections Overview
+### Verified Collections Overview (12 Collections)
 
-1. **`users`**:
+1. **`babies`**:
    - `_id`: ObjectId
-   - `email`: String (unique, index)
-   - `passwordHash`: String
-   - `name`: String
-   - `role`: Enum (`admin`, `doctor`, `nurse`, `caregiver`)
-   - `department`: String (e.g. `NICU`, `Maternity`, `Pediatrics`)
-   - `facility`: String
-   - `isActive`: Boolean
-   - `createdAt`, `updatedAt`: Date
-
-2. **`babies`**:
-   - `_id`: ObjectId
-   - `uhid`: String (unique, index) — Universal Hospital Identifier
-   - `name`: String
+   - `uhid`: String (unique, uppercase, indexed) — Universal Hospital Identifier e.g. "BS-IN-972612"
+   - `bilisureId`: String (indexed) — Permanent BiliSURE Patient ID e.g. "BS-2026-3110"
+   - `name`: String (indexed)
    - `parentsName`: String
+   - `guardianPhone`: String
+   - `guardianAddress`: String
+   - `bloodGroup`: String
+   - `rhesusFactor`: Enum (`positive`, `negative`, `unknown`)
+   - `directCoombsTest`: Enum (`positive`, `negative`, `not_tested`)
    - `dateOfBirth`: Date
-   - `gestationalAgeWeeks`: Number (optional)
+   - `exactTimeOfBirth`: String (e.g. "09:00")
+   - `gestationalAgeWeeks`: Number
+   - `gestationalAgeDays`: Number
    - `birthWeightGrams`: Number
    - `currentWeightGrams`: Number
-   - `heightCm`: Number
+   - `weight`: Number (kg)
+   - `height`: Number (cm)
    - `assignedDoctor`: String
    - `facility`: String
    - `department`: String
    - `severityState`: Enum (`normal`, `moderate`, `critical`)
    - `status`: Enum (`admitted`, `under_treatment`, `in_observation`, `discharged`)
+   - `referralStatus`: Enum (`none`, `pending`, `accepted`, `rejected`, `admitted`)
+   - `initialValue`: Number
+   - `dischargeValue`: Number
    - `registeredBy`: ObjectId -> `users`
    - `createdAt`, `updatedAt`: Date
 
-3. **`bilirubinReadings`**:
+2. **`bilirubinreadings`**:
    - `_id`: ObjectId
-   - `clientOperationId`: String (unique, index) — for idempotent offline synchronization
-   - `babyId`: ObjectId -> `babies` (index)
+   - `clientOperationId`: String (unique, indexed) — For idempotent operation tracking
+   - `babyId`: String / ObjectId (indexed)
+   - `babyUhid`: String (indexed)
    - `value`: Number (precision to 1 decimal place, e.g. 10.0)
-   - `unit`: String (default: `mg/dL`)
-   - `measurementSite`: Enum (`forehead`, `sternum`, `palms_and_soles`, `abdomen`)
-   - `source`: Enum (`manual_entry`, `device_transcutaneous`, `serum_lab`)
-   - `deviceId`: ObjectId -> `devices` (optional)
-   - `operatorId`: ObjectId -> `users`
+   - `valueMgDl`: Number
+   - `unit`: Enum (`mg/dL`, `µmol/L`)
+   - `method`: Enum (`TSB`, `TcB`)
+   - `postnatalAgeHours`: Number
+   - `bhutaniZone`: Enum (`low`, `low_intermediate`, `high_intermediate`, `high`, `ineligible`)
+   - `bhutaniPercentileApprox`: Number
+   - `phototherapyPhase`: Enum (`pre_phototherapy`, `during_phototherapy`, `post_phototherapy`, `none`)
+   - `measurementSite`: Enum (`forehead`, `sternum`, `palms_and_soles`, `abdomen`, `face`)
+   - `source`: Enum (`manual_entry`, `device_transcutaneous`, `serum_lab`, `hospital_pt_tracker`)
    - `operatorName`: String
-   - `symptoms`: [String]
+   - `symptoms`: String
    - `riskLevel`: Enum (`low`, `intermediate`, `high`)
-   - `timestamp`: Date (index)
+   - `timestamp`: Date (indexed)
+   - `sampleTimestamp`: Date
    - `isInitial`: Boolean
    - `isDischarge`: Boolean
    - `createdAt`, `updatedAt`: Date
 
-4. **`observations`**:
+3. **`observations`**:
    - `_id`: ObjectId
-   - `clientOperationId`: String (unique, index)
-   - `babyId`: ObjectId -> `babies` (index)
+   - `clientOperationId`: String (unique, indexed)
+   - `babyId`: ObjectId -> `babies` (indexed)
    - `observedBy`: ObjectId -> `users`
    - `observerName`: String
-   - `site`: String (e.g. `Face`, `Trunk`, `Extremities`)
+   - `site`: String (e.g. `Forehead`, `Sternum`, `Face`, `Palms and soles`)
    - `clinicalNotes`: String
    - `bilirubinValue`: Number
-   - `timestamp`: Date
+   - `timestamp`: Date (indexed)
    - `createdAt`, `updatedAt`: Date
 
-5. **`recommendations`**:
+4. **`users`**:
    - `_id`: ObjectId
-   - `babyId`: ObjectId -> `babies` (index)
-   - `readingId`: ObjectId -> `bilirubinReadings`
-   - `suggestedAction`: Enum (`phototherapy`, `exchange_transfusion`, `continue_monitoring`, `discharge_ready`)
-   - `frequency`: String (e.g. `Continuous`, `q4h`, `q8h`)
-   - `guidelineReference`: String (e.g. `AAP 2022 Guidelines for Hyperbilirubinemia`)
-   - `providerNotes`: String
-   - `approvedBy`: ObjectId -> `users` (optional)
-   - `status`: Enum (`suggested`, `accepted`, `overridden`, `completed`)
-   - `timestamp`: Date
-
-6. **`devices`**:
-   - `_id`: ObjectId
-   - `serialNumber`: String (unique, index)
-   - `model`: String (e.g. `BiliSURE-X1`)
-   - `macAddress`: String
-   - `facility`: String
+   - `email`: String (unique, indexed)
+   - `password`: String (bcrypt hashed)
+   - `name`: String
+   - `role`: Enum (`doctor_referring`, `receiving_hospital`, `district_admin`, `doctor`, `nurse`, `admin`)
    - `department`: String
-   - `autoCalibrateEnabled`: Boolean
-   - `accuracyTestPassed`: Boolean
-   - `totalTestsCapacity`: Number (default: 14000)
-   - `remainingTests`: Number (default: 7500)
-   - `lastCalibratedAt`: Date
-   - `status`: Enum (`active`, `calibrated`, `alert_broken`, `maintenance`)
+   - `facility`: String
+   - `isActive`: Boolean
    - `createdAt`, `updatedAt`: Date
 
-7. **`auditLogs`**:
+5. **`hospitals`**:
    - `_id`: ObjectId
-   - `userId`: ObjectId -> `users`
-   - `action`: String (e.g. `CREATE_BABY`, `LOG_READING`, `DISCHARGE`)
-   - `entityType`: String
-   - `entityId`: String
-   - `payload`: Object
-   - `ipAddress`: String
-   - `timestamp`: Date
+   - `name`: String
+   - `code`: String (unique, indexed)
+   - `type`: Enum (`receiving_hospital`, `referring_centre`)
+   - `district`: String
+   - `address`: String
+   - `contactNumber`: String
+   - `totalPTStations`: Number
+   - `operationalPTStations`: Number
+   - `occupiedPTStations`: Number
+   - `availablePTStations`: Number
 
----
+6. **`ptstations`**:
+   - `_id`: ObjectId
+   - `stationId`: String (unique, indexed)
+   - `hospitalId`: ObjectId -> `hospitals`
+   - `stationName`: String
+   - `deviceModel`: String
+   - `lightSource`: String
+   - `irradianceMwCm2`: Number
+   - `status`: Enum (`available`, `occupied`, `cleaning_prep`, `maintenance`)
 
-## 2. SQLite Local Database Schema (Mobile Offline Cache)
+7. **`referrals`**:
+   - `_id`: ObjectId
+   - `referralId`: String (unique, indexed)
+   - `babyId`: String
+   - `babyName`: String
+   - `babyUhid`: String
+   - `referringDoctorName`: String
+   - `referringCentreName`: String
+   - `receivingHospitalId`: ObjectId -> `hospitals`
+   - `status`: Enum (`pending`, `accepted`, `rejected`, `cancelled`, `completed`)
+   - `urgency`: Enum (`routine`, `urgent`, `emergency`)
+   - `clinicalSummary`: String
+   - `latestBilirubinValue`: Number
 
-Local tables mirror operational data with local UUIDs and server mapping.
+8. **`capacityreservations`**:
+   - `_id`: ObjectId
+   - `referralId`: String
+   - `hospitalId`: ObjectId -> `hospitals`
+   - `status`: Enum (`active`, `expired`, `fulfilled`, `released`)
+   - `expiresAt`: Date
 
-```sql
-CREATE TABLE IF NOT EXISTS local_babies (
-    id TEXT PRIMARY KEY,
-    server_id TEXT,
-    uhid TEXT UNIQUE NOT NULL,
-    name TEXT NOT NULL,
-    parents_name TEXT,
-    date_of_birth TEXT NOT NULL,
-    weight REAL,
-    height REAL,
-    assigned_doctor TEXT,
-    facility TEXT,
-    department TEXT,
-    severity_state TEXT DEFAULT 'normal',
-    status TEXT DEFAULT 'admitted',
-    sync_status TEXT DEFAULT 'synced',
-    updated_at TEXT NOT NULL
-);
+9. **`recommendations`**:
+   - `_id`: ObjectId
+   - `babyId`: ObjectId -> `babies`
+   - `suggestedAction`: String
+   - `frequency`: String
+   - `guidelineReference`: String
+   - `status`: String
 
-CREATE TABLE IF NOT EXISTS local_readings (
-    id TEXT PRIMARY KEY,
-    server_id TEXT,
-    client_operation_id TEXT UNIQUE NOT NULL,
-    baby_id TEXT NOT NULL,
-    value REAL NOT NULL,
-    unit TEXT DEFAULT 'mg/dL',
-    measurement_site TEXT,
-    source TEXT DEFAULT 'manual_entry',
-    operator_name TEXT,
-    symptoms TEXT,
-    risk_level TEXT,
-    timestamp TEXT NOT NULL,
-    is_initial INTEGER DEFAULT 0,
-    is_discharge INTEGER DEFAULT 0,
-    sync_status TEXT DEFAULT 'pending',
-    created_at TEXT NOT NULL,
-    FOREIGN KEY(baby_id) REFERENCES local_babies(id)
-);
+10. **`notifications`**:
+    - `_id`: ObjectId
+    - `title`: String
+    - `message`: String
+    - `type`: String
+    - `relatedBabyUhid`: String
+    - `isRead`: Boolean
 
-CREATE TABLE IF NOT EXISTS local_observations (
-    id TEXT PRIMARY KEY,
-    server_id TEXT,
-    client_operation_id TEXT UNIQUE NOT NULL,
-    baby_id TEXT NOT NULL,
-    site TEXT NOT NULL,
-    observer_name TEXT,
-    clinical_notes TEXT,
-    bilirubin_value REAL,
-    timestamp TEXT NOT NULL,
-    sync_status TEXT DEFAULT 'pending',
-    created_at TEXT NOT NULL
-);
+11. **`devices`**:
+    - `_id`: ObjectId
+    - `serialNumber`: String (unique)
+    - `model`: String
+    - `status`: String
 
-CREATE TABLE IF NOT EXISTS local_devices (
-    id TEXT PRIMARY KEY,
-    serial_number TEXT UNIQUE NOT NULL,
-    model TEXT NOT NULL,
-    mac_address TEXT,
-    remaining_tests INTEGER DEFAULT 7500,
-    total_tests INTEGER DEFAULT 14000,
-    is_calibrated INTEGER DEFAULT 1,
-    status TEXT DEFAULT 'active'
-);
-
-CREATE TABLE IF NOT EXISTS sync_queue (
-    operation_id TEXT PRIMARY KEY,
-    entity_type TEXT NOT NULL,
-    action TEXT NOT NULL,
-    payload_json TEXT NOT NULL,
-    status TEXT DEFAULT 'pending',
-    retry_count INTEGER DEFAULT 0,
-    last_error TEXT,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-);
-```
+12. **`stationavailabilityhistories`**:
+    - `_id`: ObjectId
+    - `stationId`: String
+    - `previousStatus`: String
+    - `newStatus`: String
+    - `timestamp`: Date

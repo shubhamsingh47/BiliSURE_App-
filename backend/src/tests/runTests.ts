@@ -1,6 +1,15 @@
 import { createApp } from '../app';
+import { connectDatabase } from '../config/database';
+import mongoose from 'mongoose';
 import http from 'http';
 import { evaluateBhutaniRisk, calculatePostnatalAgeHours } from '../modules/clinical/bhutani.engine';
+import { UserModel } from '../models/User';
+import { BabyModel } from '../models/Baby';
+import { BilirubinReadingModel } from '../models/BilirubinReading';
+import { ReferralModel } from '../models/Referral';
+import { NotificationModel } from '../models/Notification';
+import { HospitalModel } from '../models/Hospital';
+import { PTStationModel } from '../models/PTStation';
 
 async function testEndpoint(
   port: number,
@@ -43,6 +52,7 @@ async function testEndpoint(
 
 async function runAllTests() {
   console.log('=== STARTING COMPLETE BILISURE END-TO-END VERIFICATION SUITE ===');
+  await connectDatabase();
   const app = createApp();
   const testPort = 5998;
   const server = app.listen(testPort);

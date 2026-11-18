@@ -3,119 +3,11 @@ import { BabyModel } from '../../models/Baby';
 import { evaluateBhutaniRisk, calculatePostnatalAgeHours, mgDlToUmolL, umolLToMgDl } from '../clinical/bhutani.engine';
 import { NotificationsService } from '../notifications/notifications.service';
 
-const mockReadings: any[] = [
-  {
-    _id: 'rdg_001',
-    clientOperationId: 'op_seed_001',
-    babyId: '651a00010000000000000001',
-    babyUhid: 'M1A2N3S4I5',
-    value: 10.0,
-    valueMgDl: 10.0,
-    unit: 'mg/dL',
-    method: 'TSB',
-    postnatalAgeHours: 24,
-    bhutaniZone: 'low_intermediate',
-    bhutaniPercentileApprox: 60,
-    phototherapyPhase: 'pre_phototherapy',
-    measurementSite: 'palms_and_soles',
-    source: 'manual_entry',
-    operatorName: 'Nurse A',
-    symptoms: 'Mild jaundice around sclera',
-    riskLevel: 'low',
-    timestamp: new Date(Date.now() - 24 * 3600 * 1000),
-    sampleTimestamp: new Date(Date.now() - 24 * 3600 * 1000),
-    isInitial: true,
-    isDischarge: false,
-    createdAt: new Date(),
-  },
-  {
-    _id: 'rdg_002',
-    clientOperationId: 'op_seed_002',
-    babyId: '651a00010000000000000001',
-    babyUhid: 'M1A2N3S4I5',
-    value: 14.8,
-    valueMgDl: 14.8,
-    unit: 'mg/dL',
-    method: 'TSB',
-    postnatalAgeHours: 48,
-    bhutaniZone: 'high_intermediate',
-    bhutaniPercentileApprox: 88,
-    phototherapyPhase: 'pre_phototherapy',
-    measurementSite: 'sternum',
-    source: 'manual_entry',
-    operatorName: 'Dr. Sarah',
-    symptoms: 'Cephalocaudal progression',
-    riskLevel: 'intermediate',
-    timestamp: new Date(Date.now() - 12 * 3600 * 1000),
-    sampleTimestamp: new Date(Date.now() - 12 * 3600 * 1000),
-    isInitial: false,
-    isDischarge: false,
-    createdAt: new Date(),
-  },
-  {
-    _id: 'rdg_003',
-    clientOperationId: 'op_seed_003',
-    babyId: '651a00010000000000000001',
-    babyUhid: 'M1A2N3S4I5',
-    value: 12.0,
-    valueMgDl: 12.0,
-    unit: 'mg/dL',
-    method: 'TSB',
-    postnatalAgeHours: 60,
-    bhutaniZone: 'low_intermediate',
-    bhutaniPercentileApprox: 65,
-    phototherapyPhase: 'during_phototherapy',
-    measurementSite: 'face',
-    source: 'manual_entry',
-    operatorName: 'Nurse Sarah',
-    symptoms: 'Responding well to double LED phototherapy',
-    riskLevel: 'intermediate',
-    timestamp: new Date(Date.now() - 4 * 3600 * 1000),
-    sampleTimestamp: new Date(Date.now() - 4 * 3600 * 1000),
-    isInitial: false,
-    isDischarge: false,
-    createdAt: new Date(),
-  },
-  {
-    _id: 'rdg_004',
-    clientOperationId: 'op_seed_004',
-    babyId: '651a00010000000000000002',
-    babyUhid: 'B9C8D7E6F5',
-    value: 17.5,
-    valueMgDl: 17.5,
-    unit: 'mg/dL',
-    method: 'TSB',
-    postnatalAgeHours: 36,
-    bhutaniZone: 'high',
-    bhutaniPercentileApprox: 98,
-    phototherapyPhase: 'pre_phototherapy',
-    measurementSite: 'palms_and_soles',
-    source: 'manual_entry',
-    operatorName: 'Dr. Referring',
-    symptoms: 'Lethargy, poor suckling',
-    riskLevel: 'high',
-    timestamp: new Date(Date.now() - 1 * 3600 * 1000),
-    sampleTimestamp: new Date(Date.now() - 1 * 3600 * 1000),
-    isInitial: true,
-    isDischarge: false,
-    createdAt: new Date(),
-  },
-];
-
 export class ReadingsService {
   static async getReadingsForBaby(babyId: string, timeRange?: string) {
-    try {
-      const query: any = { babyId };
-      const readings = await BilirubinReadingModel.find(query).sort({ timestamp: -1 }).lean();
-      if (readings.length > 0) {
-        return this.filterByTimeRange(readings, timeRange);
-      }
-    } catch {}
-
-    const matched = mockReadings.filter(
-      (r) => r.babyId === babyId || r.babyUhid === babyId || babyId === 'Sunita Devi' || babyId === 'BS-IN-972612'
-    );
-    return this.filterByTimeRange(matched.length > 0 ? matched : mockReadings, timeRange);
+    const query: any = { $or: [{ babyId }, { babyUhid: babyId }] };
+    const readings = await BilirubinReadingModel.find(query).sort({ timestamp: -1 }).lean();
+    return this.filterByTimeRange(readings, timeRange);
   }
 
   static async getLatestReadingForBaby(babyId: string) {
@@ -193,31 +85,35 @@ export class ReadingsService {
       }).catch(() => null);
     }
 
-    try {
+    if (data.clientOperationId) {
       const existing = await BilirubinReadingModel.findOne({ clientOperationId: data.clientOperationId });
       if (existing) return existing.toObject();
-
-      const reading = await BilirubinReadingModel.create(readingPayload);
-
-      try {
-        const severityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
-        await BabyModel.findByIdAndUpdate(data.babyId, {
-          severityState,
-          ...(data.isInitial ? { initialValue: valueMgDl } : {}),
-          ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
-        });
-      } catch {}
-
-      return { ...reading.toObject(), bhutaniAssessment: bhutaniResult };
-    } catch {
-      const created = {
-        _id: 'rdg_' + Date.now(),
-        ...readingPayload,
-        createdAt: new Date(),
-      };
-      mockReadings.unshift(created);
-      return { ...created, bhutaniAssessment: bhutaniResult };
     }
+
+    const reading = await BilirubinReadingModel.create(readingPayload);
+
+    try {
+      const severityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
+      await BabyModel.findByIdAndUpdate(data.babyId, {
+        severityState,
+        ...(data.isInitial ? { initialValue: valueMgDl } : {}),
+        ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
+      });
+    } catch {}
+
+
+
+
+
+
+
+
+
+
+
+    
+
+    return { ...reading.toObject(), bhutaniAssessment: bhutaniResult };
   }
 
   private static filterByTimeRange(readings: any[], timeRange?: string) {

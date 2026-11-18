@@ -17,26 +17,16 @@ interface BabyCardProps {
   pillColor?: string;
 }
 
+// Shows the baby's persisted registration timestamp (MongoDB `createdAt`).
+// Never derived from sample/reading timestamps, `updatedAt`, or birth-time defaults.
 const formatRegistrationDateTime = (baby: Baby): string => {
-  const ts = baby.updatedAt || baby.dateOfBirth;
-  if (!ts) return baby.exactTimeOfBirth || '';
+  const ts = baby.createdAt || baby.registeredAt;
+  if (!ts) return '';
   const d = new Date(ts);
-  if (isNaN(d.getTime())) return baby.exactTimeOfBirth || '';
+  if (isNaN(d.getTime())) return '';
 
-  const dateStr = d.toLocaleDateString([], { day: 'numeric', month: 'short' });
-  let timeStr = '';
-  if (baby.exactTimeOfBirth && (baby.exactTimeOfBirth.includes('AM') || baby.exactTimeOfBirth.includes('PM'))) {
-    timeStr = baby.exactTimeOfBirth;
-  } else if (baby.exactTimeOfBirth && baby.exactTimeOfBirth.includes(':')) {
-    const parts = baby.exactTimeOfBirth.split(':');
-    let h = parseInt(parts[0], 10);
-    const m = parts[1];
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    h = h % 12 || 12;
-    timeStr = `${h}:${m} ${ampm}`;
-  } else {
-    timeStr = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
+  const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${dateStr}, ${timeStr}`;
 };
 

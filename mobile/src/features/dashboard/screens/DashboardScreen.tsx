@@ -94,12 +94,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   };
 
   const getBabyTimestamp = (baby: Baby): number => {
-    if (baby.dateOfBirth) {
-      const parsed = new Date(baby.dateOfBirth).getTime();
-      if (!isNaN(parsed)) return parsed;
-    }
-    if (baby.updatedAt) {
-      const parsed = new Date(baby.updatedAt).getTime();
+    // Registration timestamp (persisted createdAt) drives ordering and Today/Yesterday grouping
+    const ts = baby.createdAt || baby.registeredAt || baby.dateOfBirth;
+    if (ts) {
+      const parsed = new Date(ts).getTime();
       if (!isNaN(parsed)) return parsed;
     }
     return 0;

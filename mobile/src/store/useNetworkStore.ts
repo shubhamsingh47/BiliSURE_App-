@@ -313,79 +313,11 @@ export const recalculateHospitalCapacity = (hospitals: Hospital[], stations: PTS
   });
 };
 
-const INITIAL_REFERRALS: Referral[] = [
-  {
-    id: 'ref_001',
-    referralId: 'REF-2026-0081',
-    babyId: '6afc02903259d997ea0159ce',
-    babyName: 'Sunita Devi',
-    babyUhid: 'BS-IN-972612',
-    dateOfBirth: new Date(Date.now() - 3600000 * 48).toISOString(),
-    gestationalAgeWeeks: 38,
-    referringDoctorName: 'Dr. Priya Sharma',
-    referringCentreName: 'North Community Health Centre (CHC)',
-    receivingHospitalId: 'hosp_001',
-    receivingHospitalName: 'District Civil Hospital',
-    status: 'accepted',
-    urgency: 'urgent',
-    clinicalSummary: 'Rapidly rising TSB. Icterus to palms & soles. Recommended for double surface phototherapy.',
-    latestBilirubinValue: 14.8,
-    latestBilirubinUnit: 'mg/dL',
-    latestBhutaniRiskZone: 'high_intermediate',
-    postnatalAgeHoursAtReferral: 48,
-    phototherapyRecommended: true,
-    reviewedByDoctorName: 'Dr. Rajesh Verma (Neonatologist)',
-    reviewedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    createdAt: new Date(Date.now() - 3600000 * 3).toISOString(),
-  },
-  {
-    id: 'ref_002',
-    referralId: 'REF-2026-0082',
-    babyId: '6afc02923259d997ea0159d9',
-    babyName: 'Pooja Sharma',
-    babyUhid: 'BS-IN-656522',
-    dateOfBirth: new Date(Date.now() - 3600000 * 36).toISOString(),
-    gestationalAgeWeeks: 37,
-    referringDoctorName: 'Dr. Priya Sharma',
-    referringCentreName: 'East Primary Health Centre (PHC)',
-    receivingHospitalId: 'hosp_001',
-    receivingHospitalName: 'District Civil Hospital',
-    status: 'pending',
-    urgency: 'emergency',
-    clinicalSummary: 'Serum bilirubin 17.5 mg/dL at 36h (High Risk Zone). Scleral icterus, poor feeding.',
-    latestBilirubinValue: 17.5,
-    latestBilirubinUnit: 'mg/dL',
-    latestBhutaniRiskZone: 'high',
-    postnatalAgeHoursAtReferral: 36,
-    phototherapyRecommended: true,
-    createdAt: new Date(Date.now() - 3600000 * 1).toISOString(),
-  },
-];
+const INITIAL_REFERRALS: Referral[] = [];
 
 const INITIAL_ADMISSIONS: Admission[] = [];
 
-const INITIAL_NOTIFICATIONS: InAppNotification[] = [
-  {
-    id: 'notif_1',
-    title: 'Urgent Referral: Pooja Sharma (BS-IN-656522)',
-    message: 'High Risk Zone (17.5 mg/dL at 36h) from East PHC. Immediate review requested.',
-    type: 'referral_created',
-    relatedBabyUhid: 'BS-IN-656522',
-    relatedReferralId: 'REF-2026-0082',
-    isRead: false,
-    createdAt: new Date(Date.now() - 3600000 * 1).toISOString(),
-  },
-  {
-    id: 'notif_2',
-    title: 'Referral Accepted: Sunita Devi',
-    message: 'District Civil Hospital accepted Sunita Devi (BS-IN-972612). Neonatal transport confirmed.',
-    type: 'referral_accepted',
-    relatedBabyUhid: 'BS-IN-972612',
-    relatedReferralId: 'REF-2026-0081',
-    isRead: true,
-    createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-  },
-];
+const INITIAL_NOTIFICATIONS: InAppNotification[] = [];
 
 export const useNetworkStore = create<NetworkState>((set, get) => ({
   hospitals: recalculateHospitalCapacity(INITIAL_HOSPITALS, INITIAL_STATIONS),

@@ -3,7 +3,7 @@ import { Baby, BilirubinReading, ClinicalObservation } from '../types';
 
 /**
  * Online REST API Client for Babies, Readings, and Observations.
- * Replaces legacy SQLite offline database with direct online backend communication.
+ * Replaces legacy SQLite offline database with direct online Express/MongoDB communication.
  */
 export const PatientsApi = {
   /**
@@ -12,7 +12,11 @@ export const PatientsApi = {
   async getBabies(department?: string): Promise<Baby[]> {
     try {
       const res = await apiClient.get('/babies', { params: { department } });
-      return res.data?.data || [];
+      const items = res.data?.data || [];
+      return items.map((b: any) => ({
+        ...b,
+        id: b.id || b._id?.toString() || b._id,
+      }));
     } catch {
       return [];
     }
@@ -24,7 +28,12 @@ export const PatientsApi = {
   async getBabyById(id: string): Promise<Baby | null> {
     try {
       const res = await apiClient.get(`/babies/${id}`);
-      return res.data?.data || null;
+      const b = res.data?.data;
+      if (!b) return null;
+      return {
+        ...b,
+        id: b.id || b._id?.toString() || b._id,
+      };
     } catch {
       return null;
     }
@@ -36,7 +45,12 @@ export const PatientsApi = {
   async registerBaby(data: Partial<Baby>): Promise<Baby | null> {
     try {
       const res = await apiClient.post('/babies', data);
-      return res.data?.data || null;
+      const b = res.data?.data;
+      if (!b) return null;
+      return {
+        ...b,
+        id: b.id || b._id?.toString() || b._id,
+      };
     } catch {
       return null;
     }
@@ -48,7 +62,12 @@ export const PatientsApi = {
   async updateBaby(id: string, updates: Partial<Baby>): Promise<Baby | null> {
     try {
       const res = await apiClient.patch(`/babies/${id}`, updates);
-      return res.data?.data || null;
+      const b = res.data?.data;
+      if (!b) return null;
+      return {
+        ...b,
+        id: b.id || b._id?.toString() || b._id,
+      };
     } catch {
       return null;
     }
@@ -60,7 +79,11 @@ export const PatientsApi = {
   async getReadings(babyId: string): Promise<BilirubinReading[]> {
     try {
       const res = await apiClient.get(`/readings/baby/${babyId}`);
-      return res.data?.data || [];
+      const items = res.data?.data || [];
+      return items.map((r: any) => ({
+        ...r,
+        id: r.id || r._id?.toString() || r._id,
+      }));
     } catch {
       return [];
     }
@@ -72,7 +95,12 @@ export const PatientsApi = {
   async createReading(data: Partial<BilirubinReading>): Promise<BilirubinReading | null> {
     try {
       const res = await apiClient.post('/readings', data);
-      return res.data?.data || null;
+      const r = res.data?.data;
+      if (!r) return null;
+      return {
+        ...r,
+        id: r.id || r._id?.toString() || r._id,
+      };
     } catch {
       return null;
     }
@@ -84,7 +112,11 @@ export const PatientsApi = {
   async getObservations(babyId?: string): Promise<ClinicalObservation[]> {
     try {
       const res = await apiClient.get('/observations', { params: { babyId } });
-      return res.data?.data || [];
+      const items = res.data?.data || [];
+      return items.map((o: any) => ({
+        ...o,
+        id: o.id || o._id?.toString() || o._id,
+      }));
     } catch {
       return [];
     }
@@ -96,7 +128,12 @@ export const PatientsApi = {
   async createObservation(data: Partial<ClinicalObservation>): Promise<ClinicalObservation | null> {
     try {
       const res = await apiClient.post('/observations', data);
-      return res.data?.data || null;
+      const o = res.data?.data;
+      if (!o) return null;
+      return {
+        ...o,
+        id: o.id || o._id?.toString() || o._id,
+      };
     } catch {
       return null;
     }

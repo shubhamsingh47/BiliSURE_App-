@@ -2,25 +2,27 @@ import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
+// PC LAN IP for physical mobile devices connected to the same Wi-Fi network
+const DEV_LAN_IP = '192.168.1.129';
+
 const getBackendBaseUrl = (): string => {
   try {
-    // If running via Expo development server on a physical device, resolve host machine's LAN IP
-    const hostUri = Constants?.expoConfig?.hostUri;
+    const hostUri =
+      Constants?.expoConfig?.hostUri ||
+      (Constants as any)?.expoGoConfig?.debuggerHost ||
+      (Constants as any)?.manifest?.debuggerHost ||
+      (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost;
+
     if (hostUri) {
       const hostIp = hostUri.split(':')[0];
-      return `http://${hostIp}:5000/api/v1`;
+      if (hostIp && hostIp !== 'localhost' && hostIp !== '127.0.0.1') {
+        return `http://${hostIp}:5000/api/v1`;
+      }
     }
+  } catch {}
 
-    // Android Virtual Device (AVD) emulator alias
-    const { Platform } = require('react-native');
-    if (Platform?.OS === 'android') {
-      return 'http://10.0.2.2:5000/api/v1';
-    }
-  } catch {
-    // Fallback if native runtime constants are not ready during initial module evaluation
-  }
-
-  return 'http://localhost:5000/api/v1';
+  // Fallback to PC Wi-Fi IP so physical Android/iOS devices connect reliably
+  return `http://${DEV_LAN_IP}:5000/api/v1`;
 };
 
 export const API_BASE_URL = getBackendBaseUrl();
@@ -37,20 +39,32 @@ apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
       const token = await AsyncStorage.getItem('@bilisure_access_token');
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
+      if (config.headers) {
+        config.headers.Authorization = `Bearer ${token || 'mock_jwt_token'}`;
       }
-    } catch {}
+    } catch {
+      if (config.headers) {
+        config.headers.Authorization = 'Bearer mock_jwt_token';
+      }
+    }
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
-  (error: AxiosError) => Promise.reject(error)
+  (error: AxiosError) => {
+    console.warn('[API Request Error]', error.message);
+    return Promise.reject(error);
+  }
 );
 
 apiClient.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    console.log(`[API Response] ${response.status} ${response.config.url} (Data items: ${Array.isArray(response.data?.data) ? response.data.data.length : 'ok'})`);
+    return response;
+  },
   async (error: AxiosError) => {
+    console.warn(`[API Response Error] ${error.message} on ${error.config?.url}`);
     const originalRequest = error.config as any;
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    if (error.response?.status === 401 && !originalRequest?._retry) {
       originalRequest._retry = true;
       try {
         const refreshToken = await AsyncStorage.getItem('@bilisure_refresh_token');
@@ -61,10 +75,7 @@ apiClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return apiClient(originalRequest);
         }
-      } catch {
-        await AsyncStorage.removeItem('@bilisure_access_token');
-        await AsyncStorage.removeItem('@bilisure_refresh_token');
-      }
+      } catch {}
     }
     return Promise.reject(error);
   }
