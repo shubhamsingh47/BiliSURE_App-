@@ -41,6 +41,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const insets = useSafeAreaInsets();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  const isReceivingHospital =
+    primaryRole === 'receiving_hospital' ||
+    activeRole === 'hospital_doctor' ||
+    activeRole === 'hospital_nurse' ||
+    activeRole === 'hospital_admin';
   const handleLogoutPress = async () => {
     await logout();
     onLogout();
@@ -123,7 +128,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </TouchableOpacity>
           )}
 
-          {onOpenFacilitySelection && (
+          {!isReceivingHospital && onOpenFacilitySelection && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onOpenFacilitySelection}
@@ -185,7 +190,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <ChevronRight size={18} color="#94A3B8" />
           </TouchableOpacity>
 
-          {onOpenOtp && (
+          {!isReceivingHospital && onOpenOtp && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onOpenOtp}

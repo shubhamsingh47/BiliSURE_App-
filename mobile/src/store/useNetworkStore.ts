@@ -115,10 +115,10 @@ const INITIAL_STATIONS: PTStation[] = [
     name: 'Double LED Tunnel A1',
     type: 'led_tunnel',
     location: 'NICU Bed 1',
-    operationalStatus: 'occupied',
-    currentBabyId: 'baby_1',
-    currentBabyName: 'Baby 1',
-    currentBabyUhid: 'M1A2N3S4I5',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    currentBabyName: null,
+    currentBabyUhid: null,
     lastCleanedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
     lastUpdated: new Date().toISOString(),
   },
@@ -130,10 +130,10 @@ const INITIAL_STATIONS: PTStation[] = [
     name: 'Double Surface LED A2',
     type: 'double_surface',
     location: 'NICU Bed 2',
-    operationalStatus: 'occupied',
-    currentBabyId: 'baby_2',
-    currentBabyName: 'Baby 2',
-    currentBabyUhid: 'B9C8D7E6F5',
+    operationalStatus: 'available',
+    currentBabyId: null,
+    currentBabyName: null,
+    currentBabyUhid: null,
     lastCleanedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
     lastUpdated: new Date().toISOString(),
   },
@@ -201,7 +201,7 @@ const INITIAL_STATIONS: PTStation[] = [
     location: 'NICU Pod 1',
     operationalStatus: 'occupied',
     currentBabyId: 'baby_apex_1',
-    currentBabyName: 'Baby Aarav',
+    currentBabyName: 'Aarav Gupta',
     currentBabyUhid: 'BS-IN-MCA-01',
     lastCleanedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
     lastUpdated: new Date().toISOString(),
@@ -256,7 +256,7 @@ const INITIAL_STATIONS: PTStation[] = [
     location: 'Care Unit 1',
     operationalStatus: 'occupied',
     currentBabyId: 'baby_jude_1',
-    currentBabyName: 'Baby Ananya',
+    currentBabyName: 'Ananya Joshi',
     currentBabyUhid: 'BS-IN-SJN-01',
     lastCleanedAt: new Date(Date.now() - 3600000 * 30).toISOString(),
     lastUpdated: new Date().toISOString(),
@@ -317,9 +317,9 @@ const INITIAL_REFERRALS: Referral[] = [
   {
     id: 'ref_001',
     referralId: 'REF-2026-0081',
-    babyId: 'baby_1',
-    babyName: 'Baby 1',
-    babyUhid: 'M1A2N3S4I5',
+    babyId: '6afc02903259d997ea0159ce',
+    babyName: 'Sunita Devi',
+    babyUhid: 'BS-IN-972612',
     dateOfBirth: new Date(Date.now() - 3600000 * 48).toISOString(),
     gestationalAgeWeeks: 38,
     referringDoctorName: 'Dr. Priya Sharma',
@@ -341,9 +341,9 @@ const INITIAL_REFERRALS: Referral[] = [
   {
     id: 'ref_002',
     referralId: 'REF-2026-0082',
-    babyId: 'baby_2',
-    babyName: 'Baby 2',
-    babyUhid: 'B9C8D7E6F5',
+    babyId: '6afc02923259d997ea0159d9',
+    babyName: 'Pooja Sharma',
+    babyUhid: 'BS-IN-656522',
     dateOfBirth: new Date(Date.now() - 3600000 * 36).toISOString(),
     gestationalAgeWeeks: 37,
     referringDoctorName: 'Dr. Priya Sharma',
@@ -362,69 +362,25 @@ const INITIAL_REFERRALS: Referral[] = [
   },
 ];
 
-const INITIAL_ADMISSIONS: Admission[] = [
-  {
-    id: 'adm_001',
-    admissionId: 'ADM-2026-0041',
-    babyId: 'baby_1',
-    babyUhid: 'M1A2N3S4I5',
-    babyName: 'Baby 1',
-    hospitalId: 'hosp_001',
-    hospitalName: 'District Civil Hospital',
-    referralId: 'ref_001',
-    physicalArrivalConfirmed: true,
-    arrivalConfirmedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    arrivalConfirmedBy: 'Nurse Sunita',
-    ptStationId: 'st_dch_01',
-    ptStationName: 'Double LED Tunnel A1 (PT-DCH-01)',
-    admittedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    admissionStatus: 'under_treatment',
-    assignedDoctor: 'Dr. Rajesh Verma',
-    primaryNurse: 'Nurse Sunita',
-    initialAdmissionBilirubin: 14.8,
-    treatmentSessions: [
-      {
-        sessionId: 'sess_001',
-        startTime: new Date(Date.now() - 3600000 * 18).toISOString(),
-        endTime: new Date(Date.now() - 3600000 * 6).toISOString(),
-        durationMinutes: 720,
-        phototherapyType: 'Double Surface LED Tunnel',
-        irradianceMwCm2: 35,
-        nurseName: 'Nurse Sunita',
-        notes: 'Session 1 completed. Eye shields placed.',
-        status: 'completed',
-      },
-      {
-        sessionId: 'sess_002',
-        startTime: new Date(Date.now() - 3600000 * 4).toISOString(),
-        phototherapyType: 'Double Surface LED Tunnel',
-        irradianceMwCm2: 35,
-        nurseName: 'Nurse Sunita',
-        notes: 'Session 2 in progress.',
-        status: 'active',
-      },
-    ],
-    stationReleased: false,
-  },
-];
+const INITIAL_ADMISSIONS: Admission[] = [];
 
 const INITIAL_NOTIFICATIONS: InAppNotification[] = [
   {
     id: 'notif_1',
-    title: 'Urgent Referral: Baby 2 (B9C8D7E6F5)',
+    title: 'Urgent Referral: Pooja Sharma (BS-IN-656522)',
     message: 'High Risk Zone (17.5 mg/dL at 36h) from East PHC. Immediate review requested.',
     type: 'referral_created',
-    relatedBabyUhid: 'B9C8D7E6F5',
+    relatedBabyUhid: 'BS-IN-656522',
     relatedReferralId: 'REF-2026-0082',
     isRead: false,
     createdAt: new Date(Date.now() - 3600000 * 1).toISOString(),
   },
   {
     id: 'notif_2',
-    title: 'Referral Accepted: Baby 1',
-    message: 'District Civil Hospital accepted Baby 1 (M1A2N3S4I5). Neonatal transport confirmed.',
+    title: 'Referral Accepted: Sunita Devi',
+    message: 'District Civil Hospital accepted Sunita Devi (BS-IN-972612). Neonatal transport confirmed.',
     type: 'referral_accepted',
-    relatedBabyUhid: 'M1A2N3S4I5',
+    relatedBabyUhid: 'BS-IN-972612',
     relatedReferralId: 'REF-2026-0081',
     isRead: true,
     createdAt: new Date(Date.now() - 3600000 * 2).toISOString(),
@@ -556,7 +512,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admissionId,
       babyId: ref?.babyId || 'baby_unknown',
       babyUhid: ref?.babyUhid || 'UHID-0000',
-      babyName: ref?.babyName || 'Baby',
+      babyName: ref?.babyName || 'Newborn Patient',
       hospitalId,
       hospitalName: ref?.receivingHospitalName || 'District Civil Hospital',
       referralId: ref?.referralId,
@@ -736,9 +692,20 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           : s
       );
 
+      // Update matching referral for this baby to completed
+      const updatedReferrals = state.referrals.map((r) =>
+        r.referralId === admission?.referralId ||
+        r.id === admission?.referralId ||
+        (admission?.babyUhid && r.babyUhid === admission.babyUhid) ||
+        (admission?.babyId && r.babyId === admission.babyId)
+          ? { ...r, status: 'completed' as const }
+          : r
+      );
+
       return {
         admissions: updatedAdmissions,
         stations: updatedStations,
+        referrals: updatedReferrals,
         hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
       };
     });

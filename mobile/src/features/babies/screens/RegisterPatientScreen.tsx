@@ -29,7 +29,7 @@ export const RegisterPatientScreen: React.FC<RegisterPatientScreenProps> = ({
     setLoading(true);
     try {
       const created = await registerBaby({
-        name: name || 'Baby',
+        name: name || 'Newborn Patient',
         uhid: uhid || `UHID_${Date.now().toString().slice(-6)}`,
         weight: parseFloat(weight) || 3.1,
         height: parseFloat(height) || 48.0,

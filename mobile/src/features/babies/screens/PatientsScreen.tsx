@@ -200,7 +200,10 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         }
         renderItem={({ item }) => {
           const badge = getSeverityBadge(item.severityState);
-          const motherName = item.parentsName?.trim() || item.name;
+          const pName = item.parentsName?.trim();
+          const bName = item.name?.trim();
+          const isInvalid = (val?: string) => !val || ['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes(val.toLowerCase());
+          const motherName = (!isInvalid(pName) ? pName : (!isInvalid(bName) ? bName : 'Newborn Patient'))!;
           return (
             <TouchableOpacity
               activeOpacity={0.75}

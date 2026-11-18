@@ -55,7 +55,7 @@ export const DischargeApprovalScreen: React.FC<DischargeApprovalScreenProps> = (
 
       Alert.alert(
         'Discharge Approved!',
-        `Discharge finalized for Baby ${admission.babyName}. PT Station ${admission.ptStationName || ''} has been released to Cleaning & Preparation pool.`,
+        `Discharge finalized for ${admission.babyName}. PT Station ${admission.ptStationName || ''} has been released to Cleaning & Preparation pool.`,
         [{ text: 'Done', onPress: onSuccess }]
       );
     } catch {

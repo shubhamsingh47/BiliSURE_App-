@@ -40,6 +40,27 @@ const formatRegistrationDateTime = (baby: Baby): string => {
   return `${dateStr}, ${timeStr}`;
 };
 
+const getSeverityInfo = (state?: string) => {
+  switch (state) {
+    case 'critical':
+      return { label: 'Critical', color: COLORS.critical };
+    case 'moderate':
+      return { label: 'Moderate', color: COLORS.moderate };
+    case 'normal':
+    default:
+      return { label: 'Normal', color: COLORS.normal };
+  }
+};
+
+const getDisplayName = (baby: Baby): string => {
+  const pName = baby.parentsName?.trim();
+  const bName = baby.name?.trim();
+  const isInvalid = (val?: string) => !val || ['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes(val.toLowerCase());
+  if (pName && !isInvalid(pName)) return pName;
+  if (bName && !isInvalid(bName)) return bName;
+  return 'Newborn Patient';
+};
+
 export const BabyCard: React.FC<BabyCardProps> = ({
   baby,
   latestReading,
@@ -48,18 +69,6 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   onEditPress,
   pillColor = COLORS.pillBeige,
 }) => {
-  const getSeverityInfo = (state?: string) => {
-    switch (state) {
-      case 'critical':
-        return { label: 'Critical', color: COLORS.critical };
-      case 'moderate':
-        return { label: 'Moderate', color: COLORS.moderate };
-      case 'normal':
-      default:
-        return { label: 'Normal', color: COLORS.normal };
-    }
-  };
-
   const severity = getSeverityInfo(baby.severityState);
   const sample = latestSample !== undefined
     ? latestSample
@@ -67,6 +76,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     ? { value: latestReading.value, timestamp: latestReading.timestamp }
     : null;
   const registrationDateTime = formatRegistrationDateTime(baby);
+  const displayName = getDisplayName(baby);
 
   return (
     <TouchableOpacity
@@ -81,14 +91,14 @@ export const BabyCard: React.FC<BabyCardProps> = ({
       <View style={styles.middleSection}>
         <View style={styles.nameRow}>
           <Text style={styles.babyName} numberOfLines={1}>
-            {baby.parentsName?.trim() || baby.name}
+            {displayName}
           </Text>
           {onEditPress && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onEditPress}
+              accessibilityLabel={`Edit ${displayName}`}
               style={styles.editIconBtn}
-              accessibilityLabel={`Edit ${baby.parentsName || baby.name}`}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Edit3 size={13} color="#7D3BFF" />

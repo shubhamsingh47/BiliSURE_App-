@@ -57,6 +57,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         finalBabies = current.length > 0 ? current : SEED_BABIES;
       }
 
+      // Filter out any legacy entries named "Baby 1", "Baby 2", or "Baby"
+      finalBabies = finalBabies.filter((b) => {
+        const n = (b.name || '').trim().toLowerCase();
+        const pn = (b.parentsName || '').trim().toLowerCase();
+        return !['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes(n) &&
+               !['baby 1', 'baby 2', 'baby1', 'baby2'].includes(pn);
+      });
+
       // 2. Load observations online if active baby is present
       const activeBaby = get().selectedBaby;
       const matchingActive = activeBaby ? finalBabies.find((b) => b.id === activeBaby.id) : null;

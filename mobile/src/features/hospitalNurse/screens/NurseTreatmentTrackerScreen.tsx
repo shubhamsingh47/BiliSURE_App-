@@ -9,14 +9,17 @@ import { COLORS } from '../../../theme/colors';
 interface NurseTreatmentTrackerScreenProps {
   onBack?: () => void;
   onRecordBilirubin?: (babyUhid: string) => void;
+  onOpenNotifications?: () => void;
 }
 
 export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenProps> = ({
   onBack,
   onRecordBilirubin,
+  onOpenNotifications,
 }) => {
-  const { admissions, startTreatmentSession, endTreatmentSession } = useNetworkStore();
+  const { admissions, startTreatmentSession, endTreatmentSession, approveDischarge, notifications } = useNetworkStore();
   const { user } = useAuthStore();
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const [activeAdmission, setActiveAdmission] = useState<Admission | null>(null);
   const [sessionModalVisible, setSessionModalVisible] = useState(false);
@@ -59,22 +62,83 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     }
   };
 
+  const handleCompletePhototherapy = (admission: Admission) => {
+    Alert.alert(
+      'Complete Phototherapy Treatment',
+      `Are you sure you want to conclude phototherapy for ${admission.babyName} (${admission.babyUhid})?\n\nThis will mark the phototherapy treatment course as completed and release station ${admission.ptStationName || ''} to the cleaning & sanitization pool.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: '✓ Complete Treatment',
+          style: 'default',
+          onPress: async () => {
+            setIsProcessing(true);
+            try {
+              // Conclude any active session if one is in progress
+              const activeSess = admission.treatmentSessions.find((s) => s.status === 'active');
+              if (activeSess) {
+                await endTreatmentSession(
+                  admission.id || admission.admissionId,
+                  activeSess.sessionId,
+                  user.name,
+                  'Final cycle concluded upon phototherapy completion.'
+                );
+              }
+
+              // Complete phototherapy admission & release station
+              await approveDischarge(admission.id || admission.admissionId, {
+                doctorName: user.name,
+                dischargeBilirubinValue: admission.initialAdmissionBilirubin || 10.0,
+                dischargeNotes: 'Phototherapy course completed successfully. Infant clinically stable.',
+                followUpPlan: 'Follow-up TcB evaluation at referring centre in 24-48 hours.',
+              });
+
+              Alert.alert(
+                'Phototherapy Completed!',
+                `Phototherapy treatment for ${admission.babyName} has been successfully completed. Station ${admission.ptStationName || ''} is now released for sanitization.`
+              );
+            } catch (err: any) {
+              Alert.alert('Error', err?.message || 'Failed to complete phototherapy');
+            } finally {
+              setIsProcessing(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const insets = useSafeAreaInsets();
 
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
         <View style={styles.headerRow}>
-          {onBack && (
-            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-              <Text style={styles.backBtnText}>←</Text>
-            </TouchableOpacity>
-          )}
-          <View>
-            <Text style={styles.headerTitle}>Phototherapy Tracking</Text>
-            <Text style={styles.headerSubtitle}>Active Treatment Sessions • {user.facility}</Text>
+          <View style={styles.headerTitleGroup}>
+            {onBack && (
+              <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                <Text style={styles.backBtnText}>←</Text>
+              </TouchableOpacity>
+            )}
+            <View>
+              <Text style={styles.headerTitle}>Phototherapy Tracking</Text>
+              <Text style={styles.headerSubtitle}>Active Treatment Sessions • {user.facility}</Text>
+            </View>
           </View>
+          <TouchableOpacity
+            onPress={onOpenNotifications}
+            style={styles.notifBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badgeDot}>
+                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -101,11 +165,16 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                 <View style={styles.stationPill}>
                   <Text style={styles.stationText}>📍 {item.ptStationName || 'Station Assigned'}</Text>
                 </View>
-                <View style={[styles.activePill, activeSession ? styles.activePillOn : styles.activePillOff]}>
-                  <Text style={[styles.activeText, activeSession ? styles.activeTextOn : styles.activeTextOff]}>
-                    {activeSession ? '● PT IN PROGRESS' : 'IDLE / RESTING'}
-                  </Text>
-                </View>
+                {((item.treatmentSessions && item.treatmentSessions.length > 0) || !!activeSession) && (
+                  <TouchableOpacity
+                    onPress={() => handleCompletePhototherapy(item)}
+                    style={styles.headerCompleteBtn}
+                    disabled={isProcessing}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.headerCompleteBtnText}>Complete</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               <Text style={styles.babyName}>{item.babyName} ({item.babyUhid})</Text>
@@ -133,15 +202,14 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               {activeSession ? (
                 <View style={styles.activeSessionBox}>
                   <View style={styles.activeSessionHeader}>
-                    <Text style={styles.activeSessionTitle}>Current Cycle: {activeSession.phototherapyType}</Text>
+                    <Text style={styles.activeSessionTitle} numberOfLines={2}>
+                      Current Cycle: {activeSession.phototherapyType}
+                    </Text>
                     <Text style={styles.irradianceText}>⚡ {activeSession.irradianceMwCm2} µW/cm²</Text>
                   </View>
                   <Text style={styles.startedAtText}>
-                    Started at: {new Date(activeSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} by {activeSession.nurseName}
+                    Started at: {new Date(activeSession.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </Text>
-                  {activeSession.notes ? (
-                    <Text style={styles.activeNotesText}>Notes: {activeSession.notes}</Text>
-                  ) : null}
 
                   <TouchableOpacity
                     onPress={() => handleEndSession(item, activeSession)}
@@ -237,7 +305,6 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 10,
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomLeftRadius: 20,
@@ -246,6 +313,13 @@ const styles = StyleSheet.create({
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingRight: 12,
   },
   backBtn: {
     marginRight: 12,
@@ -265,6 +339,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+  },
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 18,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: '#FC3949',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7D3BFF',
+  },
+  badgeDotText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   listContent: {
     padding: 16,
@@ -299,27 +404,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: '#7D3BFF',
-  },
-  activePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  activePillOn: {
-    backgroundColor: '#F2FDEF',
-  },
-  activePillOff: {
-    backgroundColor: '#F1F5F9',
-  },
-  activeText: {
-    fontSize: 10,
-    fontWeight: '800',
-  },
-  activeTextOn: {
-    color: '#00A569',
-  },
-  activeTextOff: {
-    color: '#64748B',
   },
   babyName: {
     fontSize: 17,
@@ -366,27 +450,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    flexWrap: 'wrap',
+    marginBottom: 6,
+    gap: 8,
   },
   activeSessionTitle: {
+    flex: 1,
     fontSize: 13,
     fontWeight: '800',
     color: '#1D4ED8',
+    lineHeight: 18,
   },
   irradianceText: {
     fontSize: 11,
     fontWeight: '700',
     color: '#2563EB',
+    flexShrink: 0,
+    backgroundColor: '#DBEAFE',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
   },
   startedAtText: {
     fontSize: 11,
     color: '#475569',
-    marginBottom: 4,
-  },
-  activeNotesText: {
-    fontSize: 11,
-    color: '#64748B',
-    fontStyle: 'italic',
     marginBottom: 8,
   },
   endCycleBtn: {
@@ -427,6 +514,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#7D3BFF',
+  },
+  headerCompleteBtn: {
+    backgroundColor: '#00A569',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCompleteBtnText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: 0.3,
   },
   emptyContainer: {
     alignItems: 'center',

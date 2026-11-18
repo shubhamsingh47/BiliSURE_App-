@@ -8,14 +8,17 @@ import { COLORS } from '../../../theme/colors';
 
 interface NurseArrivalsScreenProps {
   onArrivalConfirmed?: (admissionId: string) => void;
+  onOpenNotifications?: () => void;
 }
 
 export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
   onArrivalConfirmed,
+  onOpenNotifications,
 }) => {
-  const { referrals, confirmArrival } = useNetworkStore();
+  const { referrals, confirmArrival, notifications } = useNetworkStore();
   const { user } = useAuthStore();
   const [isProcessing, setIsProcessing] = useState(false);
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Accepted referrals that haven't physically arrived yet
   const incomingAccepted = referrals.filter((r) => r.status === 'accepted');
@@ -26,7 +29,7 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
       const admission = await confirmArrival(referral.referralId, user.name, user.facility);
       Alert.alert(
         'Arrival Confirmed!',
-        `Baby ${referral.babyName} (${referral.babyUhid}) marked as physically arrived. Admission episode ${admission.admissionId} created. You can now allocate a PT Station.`,
+        `${referral.babyName} (${referral.babyUhid}) marked as physically arrived. Admission episode ${admission.admissionId} created. You can now allocate a PT Station.`,
         [
           {
             text: 'Allocate PT Station',
@@ -46,11 +49,28 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Arrivals & Admissions</Text>
-        <Text style={styles.headerSubtitle}>
-          Confirm Physical Patient Arrival • {user.facility}
-        </Text>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <View style={styles.headerRow}>
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>Arrivals & Admissions</Text>
+            <Text style={styles.headerSubtitle}>
+              Confirm Physical Patient Arrival • {user.facility}
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={onOpenNotifications}
+            style={styles.notifBtn}
+            activeOpacity={0.7}
+            accessibilityLabel="Notifications"
+          >
+            <Text style={styles.bellIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View style={styles.badgeDot}>
+                <Text style={styles.badgeDotText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Accepted List */}
@@ -69,13 +89,6 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
         }
         renderItem={({ item }) => (
           <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.acceptedBadge}>
-                <Text style={styles.acceptedBadgeText}>ACCEPTED FOR ADMISSION</Text>
-              </View>
-              <Text style={styles.idText}>{item.referralId}</Text>
-            </View>
-
             <Text style={styles.babyName}>{item.babyName} ({item.babyUhid})</Text>
             <Text style={styles.sourceText}>From: {item.referringCentreName} ({item.referringDoctorName})</Text>
 
@@ -86,7 +99,7 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
                   {item.latestBilirubinValue} {item.latestBilirubinUnit}
                 </Text>
               </View>
-              <View style={styles.detailCol}>
+              <View style={[styles.detailCol, styles.detailColMiddle]}>
                 <Text style={styles.detailLbl}>Risk Zone</Text>
                 <Text style={styles.detailVal}>{item.latestBhutaniRiskZone?.replace('_', ' ').toUpperCase()}</Text>
               </View>
@@ -130,11 +143,19 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#7D3BFF',
-    paddingTop: 10,
     paddingHorizontal: 20,
     paddingBottom: 14,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerTitleContainer: {
+    flex: 1,
+    paddingRight: 12,
   },
   headerTitle: {
     fontSize: 22,
@@ -145,6 +166,37 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.8)',
     marginTop: 2,
+  },
+  notifBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: 'rgba(255, 255, 255, 0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellIcon: {
+    fontSize: 18,
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: 3,
+    right: 3,
+    backgroundColor: '#FC3949',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#7D3BFF',
+  },
+  badgeDotText: {
+    fontSize: 9,
+    fontWeight: '800',
+    color: '#FFFFFF',
   },
   listContent: {
     padding: 16,
@@ -163,36 +215,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
   },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  acceptedBadge: {
-    backgroundColor: '#F2FDEF',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  acceptedBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: '#00A569',
-  },
-  idText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#64748B',
-  },
   babyName: {
     fontSize: 17,
     fontWeight: '800',
     color: '#181829',
-    marginBottom: 2,
+    marginBottom: 4,
   },
   sourceText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#64748B',
     marginBottom: 12,
   },
@@ -200,22 +230,37 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
   },
   detailCol: {
     flex: 1,
   },
+  detailColMiddle: {
+    flex: 1.15,
+    paddingHorizontal: 8,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#E2E8F0',
+  },
   detailLbl: {
     fontSize: 10,
-    color: '#94A3B8',
-    marginBottom: 2,
+    fontWeight: '600',
+    color: '#64748B',
+    marginBottom: 4,
+    textTransform: 'uppercase',
+    letterSpacing: 0.2,
   },
   detailVal: {
     fontSize: 12,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#181829',
+    lineHeight: 16,
   },
   clinicalBox: {
     backgroundColor: '#F3E8FF',

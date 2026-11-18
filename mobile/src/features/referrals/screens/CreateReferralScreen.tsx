@@ -132,7 +132,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
           </Text>
           <View style={styles.capacityBadge}>
             <Text style={styles.capacityBadgeText}>
-              {hospital.availablePTStations} PT Stations Available
+              ● {hospital.availablePTStations} PT Stations Available
             </Text>
           </View>
         </View>
@@ -360,23 +360,24 @@ const styles = StyleSheet.create({
   hospBannerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: moderateScale(8),
     marginBottom: moderateScale(6),
   },
   hospBannerName: {
     flex: 1,
+    minWidth: '55%',
     fontSize: fontScale(15),
     fontWeight: '800',
     color: '#7D3BFF',
-    marginRight: moderateScale(8),
   },
   capacityBadge: {
     backgroundColor: '#00A569',
     paddingHorizontal: moderateScale(8),
     paddingVertical: moderateScale(4),
     borderRadius: moderateScale(8),
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
     flexShrink: 0,
   },
   capacityBadgeText: {
