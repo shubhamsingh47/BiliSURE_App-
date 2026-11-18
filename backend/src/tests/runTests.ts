@@ -231,7 +231,7 @@ async function runAllTests() {
         referralId: createdReferral.referralId,
         hospitalId: receivingHospital._id || receivingHospital.id,
         durationMinutes: 120,
-        stationName: 'Double LED Tunnel A1',
+        stationName: 'BED 1',
         reservedBy: 'Dr. Rajesh Verma',
       },
       token

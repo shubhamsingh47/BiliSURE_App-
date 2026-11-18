@@ -33,7 +33,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
   const { user } = useAuthStore();
   const { babies, selectedBaby, selectBaby } = usePatientStore();
 
-  const [activeSegment, setActiveSegment] = useState<'allocation' | 'treatment'>('allocation');
+  const [activeSegment, setActiveSegment] = useState<'treatment' | 'allocation'>('treatment');
 
   // Dynamic Baby Selection Modal State
   const [showPatientModal, setShowPatientModal] = useState(false);
@@ -104,7 +104,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
       <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 8) }]}>
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
-            <Text style={styles.headerTitle} numberOfLines={1}>Ward & Stations</Text>
+            <Text style={styles.headerTitle} numberOfLines={1}>Phototherapy</Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
               {availableCount} Available • {occupiedCount} Occupied • {stations.length} Total
             </Text>
@@ -136,24 +136,8 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
           </View>
         </View>
 
-        {/* 2-Segment Control Bar */}
+        {/* 2-Segment Control Bar: Left = In Phototherapy, Right = PT Station */}
         <View style={styles.segmentContainer}>
-          <TouchableOpacity
-            style={[styles.segmentBtn, activeSegment === 'allocation' && styles.segmentBtnActive]}
-            onPress={() => setActiveSegment('allocation')}
-            activeOpacity={0.8}
-          >
-            <Text
-              style={[
-                styles.segmentText,
-                activeSegment === 'allocation' && styles.segmentTextActive,
-              ]}
-              numberOfLines={1}
-            >
-              Send to PT ({availableCount})
-            </Text>
-          </TouchableOpacity>
-
           <TouchableOpacity
             style={[styles.segmentBtn, activeSegment === 'treatment' && styles.segmentBtnActive]}
             onPress={() => setActiveSegment('treatment')}
@@ -166,7 +150,23 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
               ]}
               numberOfLines={1}
             >
-              In Treatment ({activeTreatedCount})
+              In Phototherapy ({activeTreatedCount})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.segmentBtn, activeSegment === 'allocation' && styles.segmentBtnActive]}
+            onPress={() => setActiveSegment('allocation')}
+            activeOpacity={0.8}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                activeSegment === 'allocation' && styles.segmentTextActive,
+              ]}
+              numberOfLines={1}
+            >
+              PT Station ({availableCount})
             </Text>
           </TouchableOpacity>
         </View>
@@ -221,14 +221,27 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={styles.changePatientBtn}
-                  onPress={() => setShowPatientModal(true)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.changePatientBtnText}>Change</Text>
-                  <ChevronDown size={14} color="#7D3BFF" style={{ marginLeft: 2 }} />
-                </TouchableOpacity>
+                {/* Overlapped / Paired Action Buttons: Change and Deselect */}
+                <View style={styles.bannerActions}>
+                  <TouchableOpacity
+                    style={styles.changePatientBtn}
+                    onPress={() => setShowPatientModal(true)}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Change Selected Patient"
+                  >
+                    <Text style={styles.changePatientBtnText}>Change</Text>
+                    <ChevronDown size={13} color="#7D3BFF" style={{ marginLeft: 2 }} />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.deselectPatientBtn}
+                    onPress={() => selectBaby(null)}
+                    activeOpacity={0.8}
+                    accessibilityLabel="Deselect Patient"
+                  >
+                    <Text style={styles.deselectPatientBtnText}>✕ Deselect</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             ) : (
               <TouchableOpacity
@@ -298,6 +311,20 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
               />
             </View>
 
+            {/* Quick Deselect Action in Modal */}
+            {selectedBaby && (
+              <TouchableOpacity
+                style={styles.modalDeselectBtn}
+                onPress={() => {
+                  selectBaby(null);
+                  setShowPatientModal(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalDeselectBtnText}>✕ Deselect / Clear Patient Selection</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Patient List */}
             <FlatList
               data={filteredBabies}
@@ -311,7 +338,11 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                   <TouchableOpacity
                     style={[styles.patientItemCard, isSelected && styles.patientItemCardSelected]}
                     onPress={() => {
-                      selectBaby(item);
+                      if (isSelected) {
+                        selectBaby(null);
+                      } else {
+                        selectBaby(item);
+                      }
                       setShowPatientModal(false);
                     }}
                     activeOpacity={0.7}
@@ -642,11 +673,16 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 1,
   },
+  bannerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   changePatientBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#F3E8FF',
-    paddingHorizontal: 10,
+    paddingHorizontal: 9,
     paddingVertical: 6,
     borderRadius: 8,
   },
@@ -654,6 +690,36 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     fontWeight: '700',
     color: '#7D3BFF',
+  },
+  deselectPatientBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  deselectPatientBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  modalDeselectBtn: {
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    backgroundColor: '#FEE2E2',
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+  },
+  modalDeselectBtnText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#DC2626',
   },
   // Patient Banner (Unselected)
   selectPatientBanner: {

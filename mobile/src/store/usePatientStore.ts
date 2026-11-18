@@ -11,7 +11,8 @@ interface PatientState {
   selectedDepartment: string;
   isLoading: boolean;
   loadBabies: () => Promise<void>;
-  selectBaby: (baby: Baby) => void;
+  selectBaby: (baby: Baby | null) => void;
+  deselectBaby: () => void;
   setSelectedDepartment: (dept: string) => void;
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
   updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
@@ -49,29 +50,20 @@ export const usePatientStore = create<PatientState>((set, get) => ({
         const activeBaby = currentSelected
           ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
           : null;
-        const effectiveBaby = activeBaby || finalBabies[0] || null;
+        const effectiveBaby = activeBaby || null;
 
-        if (effectiveBaby) {
-          // Load readings for every baby (so each list card can show its own latest sample)
-          const [readingsPerBaby, allObservations] = await Promise.all([
-            Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
-            PatientsApi.getObservations(),
-          ]);
+        // Load readings for every baby (so each list card can show its own latest sample)
+        const [readingsPerBaby, allObservations] = await Promise.all([
+          Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
+          PatientsApi.getObservations(),
+        ]);
 
-          set({
-            babies: finalBabies,
-            readings: readingsPerBaby.flat(),
-            observations: allObservations || [],
-            selectedBaby: effectiveBaby,
-          });
-        } else {
-          set({
-            babies: finalBabies,
-            selectedBaby: null,
-            readings: [],
-            observations: [],
-          });
-        }
+        set({
+          babies: finalBabies,
+          readings: readingsPerBaby.flat(),
+          observations: allObservations || [],
+          selectedBaby: effectiveBaby,
+        });
       } else if (onlineBabies && onlineBabies.length === 0 && get().babies.length === 0) {
         // Legitimate empty state
         set({
@@ -90,6 +82,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
   selectBaby: async (baby) => {
     set({ selectedBaby: baby });
+    if (!baby) return;
     try {
       const babyIdentifier = baby.id || baby.uhid;
       const [readings, observations] = await Promise.all([
@@ -110,6 +103,10 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     } catch (err) {
       console.error('Error fetching baby readings/observations:', err);
     }
+  },
+
+  deselectBaby: () => {
+    set({ selectedBaby: null });
   },
 
   setSelectedDepartment: (dept) => {

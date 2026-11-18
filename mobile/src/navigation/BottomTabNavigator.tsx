@@ -46,13 +46,13 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* 2. Ward & Stations Tab */}
+      {/* 2. Phototherapy Tab */}
       <TouchableOpacity
         onPress={() => onTabPress('ward_stations')}
         style={styles.tabItem}
         activeOpacity={0.7}
         accessibilityRole="tab"
-        accessibilityLabel="Ward and Phototherapy Stations"
+        accessibilityLabel="Phototherapy Stations and Admissions"
       >
         <Hospital
           size={22}
@@ -60,7 +60,7 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           strokeWidth={activeTab === 'ward_stations' ? 2.5 : 2}
         />
         <Text style={[styles.tabLabel, activeTab === 'ward_stations' && styles.tabLabelActive]} numberOfLines={1}>
-          Ward & Stations
+          Phototherapy
         </Text>
       </TouchableOpacity>
 

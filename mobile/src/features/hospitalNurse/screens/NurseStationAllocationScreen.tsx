@@ -64,13 +64,15 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAllocate = async (station: PTStation) => {
-    const targetBaby: Baby | null = selectedBaby || (selectedAdmission ? {
-      id: selectedAdmission.babyId || selectedAdmission.id,
-      uhid: selectedAdmission.babyUhid,
-      name: selectedAdmission.babyName,
-      parentsName: selectedAdmission.babyName,
-      initialValue: selectedAdmission.initialAdmissionBilirubin || 14.5,
-    } as Baby : null);
+    const targetBaby: Baby | null = embedded
+      ? selectedBaby
+      : selectedBaby || (selectedAdmission ? {
+          id: selectedAdmission.babyId || selectedAdmission.id,
+          uhid: selectedAdmission.babyUhid,
+          name: selectedAdmission.babyName,
+          parentsName: selectedAdmission.babyName,
+          initialValue: selectedAdmission.initialAdmissionBilirubin || 14.5,
+        } as Baby : null);
 
     if (!targetBaby) {
       Alert.alert('Select Patient', 'Please select a baby to send to phototherapy first.');
