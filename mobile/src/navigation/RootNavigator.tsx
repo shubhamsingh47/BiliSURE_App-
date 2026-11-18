@@ -43,7 +43,7 @@ import { RoleSwitcherBar } from '../components/RoleSwitcherBar';
 import { usePatientStore } from '../store/usePatientStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNetworkStore } from '../store/useNetworkStore';
-import { Hospital, Admission } from '../types';
+import { Hospital, Admission, Baby } from '../types';
 
 type ScreenRoute =
   | 'splash'
@@ -79,6 +79,7 @@ export const RootNavigator: React.FC = () => {
   const [readingSite, setReadingSite] = useState<string>('Palms and soles');
   const [registeredUhid, setRegisteredUhid] = useState<string>('M1A2N3S4I5');
   const [selectedHospitalForReferral, setSelectedHospitalForReferral] = useState<Hospital | null>(null);
+  const [referralContextPatient, setReferralContextPatient] = useState<Baby | null>(null);
   const [selectedAdmissionForDischarge, setSelectedAdmissionForDischarge] = useState<Admission | null>(null);
 
   const { selectBaby, selectedBaby } = usePatientStore();
@@ -198,11 +199,19 @@ export const RootNavigator: React.FC = () => {
       case 'hospital_directory':
         return (
           <HospitalDirectoryScreen
+            initialPatient={referralContextPatient}
+            onSelectPatient={(b) => {
+              setReferralContextPatient(b);
+              selectBaby(b);
+            }}
             onSelectHospital={(hosp) => {
               setSelectedHospitalForReferral(hosp);
               setCurrentRoute('create_referral');
             }}
-            onBack={() => setCurrentRoute('main')}
+            onBack={() => {
+              setReferralContextPatient(null);
+              setCurrentRoute('main');
+            }}
           />
         );
 
@@ -278,7 +287,10 @@ export const RootNavigator: React.FC = () => {
             onBackToDashboard={() => setCurrentRoute('main')}
             onOpenReadingDetail={handleOpenReadingDetail}
             onSeeAllObservations={() => setCurrentRoute('observations_list')}
-            onOpenReferral={() => setCurrentRoute('hospital_directory')}
+            onOpenReferral={() => {
+              setReferralContextPatient(selectedBaby);
+              setCurrentRoute('hospital_directory');
+            }}
           />
         );
 
@@ -418,11 +430,19 @@ export const RootNavigator: React.FC = () => {
         if (activeTab === 'phototherapy') {
           return (
             <HospitalDirectoryScreen
+              initialPatient={referralContextPatient}
+              onSelectPatient={(b) => {
+                setReferralContextPatient(b);
+                selectBaby(b);
+              }}
               onSelectHospital={(hosp) => {
                 setSelectedHospitalForReferral(hosp);
                 setCurrentRoute('create_referral');
               }}
-              onBack={() => setActiveTab('home')}
+              onBack={() => {
+                setReferralContextPatient(null);
+                setActiveTab('home');
+              }}
               isTab
             />
           );
@@ -471,6 +491,9 @@ export const RootNavigator: React.FC = () => {
         <BottomTabBar
           activeTab={activeTab}
           onTabPress={(tab) => {
+            if (tab === 'phototherapy' && activeTab !== 'phototherapy') {
+              setReferralContextPatient(null);
+            }
             setActiveTab(tab);
             if (currentRoute !== 'main') setCurrentRoute('main');
           }}

@@ -40,6 +40,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const [motherName, setMotherName] = useState('');
   const [dob, setDob] = useState(formatCurrentDateTime());
   const [uhid, setUhid] = useState('');
+  const [gestationalAge, setGestationalAge] = useState('38');
+  const [birthWeight, setBirthWeight] = useState('3.1');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
   const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
   const [severity, setSeverity] = useState<SeverityState>('normal');
@@ -61,6 +63,19 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       return;
     }
 
+    const parsedGestAge = gestationalAge.trim() ? parseInt(gestationalAge.trim(), 10) : 38;
+    const parsedWeight = birthWeight.trim() ? parseFloat(birthWeight.trim()) : 3.1;
+
+    if (gestationalAge.trim() && (isNaN(parsedGestAge) || parsedGestAge < 20 || parsedGestAge > 46)) {
+      Alert.alert('Invalid Gestational Age', 'Please enter a valid gestational age between 20 and 46 weeks.');
+      return;
+    }
+
+    if (birthWeight.trim() && (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 10)) {
+      Alert.alert('Invalid Birth Weight', 'Please enter a valid birth weight in kg (e.g. 3.1).');
+      return;
+    }
+
     setLoading(true);
     try {
       const now = new Date();
@@ -72,6 +87,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         assignedDoctor: doctor,
         facility,
         severityState: severity,
+        gestationalAgeWeeks: parsedGestAge,
+        weight: parsedWeight,
         dateOfBirth: now.toISOString(),
         exactTimeOfBirth: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         registeredAt: now.toISOString(),
@@ -101,20 +118,47 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
       <ScrollView contentContainerStyle={styles.contentCard} showsVerticalScrollIndicator={false}>
         <CustomInput
-          placeholder="Mother's name"
+          label="Mother's name"
+          placeholder="e.g. Sunita Devi"
           value={motherName}
           onChangeText={setMotherName}
         />
 
         <CustomInput
+          label="Date and time of birth"
           placeholder="Date and time of birth"
           value={dob}
           onChangeText={setDob}
         />
 
+        {/* Gestational Age & Birth Weight Row */}
+        <View style={styles.twoColRow}>
+          <View style={styles.colHalf}>
+            <CustomInput
+              label="Gestation (weeks)"
+              placeholder="38"
+              value={gestationalAge}
+              onChangeText={setGestationalAge}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+          </View>
+          <View style={styles.colHalfRight}>
+            <CustomInput
+              label="Birth weight (kg)"
+              placeholder="3.1"
+              value={birthWeight}
+              onChangeText={setBirthWeight}
+              keyboardType="decimal-pad"
+              maxLength={5}
+            />
+          </View>
+        </View>
+
         <View style={styles.uhidRow}>
           <View style={{ flex: 1 }}>
             <CustomInput
+              label="UHID / Patient ID"
               placeholder="UHID / Patient ID"
               value={uhid}
               onChangeText={setUhid}
@@ -248,20 +292,32 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.white,
   },
-  uhidRow: {
+  twoColRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: moderateScale(12),
+  },
+  colHalf: {
+    flex: 1,
+  },
+  colHalfRight: {
+    flex: 1,
+  },
+  uhidRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
     gap: moderateScale(8),
   },
   genBtn: {
-    minHeight: moderateScale(50),
+    height: 56,
     paddingHorizontal: moderateScale(14),
     backgroundColor: COLORS.primaryBg,
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(18),
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: COLORS.primaryLight,
+    marginBottom: 16,
   },
   genBtnText: {
     fontSize: fontScale(12),

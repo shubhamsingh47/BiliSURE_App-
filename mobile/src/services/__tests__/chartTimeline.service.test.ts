@@ -1,16 +1,17 @@
 import {
   calculateElapsedHoursFromRegistration,
   computeReadingHour,
+  isReadingWithinMaxHours,
   generateBilirubinTrendPaths,
   GraphReading,
 } from '../chartTimeline.service';
 
-describe('ChartCard 24-Hour Time Distribution Mechanism from Registration', () => {
-  it('correctly calculates 2.5 hours when baby registered at 2:00 PM and data taken at 4:30 PM (User Example)', () => {
-    // Exactly reproducing the user's explicit prompt example:
-    // "baby registered on 2 pm and if data is taken on same baby on 4:30 pm - its 2.30hrs - so it should plot that point between 0h and 4h"
-    const registrationTime = '2026-11-17T14:00:00'; // 2:00 PM
-    const readingTime = '2026-11-17T16:30:00'; // 4:30 PM
+describe('ChartCard 48-Hour Acute Monitoring with Continuous Elapsed Time', () => {
+  it('correctly calculates continuous elapsed hours between registration and reading (User Prompt Example)', () => {
+    // Baby registered at 2:00 PM, Reading taken at 4:30 PM -> 2.5 hours
+    // Plotted continuously between 0h and 8h ticks
+    const registrationTime = '2026-11-17T14:00:00'; // 2:00 PM (17 Nov)
+    const readingTime = '2026-11-17T16:30:00'; // 4:30 PM (2.5h later)
 
     const elapsed = calculateElapsedHoursFromRegistration(registrationTime, readingTime);
     expect(elapsed).toBe(2.5);
@@ -21,63 +22,83 @@ describe('ChartCard 24-Hour Time Distribution Mechanism from Registration', () =
       timestamp: readingTime,
     };
 
-    const plottedHour = computeReadingHour(reading, registrationTime, 24);
+    const plottedHour = computeReadingHour(reading, registrationTime, 48);
     expect(plottedHour).toBe(2.5);
-
-    // Verify it is strictly between 0h and 4h
-    expect(plottedHour).toBeGreaterThan(0);
-    expect(plottedHour).toBeLessThan(4);
   });
 
-  it('correctly plots multiple readings added at the exact same timestamp at the exact same hour coordinate', () => {
-    // 4 readings added at 4:30 PM for a baby registered at 2:00 PM
+  it('preserves exact continuous hours across the 48-hour timeline without artificial rounding', () => {
+    const registrationTime = '2026-11-17T00:00:00';
+
+    const readings: { hoursLater: number; expectedHour: number }[] = [
+      { hoursLater: 0, expectedHour: 0 },
+      { hoursLater: 2.5, expectedHour: 2.5 },
+      { hoursLater: 7.75, expectedHour: 7.75 },
+      { hoursLater: 12.0, expectedHour: 12.0 },
+      { hoursLater: 18.5, expectedHour: 18.5 },
+      { hoursLater: 24.0, expectedHour: 24.0 },
+      { hoursLater: 33.25, expectedHour: 33.25 },
+      { hoursLater: 41.5, expectedHour: 41.5 },
+      { hoursLater: 48.0, expectedHour: 48.0 },
+    ];
+
+    readings.forEach(({ hoursLater, expectedHour }) => {
+      const readingTimestamp = new Date(
+        new Date(registrationTime).getTime() + hoursLater * 3600 * 1000
+      ).toISOString();
+
+      const r: GraphReading = {
+        id: `r_${hoursLater}`,
+        value: 10 + hoursLater * 0.1,
+        timestamp: readingTimestamp,
+      };
+
+      expect(computeReadingHour(r, registrationTime, 48)).toBe(expectedHour);
+    });
+  });
+
+  it('correctly identifies and filters out readings taken beyond 48 hours', () => {
+    const registrationTime = '2026-11-17T00:00:00';
+
+    const readingDay1: GraphReading = {
+      id: 'r_day1',
+      value: 12.0,
+      timestamp: new Date(new Date(registrationTime).getTime() + 16 * 3600 * 1000).toISOString(),
+    };
+    const readingDay2: GraphReading = {
+      id: 'r_day2',
+      value: 15.0,
+      timestamp: new Date(new Date(registrationTime).getTime() + 40 * 3600 * 1000).toISOString(),
+    };
+    const readingDay4: GraphReading = {
+      id: 'r_day4',
+      value: 18.0,
+      timestamp: new Date(new Date(registrationTime).getTime() + 96 * 3600 * 1000).toISOString(),
+    };
+
+    // Day 1 & Day 2 (<= 48h) are included in acute card
+    expect(isReadingWithinMaxHours(readingDay1, registrationTime, 48)).toBe(true);
+    expect(isReadingWithinMaxHours(readingDay2, registrationTime, 48)).toBe(true);
+
+    // Day 4 (> 48h) is excluded from 48h card (destined for 0-144h Bhutani Nomogram)
+    expect(isReadingWithinMaxHours(readingDay4, registrationTime, 48)).toBe(false);
+  });
+
+  it('accurately groups co-occurring session readings (Forehead + Sternum) at the same elapsed coordinate', () => {
     const registrationTime = '2026-11-17T14:00:00';
-    const readingTime = '2026-11-17T16:30:00';
+    const readingTime = '2026-11-17T16:30:00'; // 2.5h later
 
     const readings: GraphReading[] = [
       { id: '1', value: 8.5, timestamp: readingTime, site: 'Forehead' },
       { id: '2', value: 12.5, timestamp: readingTime, site: 'Sternum' },
-      { id: '3', value: 15.5, timestamp: readingTime, site: 'Forehead' },
-      { id: '4', value: 16.0, timestamp: readingTime, site: 'Sternum' },
     ];
 
-    const hours = readings.map((r) => computeReadingHour(r, registrationTime, 24));
+    const hours = readings.map((r) => computeReadingHour(r, registrationTime, 48));
 
-    // All 4 readings must have the exact same hour coordinate (2.5h)
     expect(hours[0]).toBe(2.5);
     expect(hours[1]).toBe(2.5);
-    expect(hours[2]).toBe(2.5);
-    expect(hours[3]).toBe(2.5);
 
-    // ZERO artificial horizontal distribution
     const uniqueHours = new Set(hours);
     expect(uniqueHours.size).toBe(1);
-  });
-
-  it('plots baseline reading taken at registration time at exactly 0h', () => {
-    const registrationTime = '2026-11-17T14:00:00';
-    const readingTime = '2026-11-17T14:00:00';
-
-    const reading: GraphReading = {
-      id: 'r_base',
-      value: 6.2,
-      timestamp: readingTime,
-    };
-
-    expect(computeReadingHour(reading, registrationTime, 24)).toBe(0);
-  });
-
-  it('plots reading taken 8 hours after registration at exactly 8h', () => {
-    const registrationTime = '2026-11-17T14:00:00';
-    const readingTime = '2026-11-17T22:00:00'; // 10:00 PM
-
-    const reading: GraphReading = {
-      id: 'r_8h',
-      value: 14.0,
-      timestamp: readingTime,
-    };
-
-    expect(computeReadingHour(reading, registrationTime, 24)).toBe(8);
   });
 });
 

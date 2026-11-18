@@ -173,4 +173,34 @@ describe('Bhutani Bilirubin Risk Nomogram Service', () => {
       expect(res.methodNote).toContain('Transcutaneous');
     });
   });
+
+  describe('Continuous Postnatal Age and Multi-Reading Session Separation', () => {
+    it('accurately separates 6:00 AM (0h) and 3:00 PM (9h) readings along continuous postnatal timeline', () => {
+      const birthDate = '2026-11-17';
+      const exactTimeOfBirth = '06:00'; // 6:00 AM
+      const reading1Time = '2026-11-17T06:00:00'; // 6:00 AM
+      const reading2Time = '2026-11-17T15:00:00'; // 3:00 PM (9 hours later)
+
+      const age1 = calculatePostnatalAgeHours(birthDate, exactTimeOfBirth, reading1Time);
+      const age2 = calculatePostnatalAgeHours(birthDate, exactTimeOfBirth, reading2Time);
+
+      expect(age1).toBe(0);
+      expect(age2).toBe(9);
+      // Readings taken 9 hours apart must NOT collide at the same X coordinate
+      expect(Math.abs(age2 - age1)).toBe(9);
+    });
+
+    it('identifies co-occurring session readings (Forehead + Sternum) at the same time anchor', () => {
+      const birthDate = '2026-11-17';
+      const exactTimeOfBirth = '06:00';
+      const sessionTime = '2026-11-17T15:00:00'; // 3:00 PM
+
+      const foreheadAge = calculatePostnatalAgeHours(birthDate, exactTimeOfBirth, sessionTime);
+      const sternumAge = calculatePostnatalAgeHours(birthDate, exactTimeOfBirth, sessionTime);
+
+      expect(foreheadAge).toBe(9);
+      expect(sternumAge).toBe(9);
+      expect(Math.abs(foreheadAge - sternumAge)).toBeLessThan(0.25);
+    });
+  });
 });

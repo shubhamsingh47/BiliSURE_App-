@@ -65,18 +65,41 @@ export function calculateElapsedHoursFromRegistration(
 }
 
 /**
- * Computes the plotted hour on the 0 - 24 hour timeline based on
- * the difference between baby registration and reading timestamp.
+ * Checks whether an observation reading was taken within the acute observation window (default: 48h).
+ * Readings taken beyond 48 hours are excluded from the 48h card and stratified in the 0-144h Bhutani Nomogram.
+ */
+export function isReadingWithinMaxHours(
+  reading: GraphReading,
+  registrationTimestamp?: string | number | Date,
+  maxHours: number = 48
+): boolean {
+  if (!registrationTimestamp) return true;
+  const regMs = new Date(registrationTimestamp).getTime();
+  const readMs = new Date(reading.timestamp).getTime();
+  if (isNaN(regMs) || isNaN(readMs)) return true;
+  const diffMs = readMs - regMs;
+  if (diffMs <= 0) return true;
+  const hours = diffMs / (1000 * 60 * 60);
+  return hours <= maxHours;
+}
+
+/**
+ * Computes the plotted hour on the 0 - 48 hour timeline based on
+ * the true continuous elapsed hours between baby registration and reading timestamp.
+ *
+ * Example:
+ * Baby registered at 2:00 PM, Reading taken at 4:30 PM:
+ * Elapsed hours = 2.5h -> Plotted continuously at 2.5 on the 0 - 48h axis (between 0h and 8h ticks).
  *
  * @param reading The observation / reading record
  * @param registrationTimestamp Timestamp of baby registration
- * @param maxHours Total scale hours (default: 24)
- * @returns Plotted hour coordinate on the 0 - 24h axis
+ * @param maxHours Total scale hours (default: 48)
+ * @returns Plotted hour coordinate on the 0 - 48h axis
  */
 export function computeReadingHour(
   reading: GraphReading,
   registrationTimestamp?: string | number | Date,
-  maxHours: number = 24
+  maxHours: number = 48
 ): number {
   if (registrationTimestamp) {
     const elapsed = calculateElapsedHoursFromRegistration(
@@ -84,31 +107,22 @@ export function computeReadingHour(
       reading.timestamp
     );
 
-    if (maxHours === 24) {
-      if (elapsed <= 24) return elapsed;
-      // Beyond 24h, cycle hour within the current 24-hour phototherapy/observation period
-      const rem = elapsed % 24;
-      return rem === 0 ? 24 : Math.round(rem * 100) / 100;
-    }
-
-    const rem = elapsed % maxHours;
-    return rem === 0 && elapsed > 0 ? maxHours : Math.round(rem * 100) / 100;
+    if (elapsed <= 0) return 0;
+    return Math.min(maxHours, elapsed);
   }
 
   // Fallback if no registration timestamp is available:
-  // If postnatalAgeHours is provided on the reading
   if (typeof reading.postnatalAgeHours === 'number' && !isNaN(reading.postnatalAgeHours)) {
     const age = reading.postnatalAgeHours;
-    if (age <= maxHours) return age;
-    const rem = age % maxHours;
-    return rem === 0 ? maxHours : Math.round(rem * 100) / 100;
+    if (age <= 0) return 0;
+    return Math.min(maxHours, Math.round(age * 100) / 100);
   }
 
   // Fallback to time of day from timestamp
   const d = new Date(reading.timestamp);
   if (!isNaN(d.getTime())) {
     const h = d.getHours() + d.getMinutes() / 60;
-    return Math.round(h * 100) / 100;
+    return Math.min(maxHours, Math.round(h * 100) / 100);
   }
 
   return 0;

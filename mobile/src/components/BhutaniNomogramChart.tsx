@@ -23,9 +23,11 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
   onSelectReading,
 }) => {
   const { width: windowWidth } = useWindowDimensions();
-  const sortedReadings = [...readings].sort(
-    (a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0)
-  );
+  const sortedReadings = [...readings].sort((a, b) => {
+    const diff = (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0);
+    if (Math.abs(diff) > 0.05) return diff;
+    return (a.value || 0) - (b.value || 0);
+  });
 
   const [selectedPoint, setSelectedPoint] = useState<BilirubinReading | null>(
     activeReading || (sortedReadings.length > 0 ? sortedReadings[sortedReadings.length - 1] : null)
@@ -103,18 +105,50 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
   const p75Path = buildCurvePath('p75');
   const p40Path = buildCurvePath('p40');
 
-  // Trajectory path for serial readings across advancing hours
-  // Deduplicate points with identical postnatal hours to prevent vertical zig-zag spikes
-  const trajectoryPoints: BilirubinReading[] = [];
+  // Group readings by time anchor (within 0.25h) to identify multi-site sessions (e.g. Forehead + Sternum)
+  const sessionConnectors: { x: number; y1: number; y2: number }[] = [];
+  const groupedByTime = new Map<number, BilirubinReading[]>();
+
   sortedReadings.forEach((r) => {
-    const last = trajectoryPoints[trajectoryPoints.length - 1];
-    if (last && Math.abs((r.postnatalAgeHours || 0) - (last.postnatalAgeHours || 0)) < 0.25) {
-      // If at same hour, track latest reading at that time anchor
-      trajectoryPoints[trajectoryPoints.length - 1] = r;
+    const age = r.postnatalAgeHours || 0;
+    // Find if there's an existing group within 0.25h
+    let matchedKey: number | null = null;
+    for (const key of groupedByTime.keys()) {
+      if (Math.abs(key - age) < 0.25) {
+        matchedKey = key;
+        break;
+      }
+    }
+
+    if (matchedKey !== null) {
+      groupedByTime.get(matchedKey)!.push(r);
     } else {
-      trajectoryPoints.push(r);
+      groupedByTime.set(age, [r]);
     }
   });
+
+  groupedByTime.forEach((group, timeKey) => {
+    if (group.length > 1) {
+      const x = scaleX(timeKey);
+      const yValues = group.map((r) => scaleY(r.value || 0));
+      const minY = Math.min(...yValues);
+      const maxY = Math.max(...yValues);
+      if (maxY - minY > 2) {
+        sessionConnectors.push({ x, y1: minY, y2: maxY });
+      }
+    }
+  });
+
+  // Clinical risk trajectory path across advancing hours:
+  // For each session anchor, clinically decisive practice uses the peak reading (highest TcB)
+  const trajectoryPoints: BilirubinReading[] = [];
+  groupedByTime.forEach((group) => {
+    const peakReading = group.reduce((prev, curr) =>
+      (curr.value || 0) > (prev.value || 0) ? curr : prev
+    );
+    trajectoryPoints.push(peakReading);
+  });
+  trajectoryPoints.sort((a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0));
 
   let trajectoryPath = '';
   if (trajectoryPoints.length > 1) {
@@ -207,6 +241,21 @@ export const BhutaniNomogramChart: React.FC<BhutaniNomogramChartProps> = ({
               </SvgText>
             </G>
           )}
+
+          {/* Vertical session indicator when multiple readings exist at the same session */}
+          {sessionConnectors.map((c, i) => (
+            <Line
+              key={`session-conn-${i}`}
+              x1={c.x}
+              y1={c.y1}
+              x2={c.x}
+              y2={c.y2}
+              stroke="#7D3BFF"
+              strokeWidth={1.8}
+              strokeDasharray="3,3"
+              opacity={0.8}
+            />
+          ))}
 
           {/* Trajectory line for multiple readings - clean, sleek 1.5px stroke */}
           {trajectoryPath.length > 0 && (

@@ -15,6 +15,7 @@ import {
   GraphReading,
   computeReadingHour,
   calculateElapsedHoursFromRegistration,
+  isReadingWithinMaxHours,
   generateBilirubinTrendPaths,
 } from '../services/chartTimeline.service';
 
@@ -22,6 +23,7 @@ export type { GraphReading };
 export {
   computeReadingHour,
   calculateElapsedHoursFromRegistration,
+  isReadingWithinMaxHours,
   generateBilirubinTrendPaths,
 };
 
@@ -49,9 +51,9 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - 72);
 
-  // Fixed single 24-hour X-axis scale (0h to 24h)
-  const maxHours = 24;
-  const xTicks = [0, 4, 8, 12, 16, 20, 24];
+  // Fixed 48-hour timeline with clean 8-hour blocks (0h to 48h)
+  const maxHours = 48;
+  const xTicks = [0, 8, 16, 24, 32, 40, 48];
 
   // Fixed internal Y-axis scale: 0 to 24 mg/dL with intervals of 4
   const Y_MIN = 0;
@@ -67,12 +69,16 @@ export const ChartCard: React.FC<ChartCardProps> = ({
   const plotWidth = Math.max(10, cardWidth - paddingLeft - paddingRight);
   const plotHeight = chartHeight - paddingTop - paddingBottom;
 
-  // Normalized list of actual readings sorted ascending by timestamp
+  // Normalized list of actual readings sorted ascending by timestamp,
+  // restricted strictly to the acute 48-hour monitoring window (first 2 days)
   const sortedReadings: GraphReading[] = useMemo(() => {
+    const regTime = babyRegistrationTime || babyDateOfBirth;
     if (readings && readings.length > 0) {
-      return [...readings].sort(
-        (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
+      return [...readings]
+        .filter((r) => isReadingWithinMaxHours(r, regTime, maxHours))
+        .sort(
+          (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
     }
     // Fallback if only points (values) were passed
     if (points && points.length > 0) {
@@ -82,11 +88,11 @@ export const ChartCard: React.FC<ChartCardProps> = ({
         value: val,
         timestamp: new Date(now).toISOString(),
         site: 'Forehead',
-        postnatalAgeHours: (idx + 1) * (maxHours / points.length),
+        postnatalAgeHours: (idx + 1) * 8,
       }));
     }
     return [];
-  }, [readings, points, maxHours]);
+  }, [readings, points, maxHours, babyRegistrationTime, babyDateOfBirth]);
 
   // Compute the reading's elapsed hours from baby registration time
   // e.g. Baby registered at 2:00 PM, Data taken at 4:30 PM -> 2.5 hours
@@ -135,6 +141,29 @@ export const ChartCard: React.FC<ChartCardProps> = ({
     });
   }, [plottedPoints, paddingLeft, paddingRight, cardWidth, paddingTop, plotHeight, initialValue]);
 
+  // Multi-site session indicators (e.g. Forehead + Sternum at the same timestamp)
+  const sessionConnectors = useMemo(() => {
+    const groups = new Map<number, typeof plottedPoints>();
+    plottedPoints.forEach((pt) => {
+      const key = Math.round(pt.hour * 10) / 10;
+      const g = groups.get(key) || [];
+      g.push(pt);
+      groups.set(key, g);
+    });
+    const connectors: { x: number; y1: number; y2: number }[] = [];
+    groups.forEach((g) => {
+      if (g.length > 1) {
+        const yVals = g.map((p) => p.y);
+        const minY = Math.min(...yVals);
+        const maxY = Math.max(...yVals);
+        if (maxY - minY > 4) {
+          connectors.push({ x: g[0].x, y1: minY, y2: maxY });
+        }
+      }
+    });
+    return connectors;
+  }, [plottedPoints]);
+
   const activePoint =
     selectedPointIndex !== null && plottedPoints[selectedPointIndex]
       ? plottedPoints[selectedPointIndex]
@@ -156,7 +185,7 @@ export const ChartCard: React.FC<ChartCardProps> = ({
     <View style={styles.container}>
       <View style={styles.titleRow}>
         <Text style={styles.chartTitle}>BiliSURE Bilirubin Readings</Text>
-        <Text style={styles.chartSubtitle}>Timeline from Registration (0h – 24h)</Text>
+        <Text style={styles.chartSubtitle}>Timeline from Registration (0h – 48h)</Text>
       </View>
 
       {/* Chart Canvas with tap-away dismissal */}
@@ -240,19 +269,20 @@ export const ChartCard: React.FC<ChartCardProps> = ({
               />
             )}
 
-            {/* Vertical session indicator when multiple readings exist at the same hour */}
-            {sessionLine && sessionLine.y2 - sessionLine.y1 > 4 && (
+            {/* Vertical session indicators when multiple readings exist at the same session */}
+            {sessionConnectors.map((c, i) => (
               <Line
-                x1={sessionLine.x}
-                y1={sessionLine.y1}
-                x2={sessionLine.x}
-                y2={sessionLine.y2}
+                key={`session_bar_${i}`}
+                x1={c.x}
+                y1={c.y1}
+                x2={c.x}
+                y2={c.y2}
                 stroke="#7D3BFF"
                 strokeWidth={2}
                 strokeDasharray="3 3"
                 opacity={0.8}
               />
-            )}
+            ))}
 
             {/* Single Clear X-Axis Baseline */}
             <Line

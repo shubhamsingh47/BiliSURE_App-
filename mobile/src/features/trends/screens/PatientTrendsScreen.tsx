@@ -16,7 +16,7 @@ import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-nati
 import { COLORS } from '../../../theme/colors';
 import { ChartCard, GraphReading } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
-import { calculatePostnatalAgeHours, binPostnatalAge12h, evaluateBhutaniRisk } from '../../../services/bhutani.service';
+import { calculatePostnatalAgeHours, evaluateBhutaniRisk } from '../../../services/bhutani.service';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -181,7 +181,6 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           activeBaby.exactTimeOfBirth || '08:00',
           o.timestamp
         );
-        const binnedAge = binPostnatalAge12h(rawAge);
         const evalRisk = evaluateBhutaniRisk({
           dateOfBirth: activeBaby.dateOfBirth,
           exactTimeOfBirth: activeBaby.exactTimeOfBirth,
@@ -201,7 +200,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           unit: 'mg/dL',
           method: o.site === 'Forehead' || o.site === 'Sternum' ? 'TcB' : 'TSB',
           sampleTimestamp: o.timestamp,
-          postnatalAgeHours: binnedAge,
+          postnatalAgeHours: rawAge,
           bhutaniZone: evalRisk.zone,
           bhutaniPercentileApprox: evalRisk.percentileApprox,
           phototherapyPhase:
@@ -221,16 +220,27 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         };
       });
 
-    // Ensure direct baby readings are also binned into standard 12-hour slots for the nomogram
-    const binnedBabyReadings = babyReadings.map((r) => ({
-      ...r,
-      postnatalAgeHours: binPostnatalAge12h(r.postnatalAgeHours || 12),
-    }));
+    // Ensure direct baby readings also use true continuous postnatal age for the nomogram
+    const directBabyReadings = babyReadings.map((r) => {
+      const rawAge = r.sampleTimestamp
+        ? calculatePostnatalAgeHours(
+            activeBaby.dateOfBirth,
+            activeBaby.exactTimeOfBirth || '08:00',
+            r.sampleTimestamp
+          )
+        : r.postnatalAgeHours ?? 12;
+      return {
+        ...r,
+        postnatalAgeHours: rawAge,
+      };
+    });
 
-    const all = [...binnedBabyReadings, ...obsAsReadings];
-    return all.sort(
-      (a, b) => (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0)
-    );
+    const all = [...directBabyReadings, ...obsAsReadings];
+    return all.sort((a, b) => {
+      const diff = (a.postnatalAgeHours || 0) - (b.postnatalAgeHours || 0);
+      if (Math.abs(diff) > 0.05) return diff;
+      return new Date(a.sampleTimestamp || a.timestamp).getTime() - new Date(b.sampleTimestamp || b.timestamp).getTime();
+    });
   }, [readings, babyObservations, activeBaby]);
 
   const handleOpenAddObs = () => {
