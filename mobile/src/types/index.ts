@@ -80,6 +80,7 @@ export interface Baby {
   gestationalAgeDays?: number;
   weight?: number;
   height?: number;
+  gender?: string;
   assignedDoctor?: string;
   facility?: string;
   department?: string;
@@ -90,6 +91,10 @@ export interface Baby {
   severityState: SeverityState;
   status: PatientStatus;
   referralStatus?: 'none' | 'pending' | 'accepted' | 'rejected' | 'admitted';
+  referredToHospitalName?: string;
+  referredToHospitalId?: string;
+  referralAcceptedAt?: string;
+  acceptedAt?: string;
   initialValue?: number;
   dischargeValue?: number;
   riskFactors?: string[];

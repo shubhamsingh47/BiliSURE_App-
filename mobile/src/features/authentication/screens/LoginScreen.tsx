@@ -4,53 +4,59 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
-import { useAuthStore, PRIMARY_PRESET_USERS } from '../../../store/useAuthStore';
+import { useAuthStore, HOSPITAL_USERS, HospitalCode } from '../../../store/useAuthStore';
 import { apiClient } from '../../../services/api.client';
-import { PrimaryUserRole, PermissionProfile } from '../../../types';
 
 interface LoginScreenProps {
   onSuccess: () => void;
   onGoToRegister?: () => void;
 }
 
-const PRIMARY_ROLES: {
-  key: PrimaryUserRole;
-  title: string;
-  facility: string;
-  icon: string;
-  defaultEmail: string;
-}[] = [
+interface HospitalPreset {
+  code: HospitalCode;
+  label: string;
+  fullName: string;
+  email: string;
+}
+
+const HOSPITAL_PRESETS: HospitalPreset[] = [
   {
-    key: 'doctor_referring',
-    title: 'Doctor / Referring Centre',
-    facility: 'North Community Health Centre (CHC)',
-    icon: '🩺',
-    defaultEmail: 'priya.sharma@chc.district.org',
+    code: 'PGI',
+    label: 'PGI',
+    fullName: 'Post Graduate Institute of Medical Sciences (PGI)',
+    email: 'pgi@hospital.org',
   },
   {
-    key: 'receiving_hospital',
-    title: 'Hospital (Receiving)',
-    facility: 'District Civil Hospital (NICU / Pediatrics)',
-    icon: '🏥',
-    defaultEmail: 'hospital@dch.district.org',
+    code: 'RML',
+    label: 'RML',
+    fullName: 'Dr. Ram Manohar Lohia Institute (RML)',
+    email: 'rml@hospital.org',
   },
   {
-    key: 'district_admin',
-    title: 'District Administrator',
-    facility: 'Central District Health Authority',
-    icon: '🏛️',
-    defaultEmail: 'cmo.district@health.gov.in',
+    code: 'KGMU',
+    label: 'KGMU',
+    fullName: "King George's Medical University (KGMU)",
+    email: 'kgmu@hospital.org',
   },
 ];
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
-  const [selectedPrimaryRole, setSelectedPrimaryRole] = useState<PrimaryUserRole>('doctor_referring');
-  const [email, setEmail] = useState('priya.sharma@chc.district.org');
+  const [selectedHospital, setSelectedHospital] = useState<HospitalCode>('PGI');
+  const [email, setEmail] = useState('pgi@hospital.org');
   const [password, setPassword] = useState('Password123!');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { setUser, switchRole } = useAuthStore();
+  const { setUser } = useAuthStore();
+
+  const handleSelectHospital = (code: HospitalCode) => {
+    setSelectedHospital(code);
+    const preset = HOSPITAL_PRESETS.find((h) => h.code === code);
+    if (preset) {
+      setEmail(preset.email);
+      setPassword('Password123!');
+    }
+  };
 
   const handleLogin = async () => {
     setLoading(true);
@@ -61,20 +67,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
       setUser(user, accessToken);
       onSuccess();
     } catch {
-      // Graceful offline/demo session fallback with matching preset
-      const matched = PRIMARY_PRESET_USERS[selectedPrimaryRole] || PRIMARY_PRESET_USERS.doctor_referring;
-      setUser(matched, 'mock_jwt_token');
+      // Graceful offline/demo session fallback with matching hospital preset
+      const matched = HOSPITAL_USERS[selectedHospital] || HOSPITAL_USERS.PGI;
+      setUser(matched, `mock_jwt_token_${selectedHospital.toLowerCase()}`);
       onSuccess();
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleQuickRoleLogin = (role: PrimaryUserRole) => {
-    switchRole(role);
-    const user = PRIMARY_PRESET_USERS[role];
-    setUser(user, 'mock_jwt_token');
-    onSuccess();
   };
 
   const insets = useSafeAreaInsets();
@@ -83,39 +82,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
     <ScrollView contentContainerStyle={[styles.container, { paddingTop: insets.top + 20 }]}>
       <View style={styles.header}>
         <Text style={styles.brandTitle}>BiliSURE</Text>
-        <Text style={styles.subtitle}>Newborn Jaundice Monitoring & PT Network</Text>
+        <Text style={styles.subtitle}>Hospital Jaundice Monitoring & PT Network</Text>
         <View style={styles.roleCountBadge}>
-          <Text style={styles.roleCountText}>Unified 3-Role Architecture</Text>
+          <Text style={styles.roleCountText}>Hospital Network Edition</Text>
         </View>
       </View>
 
-      {/* Primary Role Selector */}
+      {/* 3 Horizontal Hospital Autofill Buttons: PGI | RML | KGMU */}
       <View style={styles.quickSection}>
-        <Text style={styles.sectionTitle}>Select Primary Role</Text>
-        {PRIMARY_ROLES.map((r) => {
-          const isSelected = selectedPrimaryRole === r.key;
-          return (
-            <TouchableOpacity
-              key={r.key}
-              style={[styles.roleCard, isSelected && styles.roleCardActive]}
-              onPress={() => {
-                setSelectedPrimaryRole(r.key);
-                setEmail(r.defaultEmail);
-                setPassword('Password123!');
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.roleIcon}>{r.icon}</Text>
-              <View style={styles.roleInfo}>
-                <Text style={[styles.roleTitle, isSelected && styles.roleTitleActive]}>
-                  {r.title}
+        <Text style={styles.sectionTitle}>Select Hospital</Text>
+        <View style={styles.hospitalButtonsRow}>
+          {HOSPITAL_PRESETS.map((h) => {
+            const isSelected = selectedHospital === h.code;
+            return (
+              <TouchableOpacity
+                key={h.code}
+                style={[styles.hospitalBtn, isSelected && styles.hospitalBtnActive]}
+                onPress={() => handleSelectHospital(h.code)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${h.label} hospital`}
+              >
+                <Text style={[styles.hospitalBtnText, isSelected && styles.hospitalBtnTextActive]}>
+                  {h.label}
                 </Text>
-                <Text style={styles.roleFacility}>{r.facility}</Text>
-              </View>
-              {isSelected && <Text style={styles.checkIcon}>✓</Text>}
-            </TouchableOpacity>
-          );
-        })}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+        <Text style={styles.hospitalSubText}>
+          {HOSPITAL_PRESETS.find((h) => h.code === selectedHospital)?.fullName}
+        </Text>
       </View>
 
       {/* Login Credentials Form */}
@@ -124,10 +121,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
         {error && <Text style={styles.errorText}>{error}</Text>}
 
         <CustomInput
-          label="Email Address"
+          label="Hospital Email Address"
           value={email}
           onChangeText={setEmail}
-          placeholder="doctor@hospital.org"
+          placeholder="hospital@hospital.org"
           keyboardType="email-address"
           autoCapitalize="none"
         />
@@ -141,18 +138,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onSuccess }) => {
         />
 
         <PrimaryButton
-          title={loading ? 'Authenticating...' : 'Sign In to BiliSURE'}
+          title={loading ? 'Authenticating...' : `Sign In to ${selectedHospital}`}
           onPress={handleLogin}
           disabled={loading}
           style={styles.signInBtn}
         />
-
-        <TouchableOpacity
-          style={styles.oneTapBtn}
-          onPress={() => handleQuickRoleLogin(selectedPrimaryRole)}
-        >
-          <Text style={styles.oneTapBtnText}>⚡ 1-Tap Quick Demo Sign In</Text>
-        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -167,7 +157,7 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
   },
   brandTitle: {
     fontSize: 32,
@@ -184,8 +174,8 @@ const styles = StyleSheet.create({
   roleCountBadge: {
     marginTop: 8,
     backgroundColor: '#EDE9FE',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
     borderRadius: 12,
   },
   roleCountText: {
@@ -194,91 +184,59 @@ const styles = StyleSheet.create({
     color: '#7D3BFF',
   },
   quickSection: {
-    marginBottom: 16,
+    marginBottom: 20,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
-    color: '#334155',
-    marginBottom: 8,
+    color: '#475569',
+    marginBottom: 10,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.6,
   },
-  roleCard: {
+  hospitalButtonsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  hospitalBtn: {
+    flex: 1,
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOpacity: 0.04,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
   },
-  roleCardActive: {
+  hospitalBtnActive: {
+    backgroundColor: '#7D3BFF',
     borderColor: '#7D3BFF',
-    backgroundColor: '#F5F3FF',
+    shadowColor: '#7D3BFF',
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 3,
   },
-  roleIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  roleInfo: {
-    flex: 1,
-  },
-  roleTitle: {
-    fontSize: 14,
-    fontWeight: '700',
+  hospitalBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
     color: '#1E293B',
+    letterSpacing: 0.5,
   },
-  roleTitleActive: {
-    color: '#7D3BFF',
+  hospitalBtnTextActive: {
+    color: '#FFFFFF',
   },
-  roleFacility: {
+  hospitalSubText: {
     fontSize: 11,
     color: '#64748B',
-    marginTop: 2,
-  },
-  checkIcon: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#7D3BFF',
-  },
-  profileBox: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  profileBoxTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: 8,
-  },
-  profileRow: {
-    flexDirection: 'row',
-    gap: 6,
-    flexWrap: 'wrap',
-  },
-  profilePill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    backgroundColor: '#F1F5F9',
-  },
-  profilePillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  profilePillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#475569',
-  },
-  profilePillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   formCard: {
     backgroundColor: '#FFFFFF',
@@ -304,18 +262,6 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   signInBtn: {
-    marginTop: 10,
-  },
-  oneTapBtn: {
-    marginTop: 10,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: '#EDE9FE',
-  },
-  oneTapBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#7D3BFF',
+    marginTop: 12,
   },
 });

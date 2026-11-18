@@ -51,24 +51,35 @@ export function calculatePostnatalAgeHours(
 ): number {
   let birthDate: Date;
 
-  if (typeof dateOfBirth === 'string' && exactTimeOfBirth) {
-    const datePart = dateOfBirth.split('T')[0];
-    birthDate = new Date(`${datePart}T${exactTimeOfBirth}:00`);
-    if (isNaN(birthDate.getTime())) {
+  if (dateOfBirth instanceof Date) {
+    birthDate = new Date(dateOfBirth.getTime());
+  } else if (typeof dateOfBirth === 'string') {
+    if (dateOfBirth.includes('T') && !exactTimeOfBirth) {
       birthDate = new Date(dateOfBirth);
-      const parts = exactTimeOfBirth.split(':');
-      if (parts.length >= 2) {
-        birthDate.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
+    } else {
+      // Extract local YYYY-MM-DD
+      const datePart = dateOfBirth.includes('T') ? dateOfBirth.split('T')[0] : dateOfBirth;
+      const [year, month, day] = datePart.split('-').map(Number);
+
+      let hours = 0;
+      let minutes = 0;
+      if (exactTimeOfBirth) {
+        const timeClean = exactTimeOfBirth.trim().toUpperCase();
+        const isPM = timeClean.includes('PM');
+        const isAM = timeClean.includes('AM');
+        const numPart = timeClean.replace(/[AP]M/, '').trim();
+        const parts = numPart.split(':').map((p) => parseInt(p, 10));
+        let h = parts[0] || 0;
+        const m = parts[1] || 0;
+        if (isPM && h < 12) h += 12;
+        if (isAM && h === 12) h = 0;
+        hours = h;
+        minutes = m;
       }
+      birthDate = new Date(year, (month || 1) - 1, day || 1, hours, minutes, 0, 0);
     }
   } else {
-    birthDate = new Date(dateOfBirth);
-    if (exactTimeOfBirth) {
-      const parts = exactTimeOfBirth.split(':');
-      if (parts.length >= 2) {
-        birthDate.setHours(parseInt(parts[0], 10), parseInt(parts[1], 10), 0, 0);
-      }
-    }
+    birthDate = new Date();
   }
 
   const sampleDate = new Date(sampleTimestamp);

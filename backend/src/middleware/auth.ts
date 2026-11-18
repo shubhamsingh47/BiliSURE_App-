@@ -7,8 +7,11 @@ export interface AuthUserPayload {
   userId: string;
   email: string;
   role: string;
+  primaryRole?: string;
   department?: string;
   facility?: string;
+  facilityId?: string;
+  districtId?: string;
 }
 
 declare global {
@@ -26,13 +29,29 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   }
 
   const token = authHeader.split(' ')[1];
-  if (token === 'mock_jwt_token') {
+  if (token.startsWith('mock_jwt_token')) {
+    let facility = 'PGI';
+    let email = 'pgi@hospital.org';
+    let facilityId = 'hosp_pgi';
+
+    if (token.includes('rml')) {
+      facility = 'RML';
+      email = 'rml@hospital.org';
+      facilityId = 'hosp_rml';
+    } else if (token.includes('kgmu')) {
+      facility = 'KGMU';
+      email = 'kgmu@hospital.org';
+      facilityId = 'hosp_kgmu';
+    }
+
     req.user = {
-      userId: 'user_default_001',
-      email: 'priya.sharma@chc.district.org',
-      role: 'doctor_referring',
-      department: 'NICU',
-      facility: 'North Community Health Centre (CHC)',
+      userId: `user_${facility.toLowerCase()}`,
+      email,
+      role: 'receiving_hospital',
+      primaryRole: 'receiving_hospital',
+      department: 'Pediatrics',
+      facility,
+      facilityId,
     };
     return next();
   }

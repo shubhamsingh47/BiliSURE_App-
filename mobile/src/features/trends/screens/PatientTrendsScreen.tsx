@@ -31,7 +31,7 @@ interface PatientTrendsScreenProps {
   onOpenReadingDetail: (readingVal: number, site: string) => void;
   onSeeAllObservations: () => void;
   onOpenReferral?: () => void;
-  onSendToPhototherapy?: () => void;
+  onSendToPhototherapy?: (baby?: Baby) => void;
 }
 
 export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
@@ -60,7 +60,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       a.admissionStatus !== 'discharged'
   );
 
-  const isPhototherapyActive = !!activeAdmission || !!activeReferral;
+  // Only show active treatment banner if baby is actively undergoing phototherapy on a station
+  const isPhototherapyActive = activeAdmission?.admissionStatus === 'under_treatment' && !!activeAdmission?.ptStationId;
   const [showBabyDropdown, setShowBabyDropdown] = useState(false);
 
   // Observation add/edit state
@@ -612,7 +613,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         {(onSendToPhototherapy || onOpenReferral) && (
           isPhototherapyActive ? (
             <TouchableOpacity
-              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy() : onOpenReferral?.())}
+              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
               style={[styles.referralActiveStatusCard, { marginTop: 16 }]}
               activeOpacity={0.8}
             >
@@ -639,7 +640,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
-              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy() : onOpenReferral?.())}
+              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
               style={[styles.referralCalloutBtn, { marginTop: 16 }]}
               activeOpacity={0.8}
             >

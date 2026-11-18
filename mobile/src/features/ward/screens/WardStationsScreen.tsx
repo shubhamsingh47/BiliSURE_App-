@@ -22,18 +22,28 @@ import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/re
 interface WardStationsScreenProps {
   onOpenNotifications?: () => void;
   onRecordBilirubin?: (babyUhid: string) => void;
+  initialSegment?: 'treatment' | 'allocation';
+  segmentTrigger?: number;
 }
 
 export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
   onOpenNotifications,
   onRecordBilirubin,
+  initialSegment,
+  segmentTrigger,
 }) => {
   const insets = useSafeAreaInsets();
   const { stations, registerStation, notifications, admissions } = useNetworkStore();
   const { user } = useAuthStore();
   const { babies, selectedBaby, selectBaby } = usePatientStore();
 
-  const [activeSegment, setActiveSegment] = useState<'treatment' | 'allocation'>('treatment');
+  const [activeSegment, setActiveSegment] = useState<'treatment' | 'allocation'>(initialSegment || 'treatment');
+
+  React.useEffect(() => {
+    if (initialSegment) {
+      setActiveSegment(initialSegment);
+    }
+  }, [initialSegment, segmentTrigger]);
 
   // Dynamic Baby Selection Modal State
   const [showPatientModal, setShowPatientModal] = useState(false);
@@ -48,9 +58,25 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
-  const availableCount = stations.filter((s) => s.operationalStatus === 'available').length;
-  const occupiedCount = stations.filter((s) => s.operationalStatus === 'occupied').length;
-  const activeTreatedCount = admissions.filter((a) => a.admissionStatus === 'under_treatment').length;
+
+  const currentHosp = (user?.facility || 'PGI').toUpperCase();
+  const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
+  const hospitalStations = useMemo(() => {
+    return stations.filter(
+      (s) => s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp
+    );
+  }, [stations, currentHospId, currentHosp]);
+
+  const hospitalAdmissions = useMemo(() => {
+    return admissions.filter(
+      (a) => a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp
+    );
+  }, [admissions, currentHospId, currentHosp]);
+
+  const availableCount = hospitalStations.filter((s) => s.operationalStatus === 'available').length;
+  const occupiedCount = hospitalStations.filter((s) => s.operationalStatus === 'occupied').length;
+  const activeTreatedCount = hospitalAdmissions.filter((a) => a.admissionStatus === 'under_treatment').length;
 
   const filteredBabies = useMemo(() => {
     if (!patientSearch.trim()) return babies;
@@ -106,7 +132,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
           <View style={styles.titleContainer}>
             <Text style={styles.headerTitle} numberOfLines={1}>Phototherapy</Text>
             <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {availableCount} Available • {occupiedCount} Occupied • {stations.length} Total
+              {availableCount} Available • {occupiedCount} Occupied • {hospitalStations.length} Total
             </Text>
           </View>
 
@@ -268,6 +294,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
               embedded={true}
               selectedBaby={selectedBaby}
               onBabyAllocated={() => {
+                selectBaby(null);
                 setActiveSegment('treatment');
               }}
             />

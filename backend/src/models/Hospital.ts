@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IHospital extends Document {
+  _id: any;
   name: string;
   code: string;
   type: 'referring_centre' | 'receiving_hospital';
@@ -27,6 +28,7 @@ export interface IHospital extends Document {
 
 const HospitalSchema = new Schema<IHospital>(
   {
+    _id: { type: String, required: true },
     name: { type: String, required: true, trim: true },
     code: { type: String, required: true, unique: true, uppercase: true, trim: true },
     type: {

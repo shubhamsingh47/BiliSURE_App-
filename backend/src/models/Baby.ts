@@ -28,6 +28,10 @@ export interface IBaby extends Document {
   severityState: 'normal' | 'moderate' | 'critical';
   status: 'admitted' | 'under_treatment' | 'in_observation' | 'discharged';
   referralStatus?: 'none' | 'pending' | 'accepted' | 'rejected' | 'admitted';
+  referredToHospitalName?: string;
+  referredToHospitalId?: string;
+  referralAcceptedAt?: Date;
+  acceptedAt?: Date;
   initialValue?: number;
   dischargeValue?: number;
   riskFactors?: string[];
@@ -80,6 +84,10 @@ const BabySchema = new Schema<IBaby>(
       enum: ['none', 'pending', 'accepted', 'rejected', 'admitted'],
       default: 'none',
     },
+    referredToHospitalName: { type: String, trim: true },
+    referredToHospitalId: { type: String, trim: true },
+    referralAcceptedAt: { type: Date },
+    acceptedAt: { type: Date },
     initialValue: { type: Number, default: 0 },
     dischargeValue: { type: Number, default: 0 },
     riskFactors: [{ type: String }],

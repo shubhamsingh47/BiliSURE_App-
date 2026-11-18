@@ -16,6 +16,7 @@ interface PatientState {
   setSelectedDepartment: (dept: string) => void;
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
   updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
+  markBabyAsReferred: (uhid: string, receivingHospitalName: string) => void;
   addReading: (readingData: Partial<BilirubinReading>) => Promise<BilirubinReading>;
   addObservation: (
     babyId: string,
@@ -44,34 +45,36 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       );
 
       // If online babies were fetched, update state
-      if (onlineBabies && onlineBabies.length > 0) {
-        const finalBabies = onlineBabies;
-        const currentSelected = get().selectedBaby;
-        const activeBaby = currentSelected
-          ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
-          : null;
-        const effectiveBaby = activeBaby || null;
+      if (Array.isArray(onlineBabies)) {
+        if (onlineBabies.length > 0) {
+          const finalBabies = onlineBabies;
+          const currentSelected = get().selectedBaby;
+          const activeBaby = currentSelected
+            ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
+            : null;
+          const effectiveBaby = activeBaby || null;
 
-        // Load readings for every baby (so each list card can show its own latest sample)
-        const [readingsPerBaby, allObservations] = await Promise.all([
-          Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
-          PatientsApi.getObservations(),
-        ]);
+          // Load readings for every baby (so each list card can show its own latest sample)
+          const [readingsPerBaby, allObservations] = await Promise.all([
+            Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
+            PatientsApi.getObservations(),
+          ]);
 
-        set({
-          babies: finalBabies,
-          readings: readingsPerBaby.flat(),
-          observations: allObservations || [],
-          selectedBaby: effectiveBaby,
-        });
-      } else if (onlineBabies && onlineBabies.length === 0 && get().babies.length === 0) {
-        // Legitimate empty state
-        set({
-          babies: [],
-          selectedBaby: null,
-          readings: [],
-          observations: [],
-        });
+          set({
+            babies: finalBabies,
+            readings: readingsPerBaby.flat(),
+            observations: allObservations || [],
+            selectedBaby: effectiveBaby,
+          });
+        } else {
+          // Legitimate empty state for hospitals with no patients (e.g. RML, KGMU initially)
+          set({
+            babies: [],
+            selectedBaby: null,
+            readings: [],
+            observations: [],
+          });
+        }
       }
     } catch (err) {
       console.error('Error loading babies from backend:', err);
@@ -183,6 +186,20 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     });
 
     return fallbackUpdated || (get().babies.find((b) => b.id === babyId || b.uhid === babyId) as Baby);
+  },
+
+  markBabyAsReferred: (uhid: string, receivingHospitalName: string) => {
+    set((state) => ({
+      babies: state.babies.map((b) =>
+        b.uhid === uhid || b.id === uhid
+          ? {
+              ...b,
+              referralStatus: 'pending',
+              referredToHospitalName: receivingHospitalName,
+            }
+          : b
+      ),
+    }));
   },
 
   addReading: async (readingData) => {

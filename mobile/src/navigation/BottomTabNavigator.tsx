@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bed, Hospital, Share2 } from 'lucide-react-native';
+import { Bed, Hospital, Share2, LogOut } from 'lucide-react-native';
 import { moderateScale, fontScale } from '../theme/responsive';
 
 export type TabName = 'babies' | 'ward_stations' | 'referrals';
@@ -10,11 +10,13 @@ interface BottomTabBarProps {
   activeTab: TabName;
   onTabPress: (tab: TabName) => void;
   onFabPress?: () => void;
+  onLogoutPress?: () => void;
 }
 
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
   activeTab,
   onTabPress,
+  onLogoutPress,
 }) => {
   const insets = useSafeAreaInsets();
 
@@ -64,13 +66,13 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* 3. Referrals Tab */}
+      {/* 3. Referal Tab */}
       <TouchableOpacity
         onPress={() => onTabPress('referrals')}
         style={styles.tabItem}
         activeOpacity={0.7}
         accessibilityRole="tab"
-        accessibilityLabel="District Referrals and Transfers"
+        accessibilityLabel="District Referal and Transfers"
       >
         <Share2
           size={22}
@@ -78,7 +80,25 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
           strokeWidth={activeTab === 'referrals' ? 2.5 : 2}
         />
         <Text style={[styles.tabLabel, activeTab === 'referrals' && styles.tabLabelActive]} numberOfLines={1}>
-          Referrals
+          Referal
+        </Text>
+      </TouchableOpacity>
+
+      {/* 4. Logout Tab */}
+      <TouchableOpacity
+        onPress={onLogoutPress}
+        style={styles.tabItem}
+        activeOpacity={0.7}
+        accessibilityRole="button"
+        accessibilityLabel="Log out of hospital account"
+      >
+        <LogOut
+          size={22}
+          color="#94A3B8"
+          strokeWidth={2}
+        />
+        <Text style={styles.tabLabel} numberOfLines={1}>
+          Logout
         </Text>
       </TouchableOpacity>
     </View>

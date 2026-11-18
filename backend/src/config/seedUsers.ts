@@ -8,7 +8,7 @@ export async function seedDefaultUsers() {
     return;
   }
   try {
-    const existing = await UserModel.findOne({ email: 'priya.sharma@chc.district.org' });
+    const existing = await UserModel.findOne({ email: 'pgi@hospital.org' });
     if (existing) return;
 
     const salt = await bcrypt.genSalt(10);
@@ -16,40 +16,49 @@ export async function seedDefaultUsers() {
 
     const defaultUsers = [
       {
-        email: 'priya.sharma@chc.district.org',
+        email: 'pgi@hospital.org',
         passwordHash,
-        name: 'Dr. Priya Sharma',
-        role: 'doctor_referring',
-        primaryRole: 'doctor_referring',
-        permissionProfile: 'clinical',
-        permissions: resolvePermissions('doctor_referring', 'clinical'),
-        department: 'Pediatrics',
-        facility: 'North Community Health Centre (CHC)',
-        isActive: true,
-      },
-      {
-        email: 'hospital@dch.district.org',
-        passwordHash,
-        name: 'District Civil Hospital Staff',
+        name: 'PGI Hospital',
         role: 'receiving_hospital',
         primaryRole: 'receiving_hospital',
         permissionProfile: 'all',
         permissions: resolvePermissions('receiving_hospital', 'all'),
-        department: 'NICU',
-        facility: 'District Civil Hospital',
+        department: 'Neonatology & Pediatrics',
+        facility: 'PGI',
+        facilityId: 'hosp_pgi',
+        districtId: 'dist_lucknow',
         isActive: true,
+        isActivated: true,
       },
       {
-        email: 'cmo.district@health.gov.in',
+        email: 'rml@hospital.org',
         passwordHash,
-        name: 'Dr. Arvind Saxena (CMO)',
-        role: 'district_admin',
-        primaryRole: 'district_admin',
+        name: 'RML Hospital',
+        role: 'receiving_hospital',
+        primaryRole: 'receiving_hospital',
         permissionProfile: 'all',
-        permissions: resolvePermissions('district_admin', 'all'),
-        department: 'District Health Authority',
-        facility: 'Central District Health Authority',
+        permissions: resolvePermissions('receiving_hospital', 'all'),
+        department: 'Pediatrics & NICU',
+        facility: 'RML',
+        facilityId: 'hosp_rml',
+        districtId: 'dist_lucknow',
         isActive: true,
+        isActivated: true,
+      },
+      {
+        email: 'kgmu@hospital.org',
+        passwordHash,
+        name: 'KGMU Hospital',
+        role: 'receiving_hospital',
+        primaryRole: 'receiving_hospital',
+        permissionProfile: 'all',
+        permissions: resolvePermissions('receiving_hospital', 'all'),
+        department: 'Pediatric Care & NICU',
+        facility: 'KGMU',
+        facilityId: 'hosp_kgmu',
+        districtId: 'dist_lucknow',
+        isActive: true,
+        isActivated: true,
       },
     ];
 

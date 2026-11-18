@@ -14,7 +14,8 @@ export class BabiesController {
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : 20,
       };
 
-      const result = await BabiesService.listBabies(filters);
+      const userFacility = req.user?.facility || (req.query.hospital as string);
+      const result = await BabiesService.listBabies(filters, userFacility);
       sendSuccess(res, result.items, 200, 'Babies retrieved successfully', result.pagination);
     } catch (err) {
       next(err);
@@ -33,7 +34,7 @@ export class BabiesController {
 
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const baby = await BabiesService.createBaby(req.body, req.user?.userId);
+      const baby = await BabiesService.createBaby(req.body, req.user);
       sendSuccess(res, baby, 201, 'Baby registered successfully');
     } catch (err) {
       next(err);

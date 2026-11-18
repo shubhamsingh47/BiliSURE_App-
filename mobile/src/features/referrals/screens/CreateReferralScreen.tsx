@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,41 +9,72 @@ import {
   Alert,
   Modal,
   FlatList,
+  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { ChevronDown, Check, X, Search } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Search,
+  Check,
+  ChevronDown,
+  User as UserIcon,
+  Send,
+  X,
+} from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { usePatientStore } from '../../../store/usePatientStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
+import { calculatePostnatalAgeHours } from '../../../services/bhutani.service';
 import { Hospital, ReferralUrgency, Baby } from '../../../types';
-import { COLORS } from '../../../theme/colors';
-import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
+import { fontScale, getScreenTopPadding } from '../../../theme/responsive';
 
 interface CreateReferralScreenProps {
-  hospital: Hospital;
+  hospital?: Hospital;
   onSuccess: () => void;
   onBack: () => void;
 }
 
 export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
-  hospital,
   onSuccess,
   onBack,
 }) => {
-  const { selectedBaby, selectBaby, babies, readings } = usePatientStore();
-  const { createReferral } = useNetworkStore();
+  const insets = useSafeAreaInsets();
+  const { user } = useAuthStore();
+  const { selectBaby, babies, readings } = usePatientStore();
+  const { hospitals, createReferral } = useNetworkStore();
 
-  const [urgency, setUrgency] = useState<ReferralUrgency>('urgent');
-  const [clinicalSummary, setClinicalSummary] = useState(
-    'Bilirubin level elevated in high-intermediate risk zone. Phototherapy indicated to prevent further neurotoxicity. Vitals stable.'
-  );
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showPatientModal, setShowPatientModal] = useState(false);
+  // 1. Patient selection defaults to null (no patient selected on open)
+  const [chosenBaby, setChosenBaby] = useState<Baby | null>(null);
+  const [patientPickerVisible, setPatientPickerVisible] = useState(false);
   const [patientSearch, setPatientSearch] = useState('');
 
-  const filteredBabies = React.useMemo(() => {
+  // 2. Available receiving hospitals (excluding current hospital)
+  const currentHospitalName = (user?.facility || 'PGI').toUpperCase();
+  const availableReceivingHospitals = useMemo(() => {
+    return hospitals.filter(
+      (h) =>
+        h.name.toUpperCase() !== currentHospitalName &&
+        h.id !== user?.facilityId &&
+        h._id !== user?.facilityId
+    );
+  }, [hospitals, currentHospitalName, user?.facilityId]);
+
+  // Destination hospital defaults to null (neither selected by default)
+  const [selectedReceivingHospital, setSelectedReceivingHospital] = useState<Hospital | null>(null);
+
+  // 3. Urgency defaults to 'routine' (Normal) & Notes empty by default
+  const [urgency, setUrgency] = useState<ReferralUrgency>('routine');
+  const [clinicalSummary, setClinicalSummary] = useState('');
+
+  // Confirmation modal state
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filtered babies for modal picker
+  const filteredBabies = useMemo(() => {
     if (!patientSearch.trim()) return babies;
     const q = patientSearch.toLowerCase();
     return babies.filter(
@@ -54,266 +85,457 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
     );
   }, [babies, patientSearch]);
 
-  const babyReadings = readings.filter((r) => !selectedBaby || r.babyId === selectedBaby.id);
-  const latestReading = babyReadings[0] || readings[0] || {
-    value: 14.8,
-    unit: 'mg/dL',
-    postnatalAgeHours: 48,
-    bhutaniZone: 'high_intermediate',
-    method: 'TSB',
+  // Readings for chosen baby
+  const babyReadings = useMemo(() => {
+    if (!chosenBaby) return [];
+    return readings.filter((r) => r.babyId === chosenBaby.id || r.babyId === chosenBaby.uhid);
+  }, [readings, chosenBaby]);
+
+  const latestReading = babyReadings[0] || null;
+
+  const handleSelectPatient = (baby: Baby) => {
+    setChosenBaby(baby);
+    selectBaby(baby);
+    setPatientPickerVisible(false);
+    setPatientSearch('');
   };
 
-  const handleSendReferral = async () => {
-    if (!selectedBaby) {
-      Alert.alert('Error', 'No patient selected');
+  const handleDeselectPatient = () => {
+    setChosenBaby(null);
+    selectBaby(null);
+  };
+
+  // Safe check if a given hospital is currently selected
+  const isHospitalSelected = (hosp: Hospital): boolean => {
+    if (!selectedReceivingHospital) return false;
+    const currentName = (selectedReceivingHospital.name || '').trim().toLowerCase();
+    const candidateName = (hosp.name || '').trim().toLowerCase();
+    if (currentName && candidateName) {
+      return currentName === candidateName;
+    }
+    if (selectedReceivingHospital.id && hosp.id) {
+      return selectedReceivingHospital.id === hosp.id;
+    }
+    if (selectedReceivingHospital._id && hosp._id) {
+      return selectedReceivingHospital._id === hosp._id;
+    }
+    return false;
+  };
+
+  const handleOpenConfirm = () => {
+    if (!chosenBaby) {
+      Alert.alert('Select Patient', 'Please select a patient first.');
       return;
     }
+    if (!selectedReceivingHospital) {
+      Alert.alert('Select Hospital', 'Please choose a hospital to refer.');
+      return;
+    }
+    setConfirmModalVisible(true);
+  };
+
+  const handleConfirmSend = async () => {
+    if (!chosenBaby || !selectedReceivingHospital) return;
 
     setIsSubmitting(true);
     try {
+      const bilirubinVal = latestReading ? latestReading.value : 14.5;
+      const bilirubinUnit = latestReading ? latestReading.unit : 'mg/dL';
+      const riskZone = latestReading?.bhutaniZone || 'high_intermediate';
+
+      const targetName = (selectedReceivingHospital.name || '').trim();
+      const targetId =
+        targetName.toUpperCase() === 'KGMU'
+          ? 'hosp_kgmu'
+          : targetName.toUpperCase() === 'RML'
+          ? 'hosp_rml'
+          : targetName.toUpperCase() === 'PGI'
+          ? 'hosp_pgi'
+          : selectedReceivingHospital.id || selectedReceivingHospital._id || 'hosp_kgmu';
+
       await createReferral({
-        babyId: selectedBaby.id,
-        babyName: selectedBaby.name,
-        babyUhid: selectedBaby.uhid,
-        dateOfBirth: selectedBaby.dateOfBirth,
-        gestationalAgeWeeks: selectedBaby.gestationalAgeWeeks || 38,
-        referringDoctorName: 'Dr. Priya Sharma',
-        referringCentreName: 'North Community Health Centre (CHC)',
-        receivingHospitalId: hospital.id || hospital._id || 'hosp_001',
-        receivingHospitalName: hospital.name,
+        babyId: chosenBaby.id,
+        babyName: chosenBaby.name,
+        babyUhid: chosenBaby.uhid,
+        dateOfBirth: chosenBaby.dateOfBirth,
+        gestationalAgeWeeks: chosenBaby.gestationalAgeWeeks || 38,
+        referringDoctorName: user?.name || `${user?.facility || 'PGI'} Doctor`,
+        referringCentreName: user?.facility || 'PGI',
+        receivingHospitalId: targetId,
+        receivingHospitalName: targetName,
         urgency,
-        clinicalSummary,
-        latestBilirubinValue: latestReading.value,
-        latestBilirubinUnit: latestReading.unit,
-        latestBhutaniRiskZone: latestReading.bhutaniZone || 'high_intermediate',
-        postnatalAgeHoursAtReferral: latestReading.postnatalAgeHours || 40,
+        clinicalSummary: clinicalSummary.trim(),
+        latestBilirubinValue: bilirubinVal,
+        latestBilirubinUnit: bilirubinUnit,
+        latestBhutaniRiskZone: riskZone,
+        postnatalAgeHoursAtReferral: chosenBaby.dateOfBirth
+          ? calculatePostnatalAgeHours(chosenBaby.dateOfBirth, chosenBaby.exactTimeOfBirth, new Date())
+          : (latestReading?.postnatalAgeHours || 48),
         phototherapyRecommended: true,
       });
 
+      setConfirmModalVisible(false);
       Alert.alert(
-        'Referral Dispatched!',
-        `Phototherapy referral successfully sent to ${hospital.name}. You will be notified as soon as hospital doctor reviews.`,
-        [{ text: 'View Referral Status', onPress: onSuccess }]
+        'Referal Dispatched',
+        `Referal for ${chosenBaby.name} (${chosenBaby.uhid}) sent to ${selectedReceivingHospital.name}.`,
+        [{ text: 'OK', onPress: onSuccess }]
       );
     } catch {
-      Alert.alert('Error', 'Failed to send referral');
+      Alert.alert('Error', 'Failed to dispatch referal. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const insets = useSafeAreaInsets();
-
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: getScreenTopPadding(insets, 8), paddingBottom: insets.bottom + 30 },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* Header */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity onPress={onBack} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>←</Text>
-        </TouchableOpacity>
-        <View>
-          <Text style={styles.headerTitle}>Compose Referral</Text>
-          <Text style={styles.headerSubtitle}>Destination: {hospital.name}</Text>
-        </View>
-      </View>
-
-      {/* Target Hospital Card */}
-      <View style={styles.hospBanner}>
-        <View style={styles.hospBannerTop}>
-          <Text style={styles.hospBannerName} numberOfLines={2}>
-            {hospital.name}
-          </Text>
-          <View style={styles.capacityBadge}>
-            <Text style={styles.capacityBadgeText}>
-              ● {hospital.availablePTStations} PT Stations Available
-            </Text>
+    <View style={styles.container}>
+      {/* Top Header */}
+      <View style={[styles.header, { paddingTop: getScreenTopPadding(insets, 10) }]}>
+        <View style={styles.headerRow}>
+          <TouchableOpacity onPress={onBack} style={styles.backBtn} activeOpacity={0.7}>
+            <ArrowLeft size={20} color="#0F172A" />
+          </TouchableOpacity>
+          <View style={styles.headerTitleWrap}>
+            <Text style={styles.headerTitle}>New Referal</Text>
+            <Text style={styles.headerSubtitle}>{user?.facility || 'Hospital'}</Text>
           </View>
         </View>
-        <Text style={styles.hospBannerSub}>
-          {hospital.address} • Contact: {hospital.contactNumber}
-        </Text>
       </View>
 
-      {/* Patient Summary Card */}
-      {selectedBaby && (
-        <View style={styles.card}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.cardSectionTitle}>Newborn Patient Details</Text>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 85 }]}
+      >
+        {/* ================= PATIENT SELECTOR ================= */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Patient</Text>
+
+          {!chosenBaby ? (
             <TouchableOpacity
-              onPress={() => setShowPatientModal(true)}
-              style={styles.changePatientChip}
+              style={styles.selectPatientBtn}
+              onPress={() => setPatientPickerVisible(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.changePatientChipText}>Change Patient ▾</Text>
+              <View style={styles.selectPatientLeft}>
+                <View style={styles.userIconWrap}>
+                  <UserIcon size={18} color="#7D3BFF" />
+                </View>
+                <Text style={styles.selectPatientPlaceholder}>Select a patient...</Text>
+              </View>
+              <ChevronDown size={18} color="#94A3B8" />
             </TouchableOpacity>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Patient Name:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.parentsName?.trim() || selectedBaby.name}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>UHID:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.uhid}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Mother's Name:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.parentsName?.trim() || selectedBaby.name}</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Gestational Age:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.gestationalAgeWeeks || 38} Weeks</Text>
-          </View>
-          <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Weight / Height:</Text>
-            <Text style={styles.infoValue}>{selectedBaby.weight || 3.1} kg / {selectedBaby.height || 49} cm</Text>
-          </View>
-        </View>
-      )}
-
-      {/* Compact Bhutani Nomogram Preview */}
-      <View style={styles.card}>
-        <Text style={styles.cardSectionTitle}>Bhutani Bilirubin Risk Assessment</Text>
-        <BhutaniNomogramChart
-          readings={babyReadings as any}
-          gestationalAgeWeeks={selectedBaby?.gestationalAgeWeeks || 38}
-          compact={true}
-        />
-      </View>
-
-      {/* Urgency Selector */}
-      <View style={styles.card}>
-        <Text style={styles.cardSectionTitle}>Referral Urgency</Text>
-        <View style={styles.urgencyRow}>
-          {(['routine', 'urgent', 'emergency'] as ReferralUrgency[]).map((u) => {
-            const isSel = urgency === u;
-            return (
+          ) : (
+            <View style={styles.selectedPatientRow}>
               <TouchableOpacity
-                key={u}
-                onPress={() => setUrgency(u)}
-                style={[
-                  styles.urgencyPill,
-                  isSel && u === 'routine' && { backgroundColor: '#10B981' },
-                  isSel && u === 'urgent' && { backgroundColor: '#F59E0B' },
-                  isSel && u === 'emergency' && { backgroundColor: '#FC3949' },
-                ]}
+                style={styles.selectedPatientLeft}
+                onPress={() => setPatientPickerVisible(true)}
+                activeOpacity={0.7}
               >
-                <Text style={[styles.urgencyPillText, isSel && styles.urgencyPillTextActive]}>
-                  {u.toUpperCase()}
-                </Text>
+                <View style={styles.patientAvatar}>
+                  <Text style={styles.patientAvatarText}>
+                    {(chosenBaby.name || 'B').charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+                <View style={styles.patientInfoCol}>
+                  <Text style={styles.patientName}>
+                    {chosenBaby.parentsName?.trim() || chosenBaby.name}
+                  </Text>
+                  <Text style={styles.patientMeta}>
+                    UHID: {chosenBaby.uhid} • GA: {chosenBaby.gestationalAgeWeeks || 38}w
+                  </Text>
+                </View>
               </TouchableOpacity>
-            );
-          })}
+
+              {/* Cross button on top-right to deselect patient */}
+              <TouchableOpacity
+                style={styles.deselectBtn}
+                onPress={handleDeselectPatient}
+                activeOpacity={0.7}
+                accessibilityLabel="Deselect patient"
+              >
+                <X size={16} color="#64748B" strokeWidth={2.5} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
+
+        {/* ================= NOMOGRAM (ONLY WHEN PATIENT SELECTED, NO HEADING) ================= */}
+        {chosenBaby && (
+          <View style={styles.sectionCard}>
+            {latestReading && (
+              <View style={styles.nomogramHeader}>
+                <View style={styles.latestTsbBadge}>
+                  <Text style={styles.latestTsbText}>
+                    Latest TSB: {latestReading.value} {latestReading.unit}
+                  </Text>
+                </View>
+                {latestReading.bhutaniZone && (
+                  <View style={styles.riskZoneBadge}>
+                    <Text style={styles.riskZoneBadgeText}>
+                      {latestReading.bhutaniZone.replace('_', ' ').toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            <View style={styles.chartWrapper}>
+              <BhutaniNomogramChart
+                readings={
+                  babyReadings.length > 0
+                    ? (babyReadings as any)
+                    : ([{ value: 14.5, unit: 'mg/dL', postnatalAgeHours: 48, bhutaniZone: 'high_intermediate' }] as any)
+                }
+                gestationalAgeWeeks={chosenBaby.gestationalAgeWeeks || 38}
+                compact={false}
+              />
+            </View>
+          </View>
+        )}
+
+        {/* ================= SELECT HOSPITAL TO SEND REFERRAL ================= */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Select Hospital to Send Referal</Text>
+
+          <View style={styles.hospitalsRow}>
+            {availableReceivingHospitals.map((hosp) => {
+              const isSelected = isHospitalSelected(hosp);
+              return (
+                <TouchableOpacity
+                  key={hosp.id || hosp._id || hosp.name}
+                  style={[styles.smallHospitalBox, isSelected && styles.smallHospitalBoxSelected]}
+                  onPress={() => setSelectedReceivingHospital(isSelected ? null : hosp)}
+                  activeOpacity={0.75}
+                >
+                  <Text style={[styles.smallHospitalText, isSelected && styles.smallHospitalTextSelected]}>
+                    {hosp.name}
+                  </Text>
+                  {isSelected && <Check size={14} color="#FFFFFF" strokeWidth={3} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* ================= URGENCY & NOTES ================= */}
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionLabel}>Urgency & Notes</Text>
+
+          {/* Urgency Buttons: Normal selected by default */}
+          <View style={styles.urgencyRow}>
+            {[
+              { key: 'routine', label: 'Normal' },
+              { key: 'urgent', label: 'Urgent' },
+              { key: 'emergency', label: 'Emergency' },
+            ].map((item) => {
+              const isSel = urgency === item.key;
+              return (
+                <TouchableOpacity
+                  key={item.key}
+                  onPress={() => setUrgency(item.key as ReferralUrgency)}
+                  style={[
+                    styles.urgencyBtn,
+                    isSel && item.key === 'routine' && styles.urgencyNormalActive,
+                    isSel && item.key === 'urgent' && styles.urgencyUrgentActive,
+                    isSel && item.key === 'emergency' && styles.urgencyEmergencyActive,
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.urgencyBtnText, isSel && styles.urgencyBtnTextActive]}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* Empty Notes Input by default */}
+          <TextInput
+            style={styles.notesInput}
+            multiline
+            numberOfLines={3}
+            value={clinicalSummary}
+            onChangeText={setClinicalSummary}
+            placeholder="Add clinical notes (optional)..."
+            placeholderTextColor="#94A3B8"
+          />
+        </View>
+      </ScrollView>
+
+      {/* ================= BOTTOM ACTION BAR ================= */}
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+        <TouchableOpacity
+          style={[styles.sendBtn, (!chosenBaby || !selectedReceivingHospital) && styles.sendBtnDisabled]}
+          onPress={handleOpenConfirm}
+          disabled={!chosenBaby || !selectedReceivingHospital || isSubmitting}
+          activeOpacity={0.85}
+        >
+          <Send size={16} color="#FFFFFF" strokeWidth={2.5} />
+          <Text style={styles.sendBtnText}>Send Referal</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Clinical Notes Input */}
-      <View style={styles.card}>
-        <Text style={styles.cardSectionTitle}>Clinical Summary & Transport Notes</Text>
-        <TextInput
-          style={styles.notesInput}
-          multiline
-          numberOfLines={4}
-          value={clinicalSummary}
-          onChangeText={setClinicalSummary}
-          placeholder="Add clinical observations, feeding status, maternal blood group..."
-          placeholderTextColor="#94A3B8"
-        />
-      </View>
-
-      {/* Submit Referral Button */}
-      <TouchableOpacity
-        onPress={handleSendReferral}
-        style={[styles.submitBtn, isSubmitting && styles.submitBtnDisabled]}
-        disabled={isSubmitting}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.submitBtnText}>
-          {isSubmitting ? 'Dispatching Referral...' : 'Send Referral to Hospital →'}
-        </Text>
-      </TouchableOpacity>
-
-      {/* Patient Selection Modal */}
+      {/* ================= CONFIRMATION POPUP MODAL ================= */}
       <Modal
-        visible={showPatientModal}
+        visible={confirmModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setConfirmModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalBox}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Confirm Referal</Text>
+              <TouchableOpacity
+                onPress={() => setConfirmModalVisible(false)}
+                style={styles.modalCloseBtn}
+              >
+                <X size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalSub}>
+              Are you sure you want to send this referal to {selectedReceivingHospital?.name}?
+            </Text>
+
+            <View style={styles.modalSummaryBox}>
+              <View style={styles.modalRow}>
+                <Text style={styles.modalLabel}>Patient</Text>
+                <Text style={styles.modalVal}>
+                  {chosenBaby?.parentsName?.trim() || chosenBaby?.name} ({chosenBaby?.uhid})
+                </Text>
+              </View>
+              {latestReading && (
+                <View style={styles.modalRow}>
+                  <Text style={styles.modalLabel}>Latest TSB</Text>
+                  <Text style={styles.modalValAlert}>
+                    {latestReading.value} {latestReading.unit}
+                  </Text>
+                </View>
+              )}
+              <View style={styles.modalRow}>
+                <Text style={styles.modalLabel}>To Hospital</Text>
+                <Text style={styles.modalValHighlight}>
+                  {selectedReceivingHospital?.name}
+                </Text>
+              </View>
+              <View style={styles.modalRow}>
+                <Text style={styles.modalLabel}>Urgency</Text>
+                <Text style={styles.modalVal}>
+                  {urgency === 'routine' ? 'Normal' : urgency.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.modalActionsRow}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setConfirmModalVisible(false)}
+                disabled={isSubmitting}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalConfirmBtn, isSubmitting && { opacity: 0.7 }]}
+                onPress={handleConfirmSend}
+                disabled={isSubmitting}
+                activeOpacity={0.8}
+              >
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
+                    <Text style={styles.modalConfirmText}>Confirm & Send</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ================= PATIENT PICKER MODAL ================= */}
+      <Modal
+        visible={patientPickerVisible}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowPatientModal(false)}
+        onRequestClose={() => setPatientPickerVisible(false)}
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.modalOverlay}
+          style={styles.pickerModalOverlay}
         >
-          <View style={styles.modalSheet}>
-            <View style={styles.modalHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.modalTitle}>Select Newborn Patient</Text>
-                <Text style={styles.modalSubtitle}>Change active patient for this referral</Text>
-              </View>
+          <View style={styles.pickerModalSheet}>
+            <View style={styles.pickerModalHeader}>
+              <Text style={styles.pickerModalTitle}>Select Patient</Text>
               <TouchableOpacity
-                onPress={() => setShowPatientModal(false)}
+                onPress={() => setPatientPickerVisible(false)}
                 style={styles.modalCloseBtn}
               >
                 <X size={20} color="#64748B" />
               </TouchableOpacity>
             </View>
 
-            <View style={styles.modalSearchBox}>
-              <Search size={16} color="#94A3B8" style={{ marginRight: 8 }} />
+            {/* Search Input */}
+            <View style={styles.pickerSearchRow}>
+              <Search size={16} color="#94A3B8" />
               <TextInput
-                style={styles.modalSearchInput}
-                placeholder="Search by baby name or UHID..."
+                style={styles.pickerSearchInput}
+                placeholder="Search patient name, UHID..."
                 placeholderTextColor="#94A3B8"
                 value={patientSearch}
                 onChangeText={setPatientSearch}
+                clearButtonMode="while-editing"
               />
             </View>
 
-            <FlatList
-              data={filteredBabies}
-              keyExtractor={(item) => item.id}
-              contentContainerStyle={{ paddingHorizontal: SPACING.lg, paddingBottom: 20 }}
-              renderItem={({ item }) => {
-                const isSelected = selectedBaby?.id === item.id;
-                const displayName = item.parentsName?.trim() || item.name;
-
-                return (
-                  <TouchableOpacity
-                    style={[styles.patientItemCard, isSelected && styles.patientItemCardSelected]}
-                    onPress={() => {
-                      selectBaby(item);
-                      setShowPatientModal(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.patientItemAvatar}>
-                      <Text style={styles.patientItemAvatarText}>
-                        {displayName.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.patientItemName}>{displayName}</Text>
-                      <Text style={styles.patientItemUhid}>UHID: {item.uhid} • {item.gestationalAgeWeeks || 38}w</Text>
-                    </View>
-                    {isSelected && (
-                      <View style={styles.checkCircle}>
-                        <Check size={14} color="#FFFFFF" strokeWidth={3} />
+            {filteredBabies.length === 0 ? (
+              <View style={styles.pickerEmptyBox}>
+                <Text style={styles.pickerEmptyText}>
+                  {babies.length === 0
+                    ? `No patients registered at ${user?.facility || 'current hospital'}.`
+                    : 'No patients match your search.'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredBabies}
+                keyExtractor={(item) => item.id || item.uhid}
+                showsVerticalScrollIndicator={false}
+                renderItem={({ item }) => {
+                  const isSel = chosenBaby?.id === item.id || chosenBaby?.uhid === item.uhid;
+                  return (
+                    <TouchableOpacity
+                      style={[styles.pickerItem, isSel && styles.pickerItemSelected]}
+                      onPress={() => handleSelectPatient(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.pickerItemLeft}>
+                        <View style={[styles.avatarCircleSmall, isSel && styles.avatarCircleSmallSel]}>
+                          <Text style={[styles.avatarTextSmall, isSel && styles.avatarTextSmallSel]}>
+                            {(item.name || 'B').charAt(0).toUpperCase()}
+                          </Text>
+                        </View>
+                        <View>
+                          <Text style={styles.pickerItemName}>
+                            {item.parentsName?.trim() || item.name}
+                          </Text>
+                          <Text style={styles.pickerItemMeta}>UHID: {item.uhid} • GA: {item.gestationalAgeWeeks || 38}w</Text>
+                        </View>
                       </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              }}
-            />
+                      {isSel && <Check size={18} color="#7D3BFF" strokeWidth={2.5} />}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </ScrollView>
+    </View>
   );
 };
 
@@ -322,268 +544,463 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  content: {
-    padding: 16,
-    paddingBottom: 40,
+  header: {
+    backgroundColor: '#FFFFFF',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+    paddingHorizontal: 16,
+    paddingBottom: 10,
   },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
   },
   backBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 12,
-    padding: 6,
   },
-  backBtnText: {
-    fontSize: fontScale(20),
-    color: '#181829',
-    fontWeight: '700',
+  headerTitleWrap: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: fontScale(18),
+    fontSize: fontScale(17),
     fontWeight: '800',
-    color: '#181829',
+    color: '#0F172A',
   },
   headerSubtitle: {
     fontSize: fontScale(12),
     color: '#64748B',
+    marginTop: 1,
   },
-  hospBanner: {
-    backgroundColor: '#F3E8FF',
-    borderRadius: moderateScale(16),
-    padding: SPACING.md,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: '#7D3BFF',
+  scrollContent: {
+    padding: 14,
+    gap: 12,
   },
-  hospBannerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: moderateScale(8),
-    marginBottom: moderateScale(6),
-  },
-  hospBannerName: {
-    flex: 1,
-    minWidth: '55%',
-    fontSize: fontScale(15),
-    fontWeight: '800',
-    color: '#7D3BFF',
-  },
-  capacityBadge: {
-    backgroundColor: '#00A569',
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(8),
-    alignSelf: 'center',
-    flexShrink: 0,
-  },
-  capacityBadgeText: {
-    fontSize: fontScale(10),
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  hospBannerSub: {
-    fontSize: fontScale(11),
-    color: '#475569',
-    marginTop: moderateScale(2),
-    lineHeight: fontScale(16),
-  },
-  card: {
+  sectionCard: {
     backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(18),
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
+    borderRadius: 12,
+    padding: 14,
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  cardSectionTitle: {
+  sectionLabel: {
     fontSize: fontScale(13),
     fontWeight: '700',
-    color: '#181829',
-    marginBottom: SPACING.sm,
+    color: '#0F172A',
+    marginBottom: 8,
   },
-  infoRow: {
+  selectPatientBtn: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 5,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F8FAFC',
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
-  infoLabel: {
-    fontSize: fontScale(12),
-    color: '#64748B',
-  },
-  infoValue: {
-    fontSize: fontScale(12),
-    fontWeight: '600',
-    color: '#181829',
-  },
-  urgencyRow: {
+  selectPatientLeft: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 10,
   },
-  urgencyPill: {
-    flex: 1,
+  userIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EDE9FE',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(12),
-    backgroundColor: '#F1F5F9',
-    marginHorizontal: 4,
   },
-  urgencyPillText: {
-    fontSize: fontScale(11),
-    fontWeight: '700',
+  selectPatientPlaceholder: {
+    fontSize: fontScale(13),
     color: '#64748B',
+    fontWeight: '500',
   },
-  urgencyPillTextActive: {
-    color: '#FFFFFF',
-  },
-  notesInput: {
+  selectedPatientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(14),
-    padding: SPACING.md,
-    fontSize: fontScale(12),
-    color: '#181829',
-    textAlignVertical: 'top',
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    minHeight: moderateScale(70),
   },
-  submitBtn: {
+  selectedPatientLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  patientAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#7D3BFF',
-    borderRadius: moderateScale(16),
-    minHeight: moderateScale(50),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: SPACING.sm,
+    marginRight: 10,
   },
-  submitBtnDisabled: {
-    backgroundColor: '#A855F7',
-  },
-  submitBtnText: {
+  patientAvatarText: {
     fontSize: fontScale(15),
     fontWeight: '800',
     color: '#FFFFFF',
   },
-  cardHeaderRow: {
+  patientInfoCol: {
+    flex: 1,
+  },
+  patientName: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  patientMeta: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    marginTop: 1,
+  },
+  deselectBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 8,
+  },
+  nomogramHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  changePatientChip: {
-    backgroundColor: '#F3E8FF',
-    paddingHorizontal: moderateScale(10),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(10),
+  latestTsbBadge: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  changePatientChipText: {
+  latestTsbText: {
     fontSize: fontScale(11),
     fontWeight: '700',
-    color: '#7D3BFF',
+    color: '#DC2626',
+  },
+  riskZoneBadge: {
+    backgroundColor: '#FEF3C7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  riskZoneBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '700',
+    color: '#D97706',
+  },
+  chartWrapper: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  hospitalsRow: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  smallHospitalBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 44,
+    borderRadius: 8,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  smallHospitalBoxSelected: {
+    backgroundColor: '#7D3BFF',
+    borderColor: '#7D3BFF',
+  },
+  smallHospitalText: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#1E293B',
+  },
+  smallHospitalTextSelected: {
+    color: '#FFFFFF',
+  },
+  urgencyRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+  },
+  urgencyBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 8,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  urgencyBtnText: {
+    fontSize: fontScale(11),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  urgencyBtnTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
+  urgencyNormalActive: {
+    backgroundColor: '#10B981',
+    borderColor: '#10B981',
+  },
+  urgencyUrgentActive: {
+    backgroundColor: '#F59E0B',
+    borderColor: '#F59E0B',
+  },
+  urgencyEmergencyActive: {
+    backgroundColor: '#EF4444',
+    borderColor: '#EF4444',
+  },
+  notesInput: {
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: 8,
+    padding: 10,
+    fontSize: fontScale(12),
+    color: '#0F172A',
+    minHeight: 55,
+    textAlignVertical: 'top',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  sendBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7D3BFF',
+    height: 44,
+    borderRadius: 10,
+    gap: 6,
+  },
+  sendBtnDisabled: {
+    opacity: 0.45,
+  },
+  sendBtnText: {
+    fontSize: fontScale(14),
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.55)',
-    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
-  modalSheet: {
+  modalBox: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
-    maxHeight: '80%',
-    paddingTop: SPACING.lg,
-    paddingBottom: SPACING.xxl,
+    borderRadius: 14,
+    padding: 18,
+    width: '100%',
+    maxWidth: 360,
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    alignItems: 'center',
+    marginBottom: 6,
   },
   modalTitle: {
-    fontSize: fontScale(17),
+    fontSize: fontScale(16),
     fontWeight: '800',
-    color: '#181829',
+    color: '#0F172A',
   },
-  modalSubtitle: {
+  modalSub: {
     fontSize: fontScale(12),
     color: '#64748B',
-    marginTop: 2,
+    marginBottom: 14,
+    lineHeight: 17,
   },
   modalCloseBtn: {
-    padding: 6,
-    backgroundColor: '#F1F5F9',
-    borderRadius: moderateScale(12),
+    padding: 2,
   },
-  modalSearchBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  modalSummaryBox: {
     backgroundColor: '#F8FAFC',
-    borderRadius: moderateScale(14),
-    marginHorizontal: SPACING.lg,
-    paddingHorizontal: moderateScale(12),
-    minHeight: moderateScale(42),
+    borderRadius: 10,
+    padding: 10,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    marginBottom: SPACING.md,
+    marginBottom: 16,
   },
-  modalSearchInput: {
-    flex: 1,
-    fontSize: fontScale(13),
-    color: '#181829',
-  },
-  patientItemCard: {
+  modalRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(16),
-    padding: moderateScale(12),
-    marginBottom: moderateScale(10),
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
+    justifyContent: 'space-between',
+    paddingVertical: 4,
   },
-  patientItemCardSelected: {
-    borderColor: '#7D3BFF',
-    backgroundColor: '#FAF5FF',
-    borderWidth: 1.5,
-  },
-  patientItemAvatar: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
-    backgroundColor: '#F3E8FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  patientItemAvatarText: {
-    fontSize: fontScale(15),
-    fontWeight: '800',
-    color: '#7D3BFF',
-  },
-  patientItemName: {
-    fontSize: fontScale(14),
-    fontWeight: '700',
-    color: '#181829',
-  },
-  patientItemUhid: {
+  modalLabel: {
     fontSize: fontScale(11),
     color: '#64748B',
-    marginTop: 1,
   },
-  checkCircle: {
-    width: moderateScale(22),
-    height: moderateScale(22),
-    borderRadius: moderateScale(11),
+  modalVal: {
+    fontSize: fontScale(11),
+    fontWeight: '600',
+    color: '#0F172A',
+    maxWidth: '65%',
+    textAlign: 'right',
+  },
+  modalValAlert: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#DC2626',
+  },
+  modalValHighlight: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#7D3BFF',
+  },
+  modalActionsRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: fontScale(12),
+    fontWeight: '600',
+    color: '#475569',
+  },
+  modalConfirmBtn: {
+    flex: 1.4,
+    flexDirection: 'row',
+    height: 40,
+    borderRadius: 8,
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 8,
+    gap: 4,
+  },
+  modalConfirmText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  pickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  pickerModalSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    padding: 16,
+    maxHeight: '75%',
+  },
+  pickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  pickerModalTitle: {
+    fontSize: fontScale(15),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  pickerSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F1F5F9',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    height: 38,
+    marginBottom: 10,
+  },
+  pickerSearchInput: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: fontScale(12),
+    color: '#0F172A',
+  },
+  pickerEmptyBox: {
+    padding: 24,
+    alignItems: 'center',
+  },
+  pickerEmptyText: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  pickerItemSelected: {
+    backgroundColor: '#FAF5FF',
+    borderRadius: 6,
+  },
+  pickerItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarCircleSmall: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#EDE9FE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  avatarCircleSmallSel: {
+    backgroundColor: '#7D3BFF',
+  },
+  avatarTextSmall: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#7D3BFF',
+  },
+  avatarTextSmallSel: {
+    color: '#FFFFFF',
+  },
+  pickerItemName: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  pickerItemMeta: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    marginTop: 1,
   },
 });

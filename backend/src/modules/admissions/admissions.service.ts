@@ -16,13 +16,13 @@ const SEED_ADMISSIONS = [
     babyId: '651a00010000000000000001',
     babyUhid: 'BS-IN-972612',
     babyName: 'Sunita Devi',
-    hospitalId: 'hosp_001',
-    hospitalName: 'District Civil Hospital',
+    hospitalId: 'hosp_pgi',
+    hospitalName: 'PGI',
     referralId: 'ref_seed_001',
     physicalArrivalConfirmed: true,
     arrivalConfirmedAt: new Date(Date.now() - 3600000 * 20),
     arrivalConfirmedBy: 'Nurse Sarah',
-    ptStationId: 'st_dch_01',
+    ptStationId: 'st_pgi_01',
     ptStationName: 'Double LED Tunnel A1',
     admittedAt: new Date(Date.now() - 3600000 * 20),
     admissionStatus: 'under_treatment' as const,
@@ -62,10 +62,24 @@ if (memoryAdmissions.length === 0) {
 }
 
 export class AdmissionsService {
-  static async listAdmissions(query: { hospitalId?: string; status?: string }) {
+  static async listAdmissions(query: { hospitalId?: string; status?: string; facility?: string }) {
     let list = memoryAdmissions;
-    if (query.hospitalId) {
-      list = list.filter((a) => String(a.hospitalId) === String(query.hospitalId));
+    const targetHosp =
+      query.facility ||
+      (query.hospitalId === 'hosp_kgmu'
+        ? 'KGMU'
+        : query.hospitalId === 'hosp_rml'
+        ? 'RML'
+        : query.hospitalId === 'hosp_pgi'
+        ? 'PGI'
+        : undefined);
+
+    if (query.hospitalId || targetHosp) {
+      list = list.filter(
+        (a) =>
+          (query.hospitalId && String(a.hospitalId) === String(query.hospitalId)) ||
+          (targetHosp && a.hospitalName?.toUpperCase() === targetHosp.toUpperCase())
+      );
     }
     if (query.status) {
       list = list.filter((a) => a.admissionStatus === query.status);

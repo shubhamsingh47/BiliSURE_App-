@@ -15,12 +15,13 @@ interface BabyCardProps {
   onPress: () => void;
   onEditPress?: () => void;
   pillColor?: string;
+  referredToHospital?: string | null;
 }
 
-// Shows the baby's persisted registration timestamp (MongoDB `createdAt`).
-// Never derived from sample/reading timestamps, `updatedAt`, or birth-time defaults.
+// Shows the baby's persisted registration timestamp (MongoDB `createdAt`)
+// or the referral acceptance timestamp if received via accepted referral.
 const formatRegistrationDateTime = (baby: Baby): string => {
-  const ts = baby.createdAt || baby.registeredAt;
+  const ts = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt;
   if (!ts) return '';
   const d = new Date(ts);
   if (isNaN(d.getTime())) return '';
@@ -58,6 +59,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   onPress,
   onEditPress,
   pillColor = COLORS.pillBeige,
+  referredToHospital,
 }) => {
   const severity = getSeverityInfo(baby.severityState);
   const sample = latestSample !== undefined
@@ -67,20 +69,22 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     : null;
   const registrationDateTime = formatRegistrationDateTime(baby);
   const displayName = getDisplayName(baby);
+  const referredHospital = referredToHospital || baby.referredToHospitalName || null;
+  const isReferred = !!referredHospital;
 
   return (
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
-      style={styles.card}
+      style={[styles.card, isReferred && styles.cardReferred]}
     >
-      <View style={[styles.uhidPill, { backgroundColor: pillColor }]}>
-        <Text style={styles.uhidText}>UHID</Text>
+      <View style={[styles.uhidPill, isReferred ? styles.uhidPillReferred : { backgroundColor: pillColor }]}>
+        <Text style={[styles.uhidText, isReferred && styles.uhidTextReferred]}>UHID</Text>
       </View>
 
       <View style={styles.middleSection}>
         <View style={styles.nameRow}>
-          <Text style={styles.babyName} numberOfLines={1}>
+          <Text style={[styles.babyName, isReferred && styles.babyNameReferred]} numberOfLines={1}>
             {displayName}
           </Text>
           {onEditPress && (
@@ -91,14 +95,21 @@ export const BabyCard: React.FC<BabyCardProps> = ({
               style={styles.editIconBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Edit3 size={13} color="#7D3BFF" />
+              <Edit3 size={13} color={isReferred ? '#94A3B8' : '#7D3BFF'} />
             </TouchableOpacity>
           )}
         </View>
         <View style={styles.statusRow}>
-          <Text style={[styles.statusText, { color: severity.color }]}>
+          <Text style={[styles.statusText, { color: isReferred ? '#64748B' : severity.color }]}>
             {severity.label}
           </Text>
+          {isReferred && (
+            <View style={styles.referredBadge}>
+              <Text style={styles.referredBadgeText}>
+                Referred to {referredHospital}
+              </Text>
+            </View>
+          )}
           {baby.status === 'discharged' && (
             <View style={styles.dischargedBadge}>
               <Text style={styles.dischargedBadgeText}>DISCHARGED</Text>
@@ -109,7 +120,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
 
       <View style={styles.rightSection}>
         {sample?.value != null && (
-          <Text style={[styles.sampleValueText, { color: severity.color }]}>
+          <Text style={[styles.sampleValueText, { color: isReferred ? '#64748B' : severity.color }]}>
             {sample.value.toFixed(1)} mg/dL
           </Text>
         )}
@@ -216,5 +227,33 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     color: '#64748B',
     fontWeight: '600',
+  },
+  cardReferred: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+    opacity: 0.88,
+  },
+  uhidPillReferred: {
+    backgroundColor: '#E2E8F0',
+  },
+  uhidTextReferred: {
+    color: '#64748B',
+  },
+  babyNameReferred: {
+    color: '#334155',
+  },
+  referredBadge: {
+    backgroundColor: '#E2E8F0',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  referredBadgeText: {
+    fontSize: fontScale(9.5),
+    fontWeight: '700',
+    color: '#1E293B',
+    letterSpacing: 0.2,
   },
 });

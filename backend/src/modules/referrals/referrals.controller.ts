@@ -5,7 +5,7 @@ import { sendSuccess } from '../../common/response';
 export class ReferralsController {
   static async create(req: Request, res: Response, next: NextFunction) {
     try {
-      const referral = await ReferralsService.createReferral(req.body);
+      const referral = await ReferralsService.createReferral(req.body, req.user);
       return sendSuccess(res, referral, 201, 'Referral created and hospital notified');
     } catch (err) {
       next(err);
@@ -14,12 +14,17 @@ export class ReferralsController {
 
   static async list(req: Request, res: Response, next: NextFunction) {
     try {
-      const { hospitalId, centreName, status } = req.query as any;
-      const referrals = await ReferralsService.listReferrals({
-        hospitalId: hospitalId ? String(hospitalId) : undefined,
-        centreName: centreName ? String(centreName) : undefined,
-        status,
-      });
+      const { hospitalId, centreName, status, type } = req.query as any;
+      const userFacility = req.user?.facility;
+      const referrals = await ReferralsService.listReferrals(
+        {
+          hospitalId: hospitalId ? String(hospitalId) : undefined,
+          centreName: centreName ? String(centreName) : undefined,
+          type: type ? (String(type) as any) : undefined,
+          status,
+        },
+        userFacility
+      );
       return sendSuccess(res, referrals, 200, 'Referrals retrieved successfully');
     } catch (err) {
       next(err);

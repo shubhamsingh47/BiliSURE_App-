@@ -15,6 +15,8 @@ import { ChevronDown, ChevronRight, Check, X, Search, User, Plus } from 'lucide-
 import { COLORS } from '../../../theme/colors';
 import { BabyCard } from '../../../components/BabyCard';
 import { usePatientStore } from '../../../store/usePatientStore';
+import { useNetworkStore } from '../../../store/useNetworkStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { Baby, SeverityState } from '../../../types';
 import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
@@ -30,6 +32,23 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNewRegistration,
 }) => {
   const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
+  const { referrals } = useNetworkStore();
+  const { user } = useAuthStore();
+  const currentHospital = (user?.facility || 'PGI').toUpperCase();
+
+  const getReferredHospital = (baby: Baby): string | null => {
+    if (baby.referredToHospitalName) {
+      return baby.referredToHospitalName;
+    }
+    // Also cross-reference active outgoing referrals from currentHospital
+    const outgoingRef = referrals.find(
+      (r) =>
+        (r.babyUhid === baby.uhid || r.babyId === baby.id) &&
+        (r.referringCentreName?.toUpperCase() === currentHospital) &&
+        (r.status === 'pending' || r.status === 'accepted')
+    );
+    return outgoingRef?.receivingHospitalName || null;
+  };
   const [activeDept, setActiveDept] = useState(selectedDepartment || 'Deppt');
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [search, setSearch] = useState('');
@@ -94,8 +113,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   };
 
   const getBabyTimestamp = (baby: Baby): number => {
-    // Registration timestamp (persisted createdAt) drives ordering and Today/Yesterday grouping
-    const ts = baby.createdAt || baby.registeredAt || baby.dateOfBirth;
+    // Referral acceptance timestamp takes precedence for referred babies so they appear in Today/Yesterday
+    // based on acceptance date/time, then registration timestamp (createdAt/registeredAt/dateOfBirth)
+    const ts = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt || baby.dateOfBirth;
     if (ts) {
       const parsed = new Date(ts).getTime();
       if (!isNaN(parsed)) return parsed;
@@ -343,6 +363,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   baby={baby}
                   latestSample={getLatestSample(baby.id)}
                   pillColor={getPillColor(idx)}
+                  referredToHospital={getReferredHospital(baby)}
                   onPress={() => onSelectBaby(baby)}
                   onEditPress={() => handleOpenEdit(baby)}
                 />
@@ -365,6 +386,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   baby={baby}
                   latestSample={getLatestSample(baby.id)}
                   pillColor={getPillColor(idx + 3)}
+                  referredToHospital={getReferredHospital(baby)}
                   onPress={() => onSelectBaby(baby)}
                   onEditPress={() => handleOpenEdit(baby)}
                 />

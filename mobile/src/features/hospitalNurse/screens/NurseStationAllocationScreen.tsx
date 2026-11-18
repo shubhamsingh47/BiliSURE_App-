@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { usePatientStore } from '../../../store/usePatientStore';
 import { PTStation, Admission, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 
@@ -25,10 +26,21 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   const { user } = useAuthStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // Check if a baby (by UHID or ID) is already occupying an active station
+  const currentHosp = (user?.facility || 'PGI').toUpperCase();
+  const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
+  const hospitalStations = stations.filter(
+    (s) => s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp
+  );
+
+  const hospitalAdmissions = admissions.filter(
+    (a) => a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp
+  );
+
+  // Check if a baby (by UHID or ID) is already occupying an active station in this hospital
   const isBabyAlreadyAllocated = (babyUhid?: string, babyId?: string) => {
     if (!babyUhid && !babyId) return false;
-    return stations.some(
+    return hospitalStations.some(
       (s) =>
         s.operationalStatus === 'occupied' &&
         ((babyUhid && s.currentBabyUhid === babyUhid) || (babyId && s.currentBabyId === babyId))
@@ -36,7 +48,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   };
 
   // Find admitted babies awaiting station allocation (excluding any baby already occupying a station)
-  const pendingAdmissions = admissions.filter(
+  const pendingAdmissions = hospitalAdmissions.filter(
     (a) =>
       a.admissionStatus === 'admitted' &&
       !a.ptStationId &&
@@ -55,7 +67,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     if (!isStillPending) {
       setSelectedAdmissionId(pendingAdmissions[0]?.admissionId || pendingAdmissions[0]?.id || null);
     }
-  }, [admissions, stations, pendingAdmissions.length, selectedAdmissionId]);
+  }, [hospitalAdmissions, hospitalStations, pendingAdmissions.length, selectedAdmissionId]);
 
   const selectedAdmission = pendingAdmissions.find(
     (a) => a.admissionId === selectedAdmissionId || a.id === selectedAdmissionId
@@ -109,6 +121,9 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     try {
       await allocateBabyToStation(targetBaby, station.stationId || station.id, user.name);
       
+      usePatientStore.getState().selectBaby(null);
+      setSelectedAdmissionId(null);
+
       Alert.alert(
         'Station Allocated!',
         `${babyName} (${babyUhid}) placed in ${station.name} (${station.stationId}). Phototherapy treatment has begun!`
@@ -153,9 +168,9 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
 
   const insets = useSafeAreaInsets();
 
-  const availableCount = stations.filter((s) => s.operationalStatus === 'available').length;
-  const occupiedCount = stations.filter((s) => s.operationalStatus === 'occupied').length;
-  const cleaningCount = stations.filter((s) => s.operationalStatus === 'cleaning_prep').length;
+  const availableCount = hospitalStations.filter((s) => s.operationalStatus === 'available').length;
+  const occupiedCount = hospitalStations.filter((s) => s.operationalStatus === 'occupied').length;
+  const cleaningCount = hospitalStations.filter((s) => s.operationalStatus === 'cleaning_prep').length;
 
   return (
     <View style={styles.container}>
@@ -206,7 +221,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
             </View>
             <View style={styles.fleetDivider} />
             <View style={styles.fleetStatusCol}>
-              <Text style={styles.fleetStatusVal}>{stations.length}</Text>
+              <Text style={styles.fleetStatusVal}>{hospitalStations.length}</Text>
               <Text style={styles.fleetStatusLbl}>Total</Text>
             </View>
           </View>
@@ -232,7 +247,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
           </View>
           <View style={styles.embeddedDivider} />
           <View style={styles.fleetStatusCol}>
-            <Text style={[styles.embeddedFleetVal, { color: '#181829' }]}>{stations.length}</Text>
+            <Text style={[styles.embeddedFleetVal, { color: '#181829' }]}>{hospitalStations.length}</Text>
             <Text style={styles.embeddedFleetLbl}>Total Units</Text>
           </View>
         </View>
@@ -273,7 +288,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
 
       {/* Station Cards Grid */}
       <FlatList
-        data={stations}
+        data={hospitalStations}
         keyExtractor={(item) => item.id || item.stationId}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 20 }]}
         renderItem={({ item }) => {

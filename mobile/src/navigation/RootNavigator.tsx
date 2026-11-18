@@ -26,6 +26,7 @@ import { HospitalDirectoryScreen } from '../features/referrals/screens/HospitalD
 import { BottomTabBar, TabName } from './BottomTabNavigator';
 import { usePatientStore } from '../store/usePatientStore';
 import { useNetworkStore } from '../store/useNetworkStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { Hospital, Baby } from '../types';
 
 type ScreenRoute =
@@ -51,6 +52,8 @@ type ScreenRoute =
 export const RootNavigator: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<ScreenRoute>('splash');
   const [activeTab, setActiveTab] = useState<TabName>('babies');
+  const [wardSegment, setWardSegment] = useState<'treatment' | 'allocation'>('treatment');
+  const [wardSegmentTrigger, setWardSegmentTrigger] = useState<number>(0);
   const [readingVal, setReadingVal] = useState<number>(14.8);
   const [readingSite, setReadingSite] = useState<string>('Forehead');
   const [registeredUhid, setRegisteredUhid] = useState<string>('BS-IN-100001');
@@ -59,6 +62,12 @@ export const RootNavigator: React.FC = () => {
 
   const { selectBaby, selectedBaby } = usePatientStore();
   const { hospitals } = useNetworkStore();
+  const { logout } = useAuthStore();
+
+  const handleLogout = async () => {
+    await logout();
+    setCurrentRoute('login');
+  };
 
   const handleSplashFinish = () => setCurrentRoute('onboarding');
   const handleOnboardingContinue = () => setCurrentRoute('login');
@@ -158,7 +167,6 @@ export const RootNavigator: React.FC = () => {
       case 'create_referral':
         return (
           <CreateReferralScreen
-            hospital={selectedHospitalForReferral || hospitals[0]}
             onSuccess={() => {
               setActiveTab('referrals');
               setCurrentRoute('main');
@@ -191,10 +199,13 @@ export const RootNavigator: React.FC = () => {
             onBackToDashboard={() => setCurrentRoute('main')}
             onOpenReadingDetail={handleOpenReadingDetail}
             onSeeAllObservations={() => setCurrentRoute('observations_list')}
-            onSendToPhototherapy={() => {
-              if (selectedBaby) {
-                selectBaby(selectedBaby);
+            onSendToPhototherapy={(targetBaby) => {
+              const babyToAllocate = targetBaby || selectedBaby;
+              if (babyToAllocate) {
+                selectBaby(babyToAllocate);
               }
+              setWardSegment('allocation');
+              setWardSegmentTrigger((prev) => prev + 1);
               setActiveTab('ward_stations');
               setCurrentRoute('main');
             }}
@@ -202,6 +213,8 @@ export const RootNavigator: React.FC = () => {
               if (selectedBaby) {
                 selectBaby(selectedBaby);
               }
+              setWardSegment('allocation');
+              setWardSegmentTrigger((prev) => prev + 1);
               setActiveTab('ward_stations');
               setCurrentRoute('main');
             }}
@@ -238,6 +251,8 @@ export const RootNavigator: React.FC = () => {
           case 'ward_stations':
             return (
               <WardStationsScreen
+                initialSegment={wardSegment}
+                segmentTrigger={wardSegmentTrigger}
                 onOpenNotifications={() => setCurrentRoute('notifications')}
                 onRecordBilirubin={(uhid) => {
                   setReadingVal(12.4);
@@ -288,6 +303,7 @@ export const RootNavigator: React.FC = () => {
             setActiveTab(tab);
             if (currentRoute !== 'main') setCurrentRoute('main');
           }}
+          onLogoutPress={handleLogout}
         />
       )}
     </View>

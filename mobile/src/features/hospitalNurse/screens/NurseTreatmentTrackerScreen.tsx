@@ -44,8 +44,15 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   const [historyTab, setHistoryTab] = useState<'cycles' | 'samples'>('cycles');
   const readings = usePatientStore((s) => s.readings);
 
-  // Admitted neonates who have an allocated station
-  const treatedPatients = admissions.filter((a) => a.admissionStatus === 'under_treatment');
+  // Admitted neonates who have an allocated station in the active hospital
+  const currentHosp = (user?.facility || 'PGI').toUpperCase();
+  const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
+  const treatedPatients = admissions.filter(
+    (a) =>
+      a.admissionStatus === 'under_treatment' &&
+      (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
+  );
 
   const handleStartSession = async () => {
     if (!activeAdmission) return;

@@ -62,49 +62,66 @@ if (memoryReferrals.length === 0) {
 }
 
 export class ReferralsService {
-  static async createReferral(data: {
-    babyId: string;
-    babyName: string;
-    babyUhid: string;
-    dateOfBirth: Date | string;
-    gestationalAgeWeeks?: number;
-    referringDoctorId?: string;
-    referringDoctorName?: string;
-    referringCentreName?: string;
-    receivingHospitalId: string;
-    urgency?: ReferralUrgency;
-    clinicalSummary: string;
-    latestBilirubinValue: number;
-    latestBilirubinUnit?: string;
-    latestBhutaniRiskZone?: string;
-    postnatalAgeHoursAtReferral?: number;
-  }) {
-    const hospital = await HospitalsService.getHospitalById(data.receivingHospitalId);
+  static async createReferral(
+    data: {
+      babyId: string;
+      babyName: string;
+      babyUhid: string;
+      dateOfBirth: Date | string;
+      gestationalAgeWeeks?: number;
+      referringDoctorId?: string;
+      referringDoctorName?: string;
+      referringCentreName?: string;
+      receivingHospitalId: string;
+      receivingHospitalName?: string;
+      urgency?: ReferralUrgency;
+      clinicalSummary: string;
+      latestBilirubinValue: number;
+      latestBilirubinUnit?: string;
+      latestBhutaniRiskZone?: string;
+      postnatalAgeHoursAtReferral?: number;
+    },
+    user?: any
+  ) {
+    let receivingHospitalName = (data.receivingHospitalName || '').trim();
+    let receivingHospitalId = (data.receivingHospitalId || '').trim();
 
-    if ((hospital as any).isReferralPaused) {
-      throw new BadRequestError(
-        `Referrals to ${hospital.name} are temporarily paused: ${(hospital as any).pauseReason || 'Department at maximum intake capacity'}`
-      );
+    // Reliably map hospital name & ID
+    const nameUpper = receivingHospitalName.toUpperCase();
+    if (nameUpper === 'KGMU') {
+      receivingHospitalId = 'hosp_kgmu';
+      receivingHospitalName = 'KGMU';
+    } else if (nameUpper === 'RML') {
+      receivingHospitalId = 'hosp_rml';
+      receivingHospitalName = 'RML';
+    } else if (nameUpper === 'PGI') {
+      receivingHospitalId = 'hosp_pgi';
+      receivingHospitalName = 'PGI';
+    } else if (receivingHospitalId === 'hosp_kgmu') {
+      receivingHospitalName = 'KGMU';
+    } else if (receivingHospitalId === 'hosp_rml') {
+      receivingHospitalName = 'RML';
+    } else if (receivingHospitalId === 'hosp_pgi') {
+      receivingHospitalName = 'PGI';
     }
 
     const referralId = `REF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const newRef: any = {
-      _id: 'ref_' + Date.now(),
       referralId,
       babyId: data.babyId,
       babyName: data.babyName,
       babyUhid: data.babyUhid,
       dateOfBirth: new Date(data.dateOfBirth),
       gestationalAgeWeeks: data.gestationalAgeWeeks || 38,
-      referringDoctorId: data.referringDoctorId,
-      referringDoctorName: data.referringDoctorName || 'Dr. Referring Doctor',
-      referringCentreName: data.referringCentreName || 'Community Health Centre',
-      receivingHospitalId: data.receivingHospitalId,
-      receivingHospitalName: hospital.name,
+      referringDoctorId: user?.userId || data.referringDoctorId,
+      referringDoctorName: user?.name || data.referringDoctorName || 'Attending Physician',
+      referringCentreName: user?.facility || data.referringCentreName || 'PGI',
+      receivingHospitalId: receivingHospitalId || 'hosp_kgmu',
+      receivingHospitalName: receivingHospitalName || 'KGMU',
       status: 'pending' as ReferralStatus,
-      urgency: data.urgency || 'urgent',
-      clinicalSummary: data.clinicalSummary || 'Bilirubin elevated. Transferred for hospital phototherapy evaluation.',
+      urgency: data.urgency || 'routine',
+      clinicalSummary: data.clinicalSummary || '',
       latestBilirubinValue: data.latestBilirubinValue,
       latestBilirubinUnit: data.latestBilirubinUnit || 'mg/dL',
       latestBhutaniRiskZone: data.latestBhutaniRiskZone || 'high_intermediate',
@@ -116,49 +133,127 @@ export class ReferralsService {
 
     if (isMongoConnected) {
       try {
-        await ReferralModel.create(newRef);
+        const created = await ReferralModel.create(newRef);
+        newRef._id = created._id;
+        // Do NOT change currentHospital while referral is pending!
+        // Only mark referralStatus: 'pending'. The baby still belongs to referring facility.
         await BabyModel.findOneAndUpdate(
           { uhid: data.babyUhid },
-          { referralStatus: 'pending', currentHospital: hospital.name }
+          { 
+            referralStatus: 'pending',
+            referredToHospitalName: receivingHospitalName,
+            referredToHospitalId: receivingHospitalId,
+          }
         );
-      } catch {}
+      } catch (err) {
+        console.warn('[ReferralsService] MongoDB create referral failed, using memory:', err);
+      }
     }
 
+    if (!newRef._id) {
+      newRef._id = 'ref_' + Date.now();
+    }
     memoryReferrals.unshift(newRef);
 
-    // Notify receiving hospital doctors and admin
+    // Notify receiving hospital
     await NotificationsService.createNotification({
       recipientRole: 'hospital_doctor',
       hospitalId: data.receivingHospitalId,
       title: `New Referral: ${data.babyName} (${data.babyUhid})`,
-      message: `Incoming from ${newRef.referringCentreName}. Bilirubin: ${data.latestBilirubinValue} ${newRef.latestBilirubinUnit} (${data.latestBhutaniRiskZone?.replace('_', ' ').toUpperCase()}). Urgency: ${newRef.urgency.toUpperCase()}.`,
+      message: `Incoming referral from ${newRef.referringCentreName} for Baby ${data.babyName}. Bilirubin: ${data.latestBilirubinValue} ${newRef.latestBilirubinUnit}.`,
       type: 'referral_created',
       relatedBabyUhid: data.babyUhid,
       relatedReferralId: referralId,
-    });
+    }).catch(() => {});
 
     return newRef;
   }
 
-  static async listReferrals(query: {
-    hospitalId?: string;
-    centreName?: string;
-    status?: ReferralStatus;
-  }) {
+  static async listReferrals(
+    query: {
+      hospitalId?: string;
+      centreName?: string;
+      type?: 'sended' | 'incoming';
+      status?: ReferralStatus;
+    },
+    userFacility?: string
+  ) {
+    const facility = userFacility || query.centreName || query.hospitalId;
+
+    if (isMongoConnected) {
+      try {
+        const mongoQuery: any = {};
+
+        if (query.type === 'sended') {
+          if (facility) {
+            mongoQuery.referringCentreName = facility;
+          }
+        } else if (query.type === 'incoming') {
+          if (facility) {
+            mongoQuery.$or = [
+              { receivingHospitalName: facility },
+              { receivingHospitalId: facility },
+              { receivingHospitalId: `hosp_${facility.toLowerCase()}` },
+            ];
+          }
+        } else if (facility) {
+          mongoQuery.$or = [
+            { referringCentreName: facility },
+            { receivingHospitalName: facility },
+            { receivingHospitalId: facility },
+            { receivingHospitalId: `hosp_${facility.toLowerCase()}` },
+          ];
+        }
+
+        if (query.status) {
+          mongoQuery.status = query.status;
+        }
+
+        const items = await ReferralModel.find(mongoQuery).sort({ createdAt: -1 }).lean();
+        if (items && items.length >= 0) return items;
+      } catch (err) {
+        console.warn('[ReferralsService] MongoDB listReferrals failed:', err);
+      }
+    }
+
     let list = memoryReferrals;
-    if (query.hospitalId) {
-      list = list.filter((r) => String(r.receivingHospitalId) === String(query.hospitalId));
+    if (query.type === 'sended') {
+      if (facility) {
+        list = list.filter((r) => r.referringCentreName === facility);
+      }
+    } else if (query.type === 'incoming') {
+      if (facility) {
+        list = list.filter(
+          (r) =>
+            r.receivingHospitalName === facility ||
+            String(r.receivingHospitalId) === String(facility) ||
+            String(r.receivingHospitalId) === `hosp_${facility.toLowerCase()}`
+        );
+      }
+    } else if (facility) {
+      list = list.filter(
+        (r) =>
+          r.referringCentreName === facility ||
+          r.receivingHospitalName === facility ||
+          String(r.receivingHospitalId) === String(facility)
+      );
     }
-    if (query.centreName) {
-      list = list.filter((r) => r.referringCentreName === query.centreName);
-    }
+
     if (query.status) {
       list = list.filter((r) => r.status === query.status);
     }
     return list;
   }
 
-  static async getById(id: string) {
+  static async getById(id: string): Promise<any> {
+    if (isMongoConnected) {
+      try {
+        const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { referralId: id };
+        const found = await ReferralModel.findOne(query).lean();
+        if (found) return found;
+      } catch {}
+    }
+
     const found = memoryReferrals.find(
       (r) => (r as any)._id === id || r.referralId === id || r.id === id
     );
@@ -166,45 +261,53 @@ export class ReferralsService {
     return found;
   }
 
-  static async acceptReferral(id: string, doctorName: string = 'Dr. Hospital Paediatrician') {
+  static async acceptReferral(id: string, doctorName: string = 'Attending Physician') {
     const ref = await this.getById(id);
     if (ref.status !== 'pending') {
       throw new BadRequestError(`Cannot accept referral in '${ref.status}' status`);
     }
 
+    const acceptanceTime = new Date();
     ref.status = 'accepted';
     ref.reviewedByDoctorName = doctorName;
-    ref.reviewedAt = new Date();
-    (ref as any).updatedAt = new Date();
+    ref.reviewedAt = acceptanceTime;
+    (ref as any).updatedAt = acceptanceTime;
 
     if (isMongoConnected) {
       try {
-        await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
-        await BabyModel.findOneAndUpdate({ uhid: ref.babyUhid }, { referralStatus: 'accepted' });
+        await ReferralModel.findOneAndUpdate(
+          { referralId: ref.referralId },
+          {
+            $set: {
+              status: 'accepted',
+              reviewedByDoctorName: doctorName,
+              reviewedAt: acceptanceTime,
+              updatedAt: acceptanceTime,
+            },
+          }
+        );
+        // Only upon acceptance does the baby become visible to the receiving hospital,
+        // and its registration/acceptance timestamp on the baby card is updated to acceptanceTime!
+        await BabyModel.findOneAndUpdate(
+          { uhid: ref.babyUhid },
+          {
+            $set: {
+              referralStatus: 'accepted',
+              currentHospital: ref.receivingHospitalName,
+              referralAcceptedAt: acceptanceTime,
+              acceptedAt: acceptanceTime,
+              updatedAt: acceptanceTime,
+            },
+          }
+        );
       } catch {}
     }
 
-    // Notify Referring Doctor that referral was accepted!
-    await NotificationsService.createNotification({
-      recipientRole: 'referring_doctor',
-      centreName: ref.referringCentreName,
-      title: `Referral Accepted: ${ref.babyName}`,
-      message: `${ref.receivingHospitalName} accepted Baby ${ref.babyName} (${ref.babyUhid}). Ready for transfer.`,
-      type: 'referral_accepted',
-      relatedBabyUhid: ref.babyUhid,
-      relatedReferralId: ref.referralId,
-    });
-
-    // Notify Hospital Nurses to prepare arrival & station
-    await NotificationsService.createNotification({
-      recipientRole: 'hospital_nurse',
-      hospitalId: String(ref.receivingHospitalId),
-      title: `Prepare Admission: ${ref.babyName}`,
-      message: `Referral accepted by ${doctorName}. Prepare incoming arrival bed.`,
-      type: 'referral_accepted',
-      relatedBabyUhid: ref.babyUhid,
-      relatedReferralId: ref.referralId,
-    });
+    // Keep memory cache updated
+    const memIdx = memoryReferrals.findIndex((r) => r.referralId === ref.referralId);
+    if (memIdx >= 0) {
+      memoryReferrals[memIdx] = { ...memoryReferrals[memIdx], ...ref };
+    }
 
     return ref;
   }
@@ -212,7 +315,7 @@ export class ReferralsService {
   static async rejectReferral(
     id: string,
     reason: string,
-    doctorName: string = 'Dr. Hospital Paediatrician'
+    doctorName: string = 'Attending Physician'
   ) {
     if (!reason || reason.trim().length === 0) {
       throw new BadRequestError('A clinical or operational rejection reason is required');
@@ -231,21 +334,26 @@ export class ReferralsService {
 
     if (isMongoConnected) {
       try {
-        await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
+        await ReferralModel.findOneAndUpdate(
+          { referralId: ref.referralId },
+          {
+            $set: {
+              status: 'rejected',
+              rejectionReason: reason,
+              reviewedByDoctorName: doctorName,
+              reviewedAt: ref.reviewedAt,
+              updatedAt: new Date(),
+            },
+          }
+        );
         await BabyModel.findOneAndUpdate({ uhid: ref.babyUhid }, { referralStatus: 'rejected' });
       } catch {}
     }
 
-    // Notify referring doctor
-    await NotificationsService.createNotification({
-      recipientRole: 'referring_doctor',
-      centreName: ref.referringCentreName,
-      title: `Referral Declined: ${ref.babyName}`,
-      message: `${ref.receivingHospitalName} declined referral. Reason: ${reason}. Please select an alternative facility in the directory.`,
-      type: 'referral_rejected',
-      relatedBabyUhid: ref.babyUhid,
-      relatedReferralId: ref.referralId,
-    });
+    const memIdx = memoryReferrals.findIndex((r) => r.referralId === ref.referralId);
+    if (memIdx >= 0) {
+      memoryReferrals[memIdx] = { ...memoryReferrals[memIdx], ...ref };
+    }
 
     return ref;
   }

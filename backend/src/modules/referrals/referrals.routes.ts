@@ -4,8 +4,8 @@ import { authenticate } from '../../middleware/auth';
 
 const router = Router();
 
-router.get('/', ReferralsController.list);
-router.get('/:id', ReferralsController.getById);
+router.get('/', authenticate, ReferralsController.list);
+router.get('/:id', authenticate, ReferralsController.getById);
 router.post('/', authenticate, ReferralsController.create);
 router.patch('/:id/accept', authenticate, ReferralsController.accept);
 router.patch('/:id/reject', authenticate, ReferralsController.reject);
