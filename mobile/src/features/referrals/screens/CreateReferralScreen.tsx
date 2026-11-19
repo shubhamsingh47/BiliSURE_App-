@@ -73,11 +73,14 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Filtered babies for modal picker
+  // Filtered babies for modal picker (only actively owned babies, excluding pending or transferred-out ones)
   const filteredBabies = useMemo(() => {
-    if (!patientSearch.trim()) return babies;
+    const availableBabies = babies.filter(
+      (b) => b.referralStatus !== 'pending' && !b.isTransferredOut && !b.isHistoricalOnly
+    );
+    if (!patientSearch.trim()) return availableBabies;
     const q = patientSearch.toLowerCase();
-    return babies.filter(
+    return availableBabies.filter(
       (b) =>
         b.name?.toLowerCase().includes(q) ||
         b.parentsName?.toLowerCase().includes(q) ||
@@ -174,14 +177,17 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
         phototherapyRecommended: true,
       });
 
+      usePatientStore.getState().markBabyAsReferred(chosenBaby.uhid, targetName, new Date().toISOString());
+      await usePatientStore.getState().loadBabies();
+
       setConfirmModalVisible(false);
       Alert.alert(
-        'Referal Dispatched',
-        `Referal for ${chosenBaby.name} (${chosenBaby.uhid}) sent to ${selectedReceivingHospital.name}.`,
+        'Referral Dispatched',
+        `Referral for ${chosenBaby.name} (${chosenBaby.uhid}) sent to ${selectedReceivingHospital.name}.`,
         [{ text: 'OK', onPress: onSuccess }]
       );
-    } catch {
-      Alert.alert('Error', 'Failed to dispatch referal. Please try again.');
+    } catch (err: any) {
+      Alert.alert('Error', err?.response?.data?.message || err?.message || 'Failed to dispatch referral. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -196,7 +202,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
             <ArrowLeft size={20} color="#0F172A" />
           </TouchableOpacity>
           <View style={styles.headerTitleWrap}>
-            <Text style={styles.headerTitle}>New Referal</Text>
+            <Text style={styles.headerTitle}>New Referral</Text>
             <Text style={styles.headerSubtitle}>{user?.facility || 'Hospital'}</Text>
           </View>
         </View>
@@ -295,7 +301,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
 
         {/* ================= SELECT HOSPITAL TO SEND REFERRAL ================= */}
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionLabel}>Select Hospital to Send Referal</Text>
+          <Text style={styles.sectionLabel}>Select Hospital to Send Referral</Text>
 
           <View style={styles.hospitalsRow}>
             {availableReceivingHospitals.map((hosp) => {
@@ -371,7 +377,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
           activeOpacity={0.85}
         >
           <Send size={16} color="#FFFFFF" strokeWidth={2.5} />
-          <Text style={styles.sendBtnText}>Send Referal</Text>
+          <Text style={styles.sendBtnText}>Send Referral</Text>
         </TouchableOpacity>
       </View>
 
@@ -385,7 +391,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Confirm Referal</Text>
+              <Text style={styles.modalTitle}>Confirm Referral</Text>
               <TouchableOpacity
                 onPress={() => setConfirmModalVisible(false)}
                 style={styles.modalCloseBtn}
@@ -395,7 +401,7 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
             </View>
 
             <Text style={styles.modalSub}>
-              Are you sure you want to send this referal to {selectedReceivingHospital?.name}?
+              Are you sure you want to send this referral to {selectedReceivingHospital?.name}?
             </Text>
 
             <View style={styles.modalSummaryBox}>

@@ -32,6 +32,54 @@ const formatCurrentDateTime = () => {
   return `${day}/${month}/${year} ${timeStr}`;
 };
 
+const parseInputDateTime = (inputStr: string): { isoDate: string; timeStr: string } => {
+  const now = new Date();
+  if (!inputStr || !inputStr.trim()) {
+    return {
+      isoDate: now.toISOString(),
+      timeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+  }
+
+  const str = inputStr.trim();
+  // Support DD/MM/YYYY HH:MM AM/PM or DD-MM-YYYY or standard formats
+  const match = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?:\s*([AaPp][Mm]))?)?/);
+  if (match) {
+    const day = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const year = parseInt(match[3], 10);
+    let hours = match[4] ? parseInt(match[4], 10) : 0;
+    const minutes = match[5] ? parseInt(match[5], 10) : 0;
+    const ampm = match[6]?.toUpperCase();
+
+    if (ampm === 'PM' && hours < 12) hours += 12;
+    if (ampm === 'AM' && hours === 12) hours = 0;
+
+    const parsedDate = new Date(year, month, day, hours, minutes, 0, 0);
+    if (!isNaN(parsedDate.getTime())) {
+      const timeStr = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+      return {
+        isoDate: parsedDate.toISOString(),
+        timeStr,
+      };
+    }
+  }
+
+  // Fallback to standard Date parse
+  const directDate = new Date(str);
+  if (!isNaN(directDate.getTime())) {
+    return {
+      isoDate: directDate.toISOString(),
+      timeStr: `${String(directDate.getHours()).padStart(2, '0')}:${String(directDate.getMinutes()).padStart(2, '0')}`,
+    };
+  }
+
+  return {
+    isoDate: now.toISOString(),
+    timeStr: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+};
+
 export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   onBack,
   onSuccess,
@@ -79,6 +127,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
     setLoading(true);
     try {
       const now = new Date();
+      const parsedBirth = parseInputDateTime(dob);
       const finalUhid = uhid.trim() || `BS-${Math.floor(100000 + Math.random() * 900000)}`;
       const created = await registerBaby({
         name: motherName.trim(),
@@ -89,8 +138,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         severityState: severity,
         gestationalAgeWeeks: parsedGestAge,
         weight: parsedWeight,
-        dateOfBirth: now.toISOString(),
-        exactTimeOfBirth: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        dateOfBirth: parsedBirth.isoDate,
+        exactTimeOfBirth: parsedBirth.timeStr,
         registeredAt: now.toISOString(),
         createdAt: now.toISOString(),
         updatedAt: now.toISOString(),

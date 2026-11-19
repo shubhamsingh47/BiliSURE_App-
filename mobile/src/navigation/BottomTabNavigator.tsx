@@ -66,13 +66,13 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* 3. Referal Tab */}
+      {/* 3. Referral Tab */}
       <TouchableOpacity
         onPress={() => onTabPress('referrals')}
         style={styles.tabItem}
         activeOpacity={0.7}
         accessibilityRole="tab"
-        accessibilityLabel="District Referal and Transfers"
+        accessibilityLabel="District Referral and Transfers"
       >
         <Share2
           size={22}
@@ -84,20 +84,22 @@ export const BottomTabBar: React.FC<BottomTabBarProps> = ({
         </Text>
       </TouchableOpacity>
 
-      {/* 4. Logout Tab */}
+      {/* 4. Logout Tab (Red Visual Style) */}
       <TouchableOpacity
         onPress={onLogoutPress}
-        style={styles.tabItem}
+        style={[styles.tabItem, styles.logoutTabItem]}
         activeOpacity={0.7}
         accessibilityRole="button"
         accessibilityLabel="Log out of hospital account"
       >
-        <LogOut
-          size={22}
-          color="#94A3B8"
-          strokeWidth={2}
-        />
-        <Text style={styles.tabLabel} numberOfLines={1}>
+        <View style={styles.logoutIconWrapper}>
+          <LogOut
+            size={18}
+            color="#DC2626"
+            strokeWidth={2.4}
+          />
+        </View>
+        <Text style={styles.logoutTabLabel} numberOfLines={1}>
           Logout
         </Text>
       </TouchableOpacity>
@@ -135,5 +137,22 @@ const styles = StyleSheet.create({
   tabLabelActive: {
     color: '#7D3BFF',
     fontWeight: '700',
+  },
+  logoutTabItem: {
+    paddingVertical: 2,
+  },
+  logoutIconWrapper: {
+    width: moderateScale(28),
+    height: moderateScale(28),
+    borderRadius: moderateScale(14),
+    backgroundColor: '#FEE2E2',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutTabLabel: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#DC2626',
+    marginTop: 2,
   },
 });

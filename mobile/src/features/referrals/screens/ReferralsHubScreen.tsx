@@ -14,6 +14,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Plus, Bell, Check, X, ArrowUpRight, ArrowDownLeft, Clock, CheckCircle2, XCircle } from 'lucide-react-native';
 import { useNetworkStore } from '../../../store/useNetworkStore';
+import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/responsive';
@@ -32,8 +33,8 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
   const { user } = useAuthStore();
   const { referrals, notifications, acceptReferral, rejectReferral, loadNetworkData, isLoading } = useNetworkStore();
 
-  // Two main sections: 'sended' | 'incoming'
-  const [activeSection, setActiveSection] = useState<'sended' | 'incoming'>('incoming');
+  // Two main sections: 'incoming' (LEFT) | 'sent' (RIGHT)
+  const [activeSection, setActiveSection] = useState<'incoming' | 'sent'>('incoming');
 
   // Three status filters: 'pending' | 'accepted' | 'rejected'
   const [statusFilter, setStatusFilter] = useState<'pending' | 'accepted' | 'rejected'>('pending');
@@ -50,15 +51,7 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
 
   const currentHospital = (user?.facility || 'PGI').toUpperCase();
 
-  // Filter referrals by Section (Sended vs Incoming)
-  const sendedReferrals = useMemo(() => {
-    return referrals.filter(
-      (r) =>
-        r.referringCentreName?.toUpperCase() === currentHospital ||
-        (r as any).referringCentreId === user?.facilityId
-    );
-  }, [referrals, currentHospital, user?.facilityId]);
-
+  // Filter referrals by Section (Incoming vs Sent)
   const incomingReferrals = useMemo(() => {
     return referrals.filter(
       (r) =>
@@ -67,8 +60,16 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
     );
   }, [referrals, currentHospital, user?.facilityId]);
 
+  const sentReferrals = useMemo(() => {
+    return referrals.filter(
+      (r) =>
+        r.referringCentreName?.toUpperCase() === currentHospital ||
+        (r as any).referringCentreId === user?.facilityId
+    );
+  }, [referrals, currentHospital, user?.facilityId]);
+
   // Active section list
-  const activeList = activeSection === 'sended' ? sendedReferrals : incomingReferrals;
+  const activeList = activeSection === 'incoming' ? incomingReferrals : sentReferrals;
 
   // Filter by Status within active section
   const filteredList = useMemo(() => {
@@ -87,13 +88,13 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
     setIsActionProcessing(true);
     try {
       await acceptReferral(referral.referralId, user?.name || `${currentHospital} Attending`);
-      await loadNetworkData();
+      await Promise.all([loadNetworkData(), usePatientStore.getState().loadBabies()]);
       Alert.alert(
-        'Referal Accepted',
-        `Referal for ${referral.babyName} (${referral.babyUhid}) from ${referral.referringCentreName} has been accepted.`
+        'Referral Accepted',
+        `Referral for ${referral.babyName} (${referral.babyUhid}) from ${referral.referringCentreName} has been accepted.`
       );
     } catch {
-      Alert.alert('Error', 'Failed to accept referal. Please try again.');
+      Alert.alert('Error', 'Failed to accept referral. Please try again.');
     } finally {
       setIsActionProcessing(false);
     }
@@ -108,7 +109,7 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
   const handleConfirmReject = async () => {
     if (!selectedReferralForReject) return;
     if (!rejectionReason.trim()) {
-      Alert.alert('Reason Required', 'Please enter a clinical or operational reason for declining this referal.');
+      Alert.alert('Reason Required', 'Please enter a clinical or operational reason for declining this referral.');
       return;
     }
 
@@ -122,10 +123,10 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
       setRejectModalVisible(false);
       setSelectedReferralForReject(null);
       setRejectionReason('');
-      await loadNetworkData();
-      Alert.alert('Referal Declined', 'The referring centre has been notified with the recorded reason.');
+      await Promise.all([loadNetworkData(), usePatientStore.getState().loadBabies()]);
+      Alert.alert('Referral Declined', 'The referring centre has been notified with the recorded reason.');
     } catch {
-      Alert.alert('Error', 'Failed to decline referal. Please try again.');
+      Alert.alert('Error', 'Failed to decline referral. Please try again.');
     } finally {
       setIsActionProcessing(false);
     }
@@ -219,7 +220,7 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
 
         {/* Transfer Pathway */}
         <View style={styles.routeRow}>
-          {activeSection === 'sended' ? (
+          {activeSection === 'sent' ? (
             <View style={styles.routeItem}>
               <ArrowUpRight size={14} color="#7D3BFF" />
               <Text style={styles.routeText}>
@@ -247,19 +248,11 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
           </View>
         ) : null}
 
-        {/* Status Notes (Rejection or Accepted reviewer) */}
+        {/* Status Notes (Rejection reason) */}
         {item.status === 'rejected' && item.rejectionReason ? (
           <View style={styles.rejectionWrap}>
             <Text style={styles.rejectionLabel}>Rejection Reason:</Text>
             <Text style={styles.rejectionText}>{item.rejectionReason}</Text>
-          </View>
-        ) : null}
-
-        {item.status === 'accepted' && item.reviewedByDoctorName ? (
-          <View style={styles.acceptedWrap}>
-            <Text style={styles.acceptedText}>
-              Accepted by {item.reviewedByDoctorName}
-            </Text>
           </View>
         ) : null}
 
@@ -298,9 +291,10 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
             <Text style={styles.headerTitle}>Referal</Text>
-            <Text style={styles.headerSubtitle}>
-              {sendedReferrals.length} Send • {incomingReferrals.length} Incoming • {user?.facility || 'Hospital'}
-            </Text>
+            <View style={styles.hospitalPill}>
+              <View style={styles.hospitalDot} />
+              <Text style={styles.hospitalPillText}>{user?.facility || 'Hospital'}</Text>
+            </View>
           </View>
 
           <View style={styles.headerActions}>
@@ -309,9 +303,11 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
                 activeOpacity={0.8}
                 onPress={onOpenCreateReferral}
                 style={styles.newReferralBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Create New Referral"
               >
                 <Plus size={14} color="#FFFFFF" strokeWidth={2.5} />
-                <Text style={styles.newReferralText}>+ Refer</Text>
+                <Text style={styles.newReferralText}>Refer</Text>
               </TouchableOpacity>
             )}
 
@@ -331,68 +327,265 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
           </View>
         </View>
 
-        {/* Two Main Sections: Sended & Incoming */}
-        <View style={styles.sectionTabs}>
+        {/* ================= LEVEL 1: COMPACT PRIMARY WORKSPACE SECTION CONTROLS (INCOMING vs SENT) ================= */}
+        <View style={styles.workspaceCardsRow}>
+          {/* Card 1: Incoming Referrals (LEFT) */}
           <TouchableOpacity
-            style={[styles.sectionTab, activeSection === 'sended' && styles.sectionTabActive]}
-            onPress={() => setActiveSection('sended')}
-            activeOpacity={0.8}
-          >
-            <ArrowUpRight
-              size={16}
-              color={activeSection === 'sended' ? '#7D3BFF' : '#64748B'}
-            />
-            <Text style={[styles.sectionTabText, activeSection === 'sended' && styles.sectionTabTextActive]}>
-              Send ({sendedReferrals.length})
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.sectionTab, activeSection === 'incoming' && styles.sectionTabActive]}
+            style={[
+              styles.workspaceCard,
+              activeSection === 'incoming' ? styles.workspaceCardActive : styles.workspaceCardInactive,
+            ]}
             onPress={() => setActiveSection('incoming')}
             activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeSection === 'incoming' }}
+            accessibilityLabel={`Incoming Referrals, ${incomingReferrals.length} total`}
           >
-            <ArrowDownLeft
-              size={16}
-              color={activeSection === 'incoming' ? '#7D3BFF' : '#64748B'}
-            />
-            <Text style={[styles.sectionTabText, activeSection === 'incoming' && styles.sectionTabTextActive]}>
-              Incoming ({incomingReferrals.length})
-            </Text>
+            {activeSection === 'incoming' && <View style={styles.workspaceCardAccentBarIncoming} />}
+            <View style={styles.compactCardContent}>
+              <View
+                style={[
+                  styles.workspaceIconCircle,
+                  activeSection === 'incoming'
+                    ? styles.workspaceIconCircleActiveIncoming
+                    : styles.workspaceIconCircleInactive,
+                ]}
+              >
+                <ArrowDownLeft
+                  size={15}
+                  color={activeSection === 'incoming' ? '#059669' : '#64748B'}
+                  strokeWidth={2.4}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.workspaceTitle,
+                  activeSection === 'incoming' ? styles.workspaceTitleActive : styles.workspaceTitleInactive,
+                ]}
+                numberOfLines={1}
+              >
+                Incoming
+              </Text>
+              <View
+                style={[
+                  styles.workspaceCountBadge,
+                  activeSection === 'incoming'
+                    ? styles.workspaceCountBadgeActiveIncoming
+                    : styles.workspaceCountBadgeInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.workspaceCountText,
+                    activeSection === 'incoming'
+                      ? styles.workspaceCountTextActiveIncoming
+                      : styles.workspaceCountTextInactive,
+                  ]}
+                >
+                  {incomingReferrals.length}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+
+          {/* Card 2: Sent Referrals (RIGHT) */}
+          <TouchableOpacity
+            style={[
+              styles.workspaceCard,
+              activeSection === 'sent' ? styles.workspaceCardActive : styles.workspaceCardInactive,
+            ]}
+            onPress={() => setActiveSection('sent')}
+            activeOpacity={0.8}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: activeSection === 'sent' }}
+            accessibilityLabel={`Sent Referrals, ${sentReferrals.length} total`}
+          >
+            {activeSection === 'sent' && <View style={styles.workspaceCardAccentBarSent} />}
+            <View style={styles.compactCardContent}>
+              <View
+                style={[
+                  styles.workspaceIconCircle,
+                  activeSection === 'sent'
+                    ? styles.workspaceIconCircleActiveSent
+                    : styles.workspaceIconCircleInactive,
+                ]}
+              >
+                <ArrowUpRight
+                  size={15}
+                  color={activeSection === 'sent' ? '#7D3BFF' : '#64748B'}
+                  strokeWidth={2.4}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.workspaceTitle,
+                  activeSection === 'sent' ? styles.workspaceTitleActive : styles.workspaceTitleInactive,
+                ]}
+                numberOfLines={1}
+              >
+                Sent
+              </Text>
+              <View
+                style={[
+                  styles.workspaceCountBadge,
+                  activeSection === 'sent'
+                    ? styles.workspaceCountBadgeActiveSent
+                    : styles.workspaceCountBadgeInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.workspaceCountText,
+                    activeSection === 'sent'
+                      ? styles.workspaceCountTextActiveSent
+                      : styles.workspaceCountTextInactive,
+                  ]}
+                >
+                  {sentReferrals.length}
+                </Text>
+              </View>
+            </View>
           </TouchableOpacity>
         </View>
 
-        {/* Three Status Filter Chips: Pending, Accepted, Rejected */}
-        <View style={styles.filterPillsRow}>
-          <TouchableOpacity
-            style={[styles.filterPill, statusFilter === 'pending' && styles.filterPillActive]}
-            onPress={() => setStatusFilter('pending')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.filterPillText, statusFilter === 'pending' && styles.filterPillTextActive]}>
-              Pending ({pendingCount})
-            </Text>
-          </TouchableOpacity>
+        {/* ================= LEVEL 2: SECONDARY STATUS FILTERS (PENDING | ACCEPTED | REJECTED) ================= */}
+        <View style={styles.statusFilterContainer}>
+          <View style={styles.filterChipGroup}>
+            {/* Pending Filter Chip */}
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                statusFilter === 'pending' ? styles.filterChipPendingActive : styles.filterChipInactive,
+              ]}
+              onPress={() => setStatusFilter('pending')}
+              activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityLabel={`Filter Pending (${pendingCount})`}
+            >
+              <Clock
+                size={13}
+                color={statusFilter === 'pending' ? '#D97706' : '#94A3B8'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  statusFilter === 'pending' ? styles.filterChipTextPendingActive : styles.filterChipTextInactive,
+                ]}
+              >
+                Pending
+              </Text>
+              <View
+                style={[
+                  styles.filterChipCountPill,
+                  statusFilter === 'pending'
+                    ? styles.filterChipCountPillPendingActive
+                    : styles.filterChipCountPillInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipCountText,
+                    statusFilter === 'pending'
+                      ? styles.filterChipCountTextPendingActive
+                      : styles.filterChipCountTextInactive,
+                  ]}
+                >
+                  {pendingCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.filterPill, statusFilter === 'accepted' && styles.filterPillActive]}
-            onPress={() => setStatusFilter('accepted')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.filterPillText, statusFilter === 'accepted' && styles.filterPillTextActive]}>
-              Accepted ({acceptedCount})
-            </Text>
-          </TouchableOpacity>
+            {/* Accepted Filter Chip */}
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                statusFilter === 'accepted' ? styles.filterChipAcceptedActive : styles.filterChipInactive,
+              ]}
+              onPress={() => setStatusFilter('accepted')}
+              activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityLabel={`Filter Accepted (${acceptedCount})`}
+            >
+              <CheckCircle2
+                size={13}
+                color={statusFilter === 'accepted' ? '#059669' : '#94A3B8'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  statusFilter === 'accepted' ? styles.filterChipTextAcceptedActive : styles.filterChipTextInactive,
+                ]}
+              >
+                Accepted
+              </Text>
+              <View
+                style={[
+                  styles.filterChipCountPill,
+                  statusFilter === 'accepted'
+                    ? styles.filterChipCountPillAcceptedActive
+                    : styles.filterChipCountPillInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipCountText,
+                    statusFilter === 'accepted'
+                      ? styles.filterChipCountTextAcceptedActive
+                      : styles.filterChipCountTextInactive,
+                  ]}
+                >
+                  {acceptedCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.filterPill, statusFilter === 'rejected' && styles.filterPillActive]}
-            onPress={() => setStatusFilter('rejected')}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.filterPillText, statusFilter === 'rejected' && styles.filterPillTextActive]}>
-              Rejected ({rejectedCount})
-            </Text>
-          </TouchableOpacity>
+            {/* Rejected Filter Chip */}
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                statusFilter === 'rejected' ? styles.filterChipRejectedActive : styles.filterChipInactive,
+              ]}
+              onPress={() => setStatusFilter('rejected')}
+              activeOpacity={0.75}
+              accessibilityRole="tab"
+              accessibilityLabel={`Filter Rejected (${rejectedCount})`}
+            >
+              <XCircle
+                size={13}
+                color={statusFilter === 'rejected' ? '#DC2626' : '#94A3B8'}
+                strokeWidth={2.2}
+              />
+              <Text
+                style={[
+                  styles.filterChipText,
+                  statusFilter === 'rejected' ? styles.filterChipTextRejectedActive : styles.filterChipTextInactive,
+                ]}
+              >
+                Rejected
+              </Text>
+              <View
+                style={[
+                  styles.filterChipCountPill,
+                  statusFilter === 'rejected'
+                    ? styles.filterChipCountPillRejectedActive
+                    : styles.filterChipCountPillInactive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterChipCountText,
+                    statusFilter === 'rejected'
+                      ? styles.filterChipCountTextRejectedActive
+                      : styles.filterChipCountTextInactive,
+                  ]}
+                >
+                  {rejectedCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -408,12 +601,12 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
           <View style={styles.emptyContainer}>
             <Clock size={36} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>
-              No {statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Referals
+              No {statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)} Referrals
             </Text>
             <Text style={styles.emptySubtitle}>
-              {activeSection === 'sended'
-                ? `You have not sent any ${statusFilter} referals from ${user?.facility || 'this hospital'}.`
-                : `There are no incoming ${statusFilter} referals received at ${user?.facility || 'this hospital'}.`}
+              {activeSection === 'sent'
+                ? `You have not sent any ${statusFilter} referrals from ${user?.facility || 'this hospital'}.`
+                : `There are no incoming ${statusFilter} referrals received at ${user?.facility || 'this hospital'}.`}
             </Text>
           </View>
         }
@@ -428,9 +621,9 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalBox}>
-            <Text style={styles.modalTitle}>Decline Referal</Text>
+            <Text style={styles.modalTitle}>Decline Referral</Text>
             <Text style={styles.modalSubtitle}>
-              Provide a clinical or operational reason for declining referal of{' '}
+              Provide a clinical or operational reason for declining referral of{' '}
               {selectedReferralForReject?.babyName}.
             </Text>
 
@@ -494,14 +687,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: fontScale(20),
+    fontSize: fontScale(22),
     fontWeight: '800',
     color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  headerSubtitle: {
+  hospitalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  hospitalDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  hospitalPillText: {
     fontSize: fontScale(12),
     color: '#64748B',
-    marginTop: 2,
+    fontWeight: '600',
   },
   headerActions: {
     flexDirection: 'row',
@@ -515,10 +721,10 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     paddingHorizontal: 12,
     borderRadius: 8,
-    gap: 4,
+    gap: 5,
   },
   newReferralText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(12.5),
     fontWeight: '700',
     color: '#FFFFFF',
   },
@@ -546,64 +752,210 @@ const styles = StyleSheet.create({
     fontSize: fontScale(8),
     fontWeight: '700',
   },
-  sectionTabs: {
-    flexDirection: 'row',
-    backgroundColor: '#F1F5F9',
-    borderRadius: 10,
-    padding: 3,
-    marginBottom: 10,
-  },
-  sectionTab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  sectionTabActive: {
-    backgroundColor: '#FFFFFF',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-  },
-  sectionTabText: {
-    fontSize: fontScale(13),
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  sectionTabTextActive: {
-    color: '#7D3BFF',
-    fontWeight: '700',
-  },
-  filterPillsRow: {
+
+  /* Level 1: Compact Primary Workspace Section Controls (Incoming vs Sent) */
+  workspaceCardsRow: {
     flexDirection: 'row',
     gap: 8,
+    marginTop: 4,
+    marginBottom: 8,
   },
-  filterPill: {
+  workspaceCard: {
     flex: 1,
-    paddingVertical: 6,
-    borderRadius: 8,
+    height: 44,
+    borderRadius: 11,
+    paddingHorizontal: 10,
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  workspaceCardActive: {
     backgroundColor: '#FFFFFF',
-    borderWidth: 1,
+    borderColor: '#7D3BFF',
+    shadowColor: '#7D3BFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  workspaceCardInactive: {
+    backgroundColor: '#F8FAFC',
     borderColor: '#E2E8F0',
+  },
+  workspaceCardAccentBarIncoming: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2.5,
+    backgroundColor: '#059669',
+  },
+  workspaceCardAccentBarSent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 2.5,
+    backgroundColor: '#7D3BFF',
+  },
+  compactCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  workspaceIconCircle: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterPillActive: {
-    backgroundColor: '#EDE9FE',
-    borderColor: '#7D3BFF',
+  workspaceIconCircleActiveIncoming: {
+    backgroundColor: '#ECFDF5',
   },
-  filterPillText: {
-    fontSize: fontScale(11),
-    fontWeight: '600',
+  workspaceIconCircleActiveSent: {
+    backgroundColor: '#F3E8FF',
+  },
+  workspaceIconCircleInactive: {
+    backgroundColor: '#E2E8F0',
+  },
+  workspaceTitle: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    flex: 1,
+    marginLeft: 8,
+  },
+  workspaceTitleActive: {
+    color: '#0F172A',
+    fontWeight: '800',
+  },
+  workspaceTitleInactive: {
     color: '#64748B',
   },
-  filterPillTextActive: {
-    color: '#7D3BFF',
+  workspaceCountBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1.5,
+    borderRadius: 10,
+  },
+  workspaceCountBadgeActiveIncoming: {
+    backgroundColor: '#D1FAE5',
+  },
+  workspaceCountBadgeActiveSent: {
+    backgroundColor: '#EDE9FE',
+  },
+  workspaceCountBadgeInactive: {
+    backgroundColor: '#E2E8F0',
+  },
+  workspaceCountText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '800',
+  },
+  workspaceCountTextActiveIncoming: {
+    color: '#065F46',
+  },
+  workspaceCountTextActiveSent: {
+    color: '#6D28D9',
+  },
+  workspaceCountTextInactive: {
+    color: '#64748B',
+  },
+
+  /* Level 2: Secondary Status Filter Bar */
+  statusFilterContainer: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 11,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  filterChipGroup: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  filterChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: 9,
+    borderWidth: 1,
+    gap: 4,
+  },
+  filterChipInactive: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
+  filterChipPendingActive: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#F59E0B',
+  },
+  filterChipAcceptedActive: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#10B981',
+  },
+  filterChipRejectedActive: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#EF4444',
+  },
+  filterChipText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '600',
+  },
+  filterChipTextInactive: {
+    color: '#64748B',
+  },
+  filterChipTextPendingActive: {
+    color: '#B45309',
+    fontWeight: '800',
+  },
+  filterChipTextAcceptedActive: {
+    color: '#065F46',
+    fontWeight: '800',
+  },
+  filterChipTextRejectedActive: {
+    color: '#B91C1C',
+    fontWeight: '800',
+  },
+  filterChipCountPill: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+  },
+  filterChipCountPillInactive: {
+    backgroundColor: '#E2E8F0',
+  },
+  filterChipCountPillPendingActive: {
+    backgroundColor: '#FDE68A',
+  },
+  filterChipCountPillAcceptedActive: {
+    backgroundColor: '#A7F3D0',
+  },
+  filterChipCountPillRejectedActive: {
+    backgroundColor: '#FECACA',
+  },
+  filterChipCountText: {
+    fontSize: fontScale(10),
     fontWeight: '700',
+  },
+  filterChipCountTextInactive: {
+    color: '#64748B',
+  },
+  filterChipCountTextPendingActive: {
+    color: '#78350F',
+  },
+  filterChipCountTextAcceptedActive: {
+    color: '#064E3B',
+  },
+  filterChipCountTextRejectedActive: {
+    color: '#7F1D1D',
   },
   listContent: {
     padding: 16,
@@ -788,19 +1140,6 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     color: '#7F1D1D',
     marginTop: 2,
-  },
-  acceptedWrap: {
-    backgroundColor: '#ECFDF5',
-    borderLeftWidth: 3,
-    borderLeftColor: '#059669',
-    padding: 8,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  acceptedText: {
-    fontSize: fontScale(11),
-    fontWeight: '600',
-    color: '#065F46',
   },
   actionButtonsRow: {
     flexDirection: 'row',

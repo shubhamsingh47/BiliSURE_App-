@@ -4,6 +4,7 @@ import { Edit3, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { Baby, BilirubinReading } from '../types';
 import { moderateScale, fontScale, SPACING } from '../theme/responsive';
+import { formatCardDateTime } from '../services/dateTime.service';
 
 export interface PhototherapyInfo {
   status: 'in_treatment' | 'concluded';
@@ -23,20 +24,8 @@ interface BabyCardProps {
   onEditPress?: () => void;
   pillColor?: string;
   referredToHospital?: string | null;
+  referralSentAt?: string | null;
 }
-
-// Shows the baby's persisted registration timestamp (MongoDB `createdAt`)
-// or the referral acceptance timestamp if received via accepted referral.
-const formatRegistrationDateTime = (baby: Baby): string => {
-  const ts = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt;
-  if (!ts) return '';
-  const d = new Date(ts);
-  if (isNaN(d.getTime())) return '';
-
-  const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-  const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-  return `${dateStr}, ${timeStr}`;
-};
 
 const formatDischargeDateTime = (baby: Baby): string => {
   const ts = baby.dischargedAt || baby.updatedAt;
@@ -47,7 +36,6 @@ const formatDischargeDateTime = (baby: Baby): string => {
   const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${dateStr}, ${timeStr}`;
 };
-
 const getSeverityInfo = (state?: string) => {
   switch (state) {
     case 'critical':
@@ -78,6 +66,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   onEditPress,
   pillColor = COLORS.pillBeige,
   referredToHospital,
+  referralSentAt,
 }) => {
   const severity = getSeverityInfo(baby.severityState);
   const sample = latestSample !== undefined
@@ -85,10 +74,26 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     : latestReading
     ? { value: latestReading.value, timestamp: latestReading.timestamp }
     : null;
-  const registrationDateTime = formatRegistrationDateTime(baby);
+
   const displayName = getDisplayName(baby);
-  const referredHospital = referredToHospital || baby.referredToHospitalName || null;
-  const isReferred = !!referredHospital;
+  // A baby card is greyed out and marked non-clickable if it is pending referral OR was referred/transferred to another hospital
+  const targetHospital = referredToHospital || baby.referredToHospitalName || null;
+  const isTransferred = baby.isTransferredOut || baby.isHistoricalOnly || false;
+  const isPendingReferral = baby.referralStatus === 'pending' && !!targetHospital;
+  const isReferred = isPendingReferral || isTransferred || !!referredToHospital;
+
+  // Always display "Referred to [Hospital Name]" dynamically
+  const badgeLabel = targetHospital ? `Referred to ${targetHospital}` : 'Referred';
+
+  // Sent timestamp for the referred baby
+  const sentTimestamp = referralSentAt || baby.referralSentAt || null;
+  const referralSentFormatted = formatCardDateTime(sentTimestamp);
+
+  // For active non-referred babies: show actual acceptance timestamp (if accepted) or registration timestamp
+  const activeBabyTimestamp = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt;
+  const activeBabyDateTime = formatCardDateTime(activeBabyTimestamp);
+
+  // Phototherapy & Discharge status
   const isBabyInPt = phototherapyInfo?.status === 'in_treatment' || baby.status === 'under_treatment';
   const isBabyPtConcluded = phototherapyInfo?.status === 'concluded' || (!isBabyInPt && !!baby.dischargeValue);
   const isBabyDischarged = baby.status === 'discharged';
@@ -98,7 +103,14 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
+      disabled={isReferred}
       style={[styles.card, isReferred && styles.cardReferred]}
+      accessibilityRole="button"
+      accessibilityLabel={
+        isReferred
+          ? `${displayName}, ${badgeLabel}`
+          : `${displayName}, ${severity.label}`
+      }
     >
       <View style={[styles.uhidPill, isReferred ? styles.uhidPillReferred : { backgroundColor: pillColor }]}>
         <Text style={[styles.uhidText, isReferred && styles.uhidTextReferred]}>UHID</Text>
@@ -109,7 +121,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
           <Text style={[styles.babyName, isReferred && styles.babyNameReferred]} numberOfLines={1}>
             {displayName}
           </Text>
-          {!isBabyDischarged && onEditPress && (
+          {!isReferred && !isBabyDischarged && onEditPress && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onEditPress}
@@ -117,7 +129,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
               style={styles.editIconBtn}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Edit3 size={13} color={isReferred ? '#94A3B8' : '#7D3BFF'} />
+              <Edit3 size={13} color="#7D3BFF" />
             </TouchableOpacity>
           )}
         </View>
@@ -147,34 +159,40 @@ export const BabyCard: React.FC<BabyCardProps> = ({
                   </Text>
                 </View>
               )}
-              {isReferred && (
-                <View style={styles.referredBadge}>
-                  <Text style={styles.referredBadgeText}>
-                    Referred to {referredHospital}
-                  </Text>
-                </View>
-              )}
             </>
           )}
         </View>
       </View>
 
-      <View style={styles.rightSection}>
-        {isBabyDischarged ? (
+      <View style={[styles.rightSection, isReferred && styles.rightSectionReferred]}>
+        {isReferred ? (
+          /* Referred / Transferred State: Replace bilirubin reading with badge and sent timestamp */
+          <View style={styles.referredRightCol}>
+            <View style={[styles.referredTagBadge, isTransferred && styles.transferredTagBadge]}>
+              <Text style={[styles.referredTagText, isTransferred && styles.transferredTagText]} numberOfLines={1}>
+                {badgeLabel}
+              </Text>
+            </View>
+            {!!referralSentFormatted && (
+              <Text style={styles.referralSentDateText}>{referralSentFormatted}</Text>
+            )}
+          </View>
+        ) : isBabyDischarged ? (
           <View style={styles.dischargedChevronCircle}>
             <ChevronRight size={16} color="#94A3B8" />
           </View>
         ) : (
-          <>
+          /* Normal Active State: Bilirubin reading with acceptance/registration timestamp below */
+          <View style={styles.normalRightCol}>
             {sample?.value != null && (
-              <Text style={[styles.sampleValueText, { color: isReferred ? '#64748B' : severity.color }]}>
+              <Text style={[styles.sampleValueText, { color: severity.color }]}>
                 {sample.value.toFixed(1)} mg/dL
               </Text>
             )}
-            {!!registrationDateTime && (
-              <Text style={styles.readingTime}>{registrationDateTime}</Text>
+            {!!activeBabyDateTime && (
+              <Text style={styles.readingTime}>{activeBabyDateTime}</Text>
             )}
-          </>
+          </View>
         )}
       </View>
     </TouchableOpacity>
@@ -301,7 +319,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   cardReferred: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#F8FAFC',
     borderColor: '#CBD5E1',
     opacity: 0.88,
   },
@@ -312,15 +330,24 @@ const styles = StyleSheet.create({
     color: '#64748B',
   },
   babyNameReferred: {
-    color: '#334155',
+    color: '#475569',
   },
-  referredBadge: {
+  rightSectionReferred: {
+    minWidth: moderateScale(130),
+    alignItems: 'flex-end',
+  },
+  referredRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  referredTagBadge: {
     backgroundColor: '#E2E8F0',
-    paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
-    borderRadius: moderateScale(6),
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(4),
+    borderRadius: moderateScale(8),
     borderWidth: 1,
     borderColor: '#CBD5E1',
+    marginBottom: moderateScale(3),
   },
   inPtBadge: {
     backgroundColor: '#DCFCE7',
@@ -350,10 +377,27 @@ const styles = StyleSheet.create({
     color: '#16A34A',
     letterSpacing: 0.3,
   },
-  referredBadgeText: {
-    fontSize: fontScale(9.5),
+  referredTagText: {
+    fontSize: fontScale(10.5),
     fontWeight: '700',
-    color: '#1E293B',
+    color: '#0F172A',
     letterSpacing: 0.2,
+  },
+  transferredTagBadge: {
+    backgroundColor: '#E2E8F0',
+    borderColor: '#94A3B8',
+  },
+  transferredTagText: {
+    color: '#1E293B',
+  },
+  referralSentDateText: {
+    fontSize: fontScale(10),
+    fontWeight: '600',
+    color: '#64748B',
+    marginTop: 1,
+  },
+  normalRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
 });

@@ -37,17 +37,30 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const currentHospital = (user?.facility || 'PGI').toUpperCase();
 
   const getReferredHospital = (baby: Baby): string | null => {
-    if (baby.referredToHospitalName) {
+    // A baby is in the referred state on the sender's dashboard only while its outgoing referral is pending
+    if (baby.referralStatus === 'pending' && baby.referredToHospitalName) {
       return baby.referredToHospitalName;
     }
-    // Also cross-reference active outgoing referrals from currentHospital
     const outgoingRef = referrals.find(
       (r) =>
         (r.babyUhid === baby.uhid || r.babyId === baby.id) &&
-        (r.referringCentreName?.toUpperCase() === currentHospital) &&
-        (r.status === 'pending' || r.status === 'accepted')
+        r.referringCentreName?.toUpperCase() === currentHospital &&
+        r.status === 'pending'
     );
     return outgoingRef?.receivingHospitalName || null;
+  };
+
+  const getReferralSentAt = (baby: Baby): string | null => {
+    if (baby.referralStatus === 'pending' && baby.referralSentAt) {
+      return baby.referralSentAt;
+    }
+    const outgoingRef = referrals.find(
+      (r) =>
+        (r.babyUhid === baby.uhid || r.babyId === baby.id) &&
+        r.referringCentreName?.toUpperCase() === currentHospital &&
+        r.status === 'pending'
+    );
+    return outgoingRef?.createdAt || null;
   };
   const [activeDept, setActiveDept] = useState(selectedDepartment || 'Deppt');
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
@@ -415,6 +428,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   phototherapyInfo={getPhototherapyInfo(baby)}
                   pillColor={getPillColor(idx)}
                   referredToHospital={getReferredHospital(baby)}
+                  referralSentAt={getReferralSentAt(baby)}
                   onPress={() => onSelectBaby(baby)}
                   onEditPress={() => handleOpenEdit(baby)}
                 />
@@ -439,6 +453,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                   phototherapyInfo={getPhototherapyInfo(baby)}
                   pillColor={getPillColor(idx + 3)}
                   referredToHospital={getReferredHospital(baby)}
+                  referralSentAt={getReferralSentAt(baby)}
                   onPress={() => onSelectBaby(baby)}
                   onEditPress={() => handleOpenEdit(baby)}
                 />

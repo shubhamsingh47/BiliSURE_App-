@@ -93,8 +93,12 @@ export interface Baby {
   referralStatus?: 'none' | 'pending' | 'accepted' | 'rejected' | 'admitted';
   referredToHospitalName?: string;
   referredToHospitalId?: string;
+  referralSentAt?: string;
   referralAcceptedAt?: string;
   acceptedAt?: string;
+  activeReferralId?: string;
+  isTransferredOut?: boolean;
+  isHistoricalOnly?: boolean;
   initialValue?: number;
   dischargeValue?: number;
   dischargedAt?: string;

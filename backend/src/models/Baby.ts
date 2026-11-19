@@ -30,8 +30,12 @@ export interface IBaby extends Document {
   referralStatus?: 'none' | 'pending' | 'accepted' | 'rejected' | 'admitted';
   referredToHospitalName?: string;
   referredToHospitalId?: string;
+  referralSentAt?: Date;
   referralAcceptedAt?: Date;
   acceptedAt?: Date;
+  activeReferralId?: string;
+  isTransferredOut?: boolean;
+  isHistoricalOnly?: boolean;
   initialValue?: number;
   dischargeValue?: number;
   riskFactors?: string[];
@@ -86,8 +90,10 @@ const BabySchema = new Schema<IBaby>(
     },
     referredToHospitalName: { type: String, trim: true },
     referredToHospitalId: { type: String, trim: true },
+    referralSentAt: { type: Date },
     referralAcceptedAt: { type: Date },
     acceptedAt: { type: Date },
+    activeReferralId: { type: String, trim: true },
     initialValue: { type: Number, default: 0 },
     dischargeValue: { type: Number, default: 0 },
     riskFactors: [{ type: String }],
@@ -98,6 +104,7 @@ const BabySchema = new Schema<IBaby>(
 );
 
 BabySchema.index({ department: 1, severityState: 1 });
+BabySchema.index({ currentHospital: 1, referralStatus: 1 });
 BabySchema.index({ createdAt: -1 });
 
 export const BabyModel = mongoose.model<IBaby>('Baby', BabySchema);

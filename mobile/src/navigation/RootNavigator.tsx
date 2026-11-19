@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet } from 'react-native';
+import { moderateScale, fontScale } from '../theme/responsive';
 import { SplashScreen } from '../features/authentication/screens/SplashScreen';
 import { OnboardingScreen } from '../features/authentication/screens/OnboardingScreen';
 import { LoginScreen } from '../features/authentication/screens/LoginScreen';
@@ -61,6 +62,7 @@ export const RootNavigator: React.FC = () => {
   const [referralContextPatient, setReferralContextPatient] = useState<Baby | null>(null);
   const [ptTargetBaby, setPtTargetBaby] = useState<Baby | null>(null);
   const [ptTargetFilter, setPtTargetFilter] = useState<'active' | 'concluded'>('active');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const { selectBaby, selectedBaby } = usePatientStore();
   const { hospitals } = useNetworkStore();
@@ -323,9 +325,51 @@ export const RootNavigator: React.FC = () => {
             setActiveTab(tab);
             if (currentRoute !== 'main') setCurrentRoute('main');
           }}
-          onLogoutPress={handleLogout}
+          onLogoutPress={() => setShowLogoutModal(true)}
         />
       )}
+
+      {/* Custom Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.logoutModalCard}>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalMessage}>
+              Are you sure you want to log out of your account?
+            </Text>
+
+            <View style={styles.logoutActionsRow}>
+              <TouchableOpacity
+                style={styles.logoutCancelBtn}
+                onPress={() => setShowLogoutModal(false)}
+                activeOpacity={0.7}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel logout"
+              >
+                <Text style={styles.logoutCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.logoutConfirmBtn}
+                onPress={async () => {
+                  setShowLogoutModal(false);
+                  await handleLogout();
+                }}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel="Yes, Logout"
+              >
+                <Text style={styles.logoutConfirmText}>Yes, Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -337,5 +381,72 @@ const styles = StyleSheet.create({
   },
   screenContainer: {
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  logoutModalCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(22),
+    paddingVertical: moderateScale(26),
+    paddingHorizontal: moderateScale(22),
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  logoutModalTitle: {
+    fontSize: fontScale(18),
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: moderateScale(8),
+    textAlign: 'center',
+  },
+  logoutModalMessage: {
+    fontSize: fontScale(13),
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: moderateScale(22),
+    paddingHorizontal: moderateScale(6),
+  },
+  logoutActionsRow: {
+    flexDirection: 'row',
+    gap: moderateScale(10),
+    width: '100%',
+  },
+  logoutCancelBtn: {
+    flex: 1,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutCancelText: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#475569',
+  },
+  logoutConfirmBtn: {
+    flex: 1.15,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#DC2626',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  logoutConfirmText: {
+    fontSize: fontScale(13),
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

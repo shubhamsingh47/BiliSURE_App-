@@ -16,7 +16,7 @@ interface PatientState {
   setSelectedDepartment: (dept: string) => void;
   registerBaby: (babyData: Partial<Baby>) => Promise<Baby>;
   updateBaby: (babyId: string, updates: Partial<Baby>) => Promise<Baby>;
-  markBabyAsReferred: (uhid: string, receivingHospitalName: string) => void;
+  markBabyAsReferred: (uhid: string, receivingHospitalName: string, referralSentAt?: string) => void;
   addReading: (readingData: Partial<BilirubinReading>) => Promise<BilirubinReading>;
   addObservation: (
     babyId: string,
@@ -189,7 +189,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     return fallbackUpdated || (get().babies.find((b) => b.id === babyId || b.uhid === babyId) as Baby);
   },
 
-  markBabyAsReferred: (uhid: string, receivingHospitalName: string) => {
+  markBabyAsReferred: (uhid: string, receivingHospitalName: string, referralSentAt?: string) => {
     set((state) => ({
       babies: state.babies.map((b) =>
         b.uhid === uhid || b.id === uhid
@@ -197,6 +197,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
               ...b,
               referralStatus: 'pending',
               referredToHospitalName: receivingHospitalName,
+              referralSentAt: referralSentAt || new Date().toISOString(),
             }
           : b
       ),

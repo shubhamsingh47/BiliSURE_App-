@@ -374,37 +374,53 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
     // Update baby in patient store so Babies page card immediately greys out and shows "Referred to [Hospital]"
     if (newRef.babyUhid && newRef.receivingHospitalName) {
-      usePatientStore.getState().markBabyAsReferred(newRef.babyUhid, newRef.receivingHospitalName);
+      usePatientStore.getState().markBabyAsReferred(newRef.babyUhid, newRef.receivingHospitalName, newRef.createdAt);
     }
 
-    apiClient.post('/referrals', newRef).catch(() => {});
+    try {
+      await apiClient.post('/referrals', newRef);
+    } catch (err) {
+      console.warn('[useNetworkStore] createReferral API failed:', err);
+    }
     return newRef;
   },
 
   acceptReferral: async (referralId, doctorName) => {
+    const acceptanceTime = new Date().toISOString();
     set((state) => ({
       referrals: state.referrals.map((r) =>
         r.referralId === referralId || r.id === referralId
-          ? { ...r, status: 'accepted', reviewedByDoctorName: doctorName, reviewedAt: new Date().toISOString() }
+          ? { ...r, status: 'accepted', reviewedByDoctorName: doctorName, reviewedAt: acceptanceTime }
           : r
       ),
     }));
 
-    apiClient.patch(`/referrals/${referralId}/accept`, { doctorName }).catch(() => {});
+    try {
+      await apiClient.patch(`/referrals/${referralId}/accept`, { doctorName });
+      await usePatientStore.getState().loadBabies();
+    } catch (err) {
+      console.warn('[useNetworkStore] acceptReferral API failed:', err);
+    }
     const updated = get().referrals.find((r) => r.referralId === referralId || r.id === referralId)!;
     return updated;
   },
 
   rejectReferral: async (referralId, reason, doctorName) => {
+    const rejectionTime = new Date().toISOString();
     set((state) => ({
       referrals: state.referrals.map((r) =>
         r.referralId === referralId || r.id === referralId
-          ? { ...r, status: 'rejected', rejectionReason: reason, reviewedByDoctorName: doctorName, reviewedAt: new Date().toISOString() }
+          ? { ...r, status: 'rejected', rejectionReason: reason, reviewedByDoctorName: doctorName, reviewedAt: rejectionTime }
           : r
       ),
     }));
 
-    apiClient.patch(`/referrals/${referralId}/reject`, { reason, doctorName }).catch(() => {});
+    try {
+      await apiClient.patch(`/referrals/${referralId}/reject`, { reason, doctorName });
+      await usePatientStore.getState().loadBabies();
+    } catch (err) {
+      console.warn('[useNetworkStore] rejectReferral API failed:', err);
+    }
     const updated = get().referrals.find((r) => r.referralId === referralId || r.id === referralId)!;
     return updated;
   },

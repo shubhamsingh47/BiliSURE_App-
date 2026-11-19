@@ -144,9 +144,10 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
         <View style={styles.headerRow}>
           <View style={styles.titleContainer}>
             <Text style={styles.headerTitle} numberOfLines={1}>Phototherapy</Text>
-            <Text style={styles.headerSubtitle} numberOfLines={1}>
-              {availableCount} Available • {occupiedCount} Occupied • {hospitalStations.length} Total
-            </Text>
+            <View style={styles.hospitalPill}>
+              <View style={styles.hospitalDot} />
+              <Text style={styles.hospitalPillText}>{user?.facility || 'Hospital'}</Text>
+            </View>
           </View>
 
           <View style={styles.headerActions}>
@@ -558,14 +559,27 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   headerTitle: {
-    fontSize: fontScale(20),
+    fontSize: fontScale(22),
     fontWeight: '800',
-    color: '#181829',
+    color: '#0F172A',
+    letterSpacing: -0.3,
   },
-  headerSubtitle: {
+  hospitalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  hospitalDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: '#10B981',
+  },
+  hospitalPillText: {
     fontSize: fontScale(12),
     color: '#64748B',
-    marginTop: 2,
+    fontWeight: '600',
   },
   headerActions: {
     flexDirection: 'row',

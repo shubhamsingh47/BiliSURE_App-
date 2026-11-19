@@ -43,7 +43,7 @@ export class ReferralsController {
   static async accept(req: Request, res: Response, next: NextFunction) {
     try {
       const doctorName = (req as any).user?.name || req.body.doctorName || 'Dr. Hospital Paediatrician';
-      const referral = await ReferralsService.acceptReferral(String(req.params.id), doctorName);
+      const referral = await ReferralsService.acceptReferral(String(req.params.id), doctorName, req.user);
       return sendSuccess(res, referral, 200, 'Referral accepted successfully');
     } catch (err) {
       next(err);
@@ -56,7 +56,8 @@ export class ReferralsController {
       const referral = await ReferralsService.rejectReferral(
         String(req.params.id),
         String(reason),
-        doctorName || (req as any).user?.name || 'Dr. Hospital Paediatrician'
+        doctorName || (req as any).user?.name || 'Dr. Hospital Paediatrician',
+        req.user
       );
       return sendSuccess(res, referral, 200, 'Referral declined with reason recorded');
     } catch (err) {

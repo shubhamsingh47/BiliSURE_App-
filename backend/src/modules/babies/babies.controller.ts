@@ -25,7 +25,7 @@ export class BabiesController {
   static async getById(req: Request, res: Response, next: NextFunction) {
     try {
       const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
-      const baby = await BabiesService.getBabyById(id);
+      const baby = await BabiesService.getBabyById(id, req.user?.facility);
       sendSuccess(res, baby, 200, 'Baby profile retrieved successfully');
     } catch (err) {
       next(err);
