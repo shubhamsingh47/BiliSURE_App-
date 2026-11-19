@@ -97,6 +97,7 @@ export interface Baby {
   acceptedAt?: string;
   initialValue?: number;
   dischargeValue?: number;
+  dischargedAt?: string;
   riskFactors?: string[];
   syncStatus?: SyncStatus;
   registeredAt?: string;

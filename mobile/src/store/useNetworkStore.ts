@@ -472,7 +472,19 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       throw new Error(`Patient ${admission.babyName} (${admission.babyUhid}) is already allocated to station ${alreadyAllocated.stationId}`);
     }
 
-    if (admission.ptStationId) {
+    const hasActiveOccupiedStation =
+      !admission.stationReleased &&
+      admission.admissionStatus === 'under_treatment' &&
+      admission.ptStationId &&
+      state.stations.some(
+        (s) =>
+          (s.id === admission.ptStationId || s.stationId === admission.ptStationId) &&
+          s.operationalStatus === 'occupied' &&
+          ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
+           (admission.babyId && s.currentBabyId === admission.babyId))
+      );
+
+    if (hasActiveOccupiedStation) {
       throw new Error(`Admission ${admission.admissionId} already has an active PT station assigned.`);
     }
 
@@ -498,6 +510,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             ptStationId: stationId,
             ptStationName: `${targetStation.name} (${targetStation.stationId})`,
             admissionStatus: 'under_treatment' as const,
+            stationReleased: false,
           }
         : a
     );
@@ -720,6 +733,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
               followUpPlan: data.followUpPlan,
               dischargedAt: new Date().toISOString(),
               stationReleased: true,
+              ptStationId: undefined,
+              ptStationName: undefined,
             }
           : a
       );

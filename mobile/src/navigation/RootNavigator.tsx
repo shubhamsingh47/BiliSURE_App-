@@ -59,6 +59,8 @@ export const RootNavigator: React.FC = () => {
   const [registeredUhid, setRegisteredUhid] = useState<string>('BS-IN-100001');
   const [selectedHospitalForReferral, setSelectedHospitalForReferral] = useState<Hospital | null>(null);
   const [referralContextPatient, setReferralContextPatient] = useState<Baby | null>(null);
+  const [ptTargetBaby, setPtTargetBaby] = useState<Baby | null>(null);
+  const [ptTargetFilter, setPtTargetFilter] = useState<'active' | 'concluded'>('active');
 
   const { selectBaby, selectedBaby } = usePatientStore();
   const { hospitals } = useNetworkStore();
@@ -196,23 +198,31 @@ export const RootNavigator: React.FC = () => {
       case 'trends':
         return (
           <PatientTrendsScreen
-            onBackToDashboard={() => setCurrentRoute('main')}
+            onBackToDashboard={() => {
+              setPtTargetBaby(null);
+              setCurrentRoute('main');
+            }}
             onOpenReadingDetail={handleOpenReadingDetail}
             onSeeAllObservations={() => setCurrentRoute('observations_list')}
+            onViewPhototherapyTracker={(targetBaby, filter = 'active') => {
+              const babyToView = targetBaby || selectedBaby;
+              setPtTargetBaby(babyToView || null);
+              setPtTargetFilter(filter);
+              setWardSegment('treatment');
+              setWardNavTimestamp(Date.now());
+              setActiveTab('ward_stations');
+              setCurrentRoute('main');
+            }}
             onSendToPhototherapy={(targetBaby) => {
               const babyToAllocate = targetBaby || selectedBaby;
-              if (babyToAllocate) {
-                selectBaby(babyToAllocate);
-              }
+              setPtTargetBaby(babyToAllocate || null);
               setWardSegment('allocation');
               setWardNavTimestamp(Date.now());
               setActiveTab('ward_stations');
               setCurrentRoute('main');
             }}
             onOpenReferral={() => {
-              if (selectedBaby) {
-                selectBaby(selectedBaby);
-              }
+              setPtTargetBaby(selectedBaby || null);
               setWardSegment('allocation');
               setWardNavTimestamp(Date.now());
               setActiveTab('ward_stations');
@@ -253,6 +263,11 @@ export const RootNavigator: React.FC = () => {
               <WardStationsScreen
                 initialSegment={wardSegment}
                 segmentTrigger={wardNavTimestamp}
+                initialPatientToSend={ptTargetBaby}
+                initialPtFilter={ptTargetFilter}
+                onPatientAllocated={() => {
+                  setPtTargetBaby(null);
+                }}
                 onOpenNotifications={() => setCurrentRoute('notifications')}
                 onRecordBilirubin={(uhid) => {
                   setReadingVal(12.4);
@@ -302,6 +317,9 @@ export const RootNavigator: React.FC = () => {
         <BottomTabBar
           activeTab={activeTab}
           onTabPress={(tab) => {
+            if (tab !== 'ward_stations') {
+              setPtTargetBaby(null);
+            }
             setActiveTab(tab);
             if (currentRoute !== 'main') setCurrentRoute('main');
           }}

@@ -131,6 +131,14 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
         }
       />
 
+      {isDischarged && (
+        <View style={styles.dischargedReadOnlyBanner}>
+          <Text style={styles.dischargedReadOnlyText}>
+            Patient is discharged. Observation records are read-only and locked.
+          </Text>
+        </View>
+      )}
+
       <FlatList
         data={sortedObservations}
         keyExtractor={(item) => item.id}
@@ -155,16 +163,18 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
                 <Text style={styles.valueUnit}>mg/dL</Text>
               </View>
 
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() => handleOpenEdit(item)}
-                style={styles.editBtn}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                accessibilityLabel="Edit Observation"
-              >
-                <Edit3 size={moderateScale(13)} color="#7D3BFF" />
-                <Text style={styles.editBtnText}>Edit</Text>
-              </TouchableOpacity>
+              {!isDischarged && (
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  onPress={() => handleOpenEdit(item)}
+                  style={styles.editBtn}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Edit Observation"
+                >
+                  <Edit3 size={moderateScale(13)} color="#7D3BFF" />
+                  <Text style={styles.editBtnText}>Edit</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             <View style={styles.divider} />
@@ -526,5 +536,18 @@ const styles = StyleSheet.create({
     fontSize: fontScale(14),
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  dischargedReadOnlyBanner: {
+    backgroundColor: '#F8FAFC',
+    paddingVertical: moderateScale(8),
+    paddingHorizontal: moderateScale(16),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E2E8F0',
+  },
+  dischargedReadOnlyText: {
+    fontSize: fontScale(11),
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
   },
 });

@@ -1,9 +1,15 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { Edit3 } from 'lucide-react-native';
+import { Edit3, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { Baby, BilirubinReading } from '../types';
 import { moderateScale, fontScale, SPACING } from '../theme/responsive';
+
+export interface PhototherapyInfo {
+  status: 'in_treatment' | 'concluded';
+  hours?: number | string;
+  stationName?: string;
+}
 
 interface BabyCardProps {
   baby: Baby;
@@ -12,6 +18,7 @@ interface BabyCardProps {
     value?: number;
     timestamp?: string;
   } | null;
+  phototherapyInfo?: PhototherapyInfo | null;
   onPress: () => void;
   onEditPress?: () => void;
   pillColor?: string;
@@ -28,6 +35,16 @@ const formatRegistrationDateTime = (baby: Baby): string => {
 
   const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
   const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  return `${dateStr}, ${timeStr}`;
+};
+
+const formatDischargeDateTime = (baby: Baby): string => {
+  const ts = baby.dischargedAt || baby.updatedAt;
+  if (!ts) return '';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '';
+  const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+  const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${dateStr}, ${timeStr}`;
 };
 
@@ -56,6 +73,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   baby,
   latestReading,
   latestSample,
+  phototherapyInfo,
   onPress,
   onEditPress,
   pillColor = COLORS.pillBeige,
@@ -71,6 +89,10 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   const displayName = getDisplayName(baby);
   const referredHospital = referredToHospital || baby.referredToHospitalName || null;
   const isReferred = !!referredHospital;
+  const isBabyInPt = phototherapyInfo?.status === 'in_treatment' || baby.status === 'under_treatment';
+  const isBabyPtConcluded = phototherapyInfo?.status === 'concluded' || (!isBabyInPt && !!baby.dischargeValue);
+  const isBabyDischarged = baby.status === 'discharged';
+  const dischargeTimeStr = isBabyDischarged ? formatDischargeDateTime(baby) : '';
 
   return (
     <TouchableOpacity
@@ -87,7 +109,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
           <Text style={[styles.babyName, isReferred && styles.babyNameReferred]} numberOfLines={1}>
             {displayName}
           </Text>
-          {onEditPress && (
+          {!isBabyDischarged && onEditPress && (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={onEditPress}
@@ -100,32 +122,59 @@ export const BabyCard: React.FC<BabyCardProps> = ({
           )}
         </View>
         <View style={styles.statusRow}>
-          <Text style={[styles.statusText, { color: isReferred ? '#64748B' : severity.color }]}>
-            {severity.label}
-          </Text>
-          {isReferred && (
-            <View style={styles.referredBadge}>
-              <Text style={styles.referredBadgeText}>
-                Referred to {referredHospital}
+          {isBabyDischarged ? (
+            <View style={styles.dischargedTagPill}>
+              <Text style={styles.dischargedTagPillText}>
+                Discharged{dischargeTimeStr ? ` • ${dischargeTimeStr}` : ''}
               </Text>
             </View>
-          )}
-          {baby.status === 'discharged' && (
-            <View style={styles.dischargedBadge}>
-              <Text style={styles.dischargedBadgeText}>DISCHARGED</Text>
-            </View>
+          ) : (
+            <>
+              <Text style={[styles.statusText, { color: isReferred ? '#64748B' : severity.color }]}>
+                {severity.label}
+              </Text>
+              {isBabyInPt && (
+                <View style={styles.inPtBadge}>
+                  <Text style={styles.inPtBadgeText}>
+                    ● IN PT{phototherapyInfo?.stationName ? ` (${phototherapyInfo.stationName})` : ''}
+                  </Text>
+                </View>
+              )}
+              {!isBabyInPt && isBabyPtConcluded && (
+                <View style={styles.concludedPtBadge}>
+                  <Text style={styles.concludedPtBadgeText}>
+                    ✓ PT DONE{phototherapyInfo?.hours ? ` (${phototherapyInfo.hours}h)` : ''}
+                  </Text>
+                </View>
+              )}
+              {isReferred && (
+                <View style={styles.referredBadge}>
+                  <Text style={styles.referredBadgeText}>
+                    Referred to {referredHospital}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
         </View>
       </View>
 
       <View style={styles.rightSection}>
-        {sample?.value != null && (
-          <Text style={[styles.sampleValueText, { color: isReferred ? '#64748B' : severity.color }]}>
-            {sample.value.toFixed(1)} mg/dL
-          </Text>
-        )}
-        {!!registrationDateTime && (
-          <Text style={styles.readingTime}>{registrationDateTime}</Text>
+        {isBabyDischarged ? (
+          <View style={styles.dischargedChevronCircle}>
+            <ChevronRight size={16} color="#94A3B8" />
+          </View>
+        ) : (
+          <>
+            {sample?.value != null && (
+              <Text style={[styles.sampleValueText, { color: isReferred ? '#64748B' : severity.color }]}>
+                {sample.value.toFixed(1)} mg/dL
+              </Text>
+            )}
+            {!!registrationDateTime && (
+              <Text style={styles.readingTime}>{registrationDateTime}</Text>
+            )}
+          </>
         )}
       </View>
     </TouchableOpacity>
@@ -212,6 +261,29 @@ const styles = StyleSheet.create({
     color: '#475569',
     letterSpacing: 0.5,
   },
+  dischargedTagPill: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(7),
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignSelf: 'flex-start',
+  },
+  dischargedTagPillText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.2,
+  },
+  dischargedChevronCircle: {
+    width: moderateScale(26),
+    height: moderateScale(26),
+    borderRadius: moderateScale(13),
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   rightSection: {
     alignItems: 'flex-end',
     justifyContent: 'center',
@@ -249,6 +321,34 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(6),
     borderWidth: 1,
     borderColor: '#CBD5E1',
+  },
+  inPtBadge: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  inPtBadgeText: {
+    fontSize: fontScale(9),
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.3,
+  },
+  concludedPtBadge: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(2),
+    borderRadius: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  concludedPtBadgeText: {
+    fontSize: fontScale(9),
+    fontWeight: '800',
+    color: '#16A34A',
+    letterSpacing: 0.3,
   },
   referredBadgeText: {
     fontSize: fontScale(9.5),

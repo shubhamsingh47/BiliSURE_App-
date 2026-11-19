@@ -270,12 +270,25 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     const updatedSeverity: SeverityState =
       riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
 
+    const matchingObs: ClinicalObservation = {
+      id: 'obs_' + Date.now(),
+      clientOperationId: clientOpId,
+      babyId: targetBaby?.id || babyId,
+      site: (readingData.measurementSite || 'Forehead').charAt(0).toUpperCase() + (readingData.measurementSite || 'Forehead').slice(1),
+      bilirubinValue: value,
+      timestamp: readingData.sampleTimestamp || new Date().toISOString(),
+      observerName: readingData.operatorName || 'Nurse Staff',
+      clinicalNotes: `${method}${readingData.phototherapyPhase ? ' • ' + readingData.phototherapyPhase.replace(/_/g, ' ') : ''}`,
+      syncStatus: 'synced',
+    };
+
     set((state) => {
       const updatedBabies = state.babies.map((b) =>
         b.id === babyId || b.uhid === babyUhid ? { ...b, severityState: updatedSeverity } : b
       );
       return {
         readings: [readingToStore, ...state.readings],
+        observations: [matchingObs, ...state.observations],
         babies: updatedBabies,
         selectedBaby: targetBaby && (targetBaby.id === babyId || targetBaby.uhid === babyUhid)
           ? { ...targetBaby, severityState: updatedSeverity }
