@@ -7,60 +7,6 @@ import { NotFoundError, BadRequestError, ForbiddenError } from '../../common/err
 
 const memoryReferrals: IReferral[] = [];
 
-// Seed an initial referral for immediate demo capability
-const SEED_REFERRALS = [
-  {
-    _id: 'ref_seed_001',
-    referralId: 'REF-2026-0081',
-    babyId: '6afc02903259d997ea0159ce',
-    babyName: 'Sunita Devi',
-    babyUhid: 'BS-IN-972612',
-    dateOfBirth: new Date(Date.now() - 3600000 * 48),
-    gestationalAgeWeeks: 38,
-    referringDoctorName: 'Dr. Priya Sharma',
-    referringCentreName: 'North Community Health Centre (CHC)',
-    receivingHospitalId: 'hosp_001',
-    receivingHospitalName: 'District Civil Hospital',
-    status: 'accepted' as ReferralStatus,
-    urgency: 'urgent' as ReferralUrgency,
-    clinicalSummary: 'Rapidly rising transcutaneous reading, icterus extending to abdomen and palms. Recommended for double surface phototherapy.',
-    latestBilirubinValue: 14.8,
-    latestBilirubinUnit: 'mg/dL',
-    latestBhutaniRiskZone: 'high_intermediate',
-    postnatalAgeHoursAtReferral: 48,
-    phototherapyRecommended: true,
-    reviewedByDoctorName: 'Dr. Hospital Paediatrician',
-    reviewedAt: new Date(Date.now() - 3600000 * 2),
-    createdAt: new Date(Date.now() - 3600000 * 3),
-  },
-  {
-    _id: 'ref_seed_002',
-    referralId: 'REF-2026-0082',
-    babyId: '6afc02923259d997ea0159d9',
-    babyName: 'Pooja Sharma',
-    babyUhid: 'BS-IN-656522',
-    dateOfBirth: new Date(Date.now() - 3600000 * 36),
-    gestationalAgeWeeks: 37,
-    referringDoctorName: 'Dr. Sarah Smith',
-    referringCentreName: 'East Primary Health Centre (PHC)',
-    receivingHospitalId: 'hosp_001',
-    receivingHospitalName: 'District Civil Hospital',
-    status: 'pending' as ReferralStatus,
-    urgency: 'emergency' as ReferralUrgency,
-    clinicalSummary: 'Serum bilirubin 17.5 mg/dL at 36 hours. Scleral icterus, poor feeding, lethargic.',
-    latestBilirubinValue: 17.5,
-    latestBilirubinUnit: 'mg/dL',
-    latestBhutaniRiskZone: 'high',
-    postnatalAgeHoursAtReferral: 36,
-    phototherapyRecommended: true,
-    createdAt: new Date(Date.now() - 3600000 * 1),
-  },
-];
-
-if (memoryReferrals.length === 0) {
-  memoryReferrals.push(...(SEED_REFERRALS as any));
-}
-
 export class ReferralsService {
   static async createReferral(
     data: {
@@ -178,7 +124,7 @@ export class ReferralsService {
         // The baby still belongs to referring facility, but gains pending referral status & sent timestamp
         await BabyModel.findOneAndUpdate(
           { uhid: data.babyUhid.toUpperCase().trim() },
-          { 
+          {
             $set: {
               referralStatus: 'pending',
               referredToHospitalName: receivingHospitalName,
@@ -208,7 +154,7 @@ export class ReferralsService {
       type: 'referral_created',
       relatedBabyUhid: data.babyUhid,
       relatedReferralId: referralId,
-    }).catch(() => {});
+    }).catch(() => { });
 
     return newRef;
   }
@@ -295,7 +241,7 @@ export class ReferralsService {
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { referralId: id };
         const found = await ReferralModel.findOne(query).lean();
         if (found) return found;
-      } catch {}
+      } catch { }
     }
 
     const found = memoryReferrals.find(
@@ -481,7 +427,7 @@ export class ReferralsService {
     if (isMongoConnected) {
       try {
         await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
-      } catch {}
+      } catch { }
     }
 
     await NotificationsService.createNotification({
@@ -507,7 +453,7 @@ export class ReferralsService {
       try {
         await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
         await BabyModel.findOneAndUpdate({ uhid: ref.babyUhid }, { referralStatus: 'none' });
-      } catch {}
+      } catch { }
     }
 
     await NotificationsService.createNotification({

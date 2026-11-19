@@ -3,37 +3,6 @@ import { isMongoConnected } from '../../config/database';
 
 const memoryNotifications: INotification[] = [];
 
-const SEED_NOTIFICATIONS = [
-  {
-    _id: 'notif_001',
-    recipientRole: 'hospital_doctor',
-    hospitalId: 'hosp_001',
-    title: 'New Urgent Referral: Pooja Sharma (BS-IN-656522)',
-    message: 'Transferred from East PHC. Bilirubin 17.5 mg/dL at 36h (High Risk Zone). Immediate phototherapy review recommended.',
-    type: 'referral_created' as NotificationType,
-    relatedBabyUhid: 'BS-IN-656522',
-    relatedReferralId: 'REF-2026-0082',
-    isRead: false,
-    createdAt: new Date(Date.now() - 3600000 * 1),
-  },
-  {
-    _id: 'notif_002',
-    recipientRole: 'referring_doctor',
-    centreName: 'North Community Health Centre (CHC)',
-    title: 'Referral Accepted: Sunita Devi',
-    message: 'District Civil Hospital accepted Sunita Devi (BS-IN-972612). Neonatal transport may proceed.',
-    type: 'referral_accepted' as NotificationType,
-    relatedBabyUhid: 'BS-IN-972612',
-    relatedReferralId: 'REF-2026-0081',
-    isRead: true,
-    createdAt: new Date(Date.now() - 3600000 * 2),
-  },
-];
-
-if (memoryNotifications.length === 0) {
-  memoryNotifications.push(...(SEED_NOTIFICATIONS as any));
-}
-
 export class NotificationsService {
   static async createNotification(data: {
     recipientRole?: string;
@@ -62,7 +31,7 @@ export class NotificationsService {
     if (isMongoConnected) {
       try {
         await NotificationModel.create(newNotif);
-      } catch {}
+      } catch { }
     }
 
     memoryNotifications.unshift(newNotif);

@@ -221,7 +221,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       gestationalAgeDays: babyData.gestationalAgeDays !== undefined ? babyData.gestationalAgeDays : 0,
       weight: babyData.weight || 3.0,
       height: babyData.height || 48.0,
-      assignedDoctor: babyData.assignedDoctor || 'Dr. Priya Sharma',
+      assignedDoctor: (babyData.assignedDoctor && babyData.assignedDoctor !== 'None') ? babyData.assignedDoctor : undefined,
       facility: babyData.facility || 'North Community Health Centre (CHC)',
       department: get().selectedDepartment !== 'Deppt' ? get().selectedDepartment : 'NICU',
       severityState: babyData.severityState || 'normal',

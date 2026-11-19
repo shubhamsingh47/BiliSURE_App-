@@ -48,6 +48,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const { user } = useAuthStore();
   const { referrals, admissions, stations, approveDischarge } = useNetworkStore();
   const activeBaby: Baby = selectedBaby || babies[0];
+  const ALLOWED_DOCTORS = ['Dr. Mohan Gurjar', 'Dr. Amita Agarwal', 'Dr. Narayan Prasad'];
+  const hasDoctor = Boolean(
+    activeBaby?.assignedDoctor &&
+    ALLOWED_DOCTORS.includes(activeBaby.assignedDoctor.trim())
+  );
 
   const activeReferral = referrals.find(
     (r) =>
@@ -450,19 +455,39 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             <ArrowLeft size={22} color="#7D3BFF" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={() => setShowBabyDropdown(true)}
-            style={styles.babyDropdownPill}
-            accessibilityLabel="Select Patient Dropdown"
-          >
-            <ChevronDown size={16} color="#7D3BFF" />
-            <Text style={styles.babyDropdownText} numberOfLines={1} ellipsizeMode="tail">
-              {activeBaby.parentsName || activeBaby.name}
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.headerCenterGroup}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => setShowBabyDropdown(true)}
+              style={[
+                styles.babyDropdownPill,
+                hasDoctor ? styles.babyDropdownPillWithDoctor : styles.babyDropdownPillSolo,
+              ]}
+              accessibilityLabel="Select Patient Dropdown"
+            >
+              <ChevronDown size={hasDoctor ? 15 : 16} color="#7D3BFF" />
+              <Text
+                style={[
+                  styles.babyDropdownText,
+                  !hasDoctor && styles.babyDropdownTextSolo,
+                ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {activeBaby.parentsName || activeBaby.name}
+              </Text>
+            </TouchableOpacity>
 
-          {!isLocked && (
+            {hasDoctor && (
+              <View style={styles.doctorHeaderTag}>
+                <Text style={styles.doctorHeaderTagText} numberOfLines={1} ellipsizeMode="tail">
+                  {activeBaby.assignedDoctor}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {!isLocked ? (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleOpenEdit}
@@ -471,6 +496,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             >
               <Edit3 size={18} color="#7D3BFF" />
             </TouchableOpacity>
+          ) : (
+            <View style={{ width: moderateScale(42) }} />
           )}
         </View>
 
@@ -1006,22 +1033,58 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  headerCenterGroup: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: moderateScale(6),
+    gap: moderateScale(6),
+    minWidth: 0,
+  },
   babyDropdownPill: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EDE9FE',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(7),
     borderRadius: moderateScale(20),
-    maxWidth: '65%',
     flexShrink: 1,
   },
+  babyDropdownPillSolo: {
+    paddingHorizontal: moderateScale(14),
+    paddingVertical: moderateScale(7),
+    maxWidth: '85%',
+  },
+  babyDropdownPillWithDoctor: {
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(6),
+    maxWidth: '56%',
+  },
   babyDropdownText: {
-    fontSize: fontScale(14),
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#181829',
     marginLeft: moderateScale(4),
     flexShrink: 1,
+  },
+  babyDropdownTextSolo: {
+    fontSize: fontScale(14.5),
+    marginLeft: moderateScale(6),
+  },
+  doctorHeaderTag: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(3),
+    maxWidth: '44%',
+    flexShrink: 1,
+  },
+  doctorHeaderTagText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#475569',
+    letterSpacing: 0.1,
   },
   statCardsRow: {
     flexDirection: 'row',

@@ -74,7 +74,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
     setEditGestationalAge(baby.gestationalAgeWeeks ? String(baby.gestationalAgeWeeks) : '38');
     setEditWeight(baby.weight ? String(baby.weight) : '3.1');
     setEditHeight(baby.height ? String(baby.height) : '48');
-    setEditDoctor(baby.assignedDoctor || 'Dr. Priya Sharma');
+    setEditDoctor(baby.assignedDoctor || 'None');
   };
 
   const handleSaveEdit = async () => {
@@ -92,7 +92,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
         height: parseFloat(editHeight) || 48.0,
-        assignedDoctor: editDoctor.trim(),
+        assignedDoctor: editDoctor.trim() && editDoctor.trim() !== 'None' ? editDoctor.trim() : undefined,
       });
       setEditingBaby(null);
       Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
@@ -276,7 +276,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
                 style={styles.textInput}
                 value={editDoctor}
                 onChangeText={setEditDoctor}
-                placeholder="Dr. Priya Sharma"
+                placeholder="Dr. Mohan Gurjar"
               />
 
               <View style={styles.modalBtnRow}>

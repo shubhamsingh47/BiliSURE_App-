@@ -18,7 +18,7 @@ export interface IBaby extends Document {
   currentWeightGrams?: number;
   weight?: number; // In kg or as entered
   height?: number; // In cm
-  assignedDoctor: string;
+  assignedDoctor?: string;
   facility: string;
   department: string;
   referringDoctor?: string;
@@ -64,7 +64,7 @@ const BabySchema = new Schema<IBaby>(
     currentWeightGrams: { type: Number },
     weight: { type: Number, default: 3.1 },
     height: { type: Number, default: 49.0 },
-    assignedDoctor: { type: String, default: 'Dr. XYZ' },
+    assignedDoctor: { type: String, trim: true },
     facility: { type: String, default: 'Central Children Hospital' },
     department: { type: String, default: 'NICU', index: true },
     referringDoctor: { type: String },

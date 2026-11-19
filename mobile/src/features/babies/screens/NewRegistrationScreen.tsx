@@ -7,11 +7,13 @@ import {
   Switch,
   TouchableOpacity,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
-import { ArrowLeft, Paperclip, ChevronDown } from 'lucide-react-native';
+import { ArrowLeft, Paperclip, ChevronDown, Calendar as CalendarIcon, Clock, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
+import { BirthDateTimePickerModal } from '../../../components/BirthDateTimePickerModal';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
@@ -80,6 +82,13 @@ const parseInputDateTime = (inputStr: string): { isoDate: string; timeStr: strin
   };
 };
 
+const DOCTOR_OPTIONS = [
+  'None',
+  'Dr. Mohan Gurjar',
+  'Dr. Amita Agarwal',
+  'Dr. Narayan Prasad',
+];
+
 export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   onBack,
   onSuccess,
@@ -87,12 +96,14 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const { user } = useAuthStore();
   const [motherName, setMotherName] = useState('');
   const [dob, setDob] = useState(formatCurrentDateTime());
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
   const [uhid, setUhid] = useState('');
   const [gestationalAge, setGestationalAge] = useState('');
   const [gestationalDays, setGestationalDays] = useState('');
   const [birthWeight, setBirthWeight] = useState('');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
-  const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
+  const [doctor, setDoctor] = useState('None');
+  const [showDoctorDropdown, setShowDoctorDropdown] = useState(false);
   const severity: SeverityState = 'normal';
   const [repeatTransaction, setRepeatTransaction] = useState(false);
   const [hasAttachment, setHasAttachment] = useState(false);
@@ -100,6 +111,8 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
   const { registerBaby } = usePatientStore();
   const insets = useSafeAreaInsets();
+  const { width: windowWidth } = useWindowDimensions();
+  const isCompact = windowWidth < 380;
 
   const generateUhid = () => {
     const rawFac = (user?.facility || facility || 'PGI').toUpperCase();
@@ -164,7 +177,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         name: motherName.trim(),
         parentsName: motherName.trim(),
         uhid: finalUhid,
-        assignedDoctor: doctor,
+        assignedDoctor: doctor && doctor !== 'None' ? doctor : undefined,
         facility,
         severityState: 'normal',
         gestationalAgeWeeks: parsedGestAge,
@@ -200,50 +213,81 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       <ScrollView contentContainerStyle={styles.contentCard} showsVerticalScrollIndicator={false}>
         <CustomInput
           label="Mother's name"
-          placeholder="e.g. Sunita Devi"
+          placeholder={isCompact ? "Mother's name" : "e.g. Sunita Devi"}
+          compactPlaceholder="Sunita Devi"
           value={motherName}
           onChangeText={setMotherName}
         />
 
-        <CustomInput
-          label="Date and time of birth"
-          placeholder="Date and time of birth"
+        {/* Date and time of birth Selection Field */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Date and time of birth</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => setShowDatePickerModal(true)}
+            style={styles.datePickerBtn}
+            accessibilityLabel="Select date and time of birth"
+          >
+            <View style={styles.datePickerLeft}>
+              <View style={styles.calendarIconCircle}>
+                <CalendarIcon size={16} color="#7D3BFF" strokeWidth={2.2} />
+              </View>
+              <Text style={styles.datePickerValueText}>
+                {dob || 'Select date & time of birth'}
+              </Text>
+            </View>
+
+            <View style={styles.calendarPill}>
+              <Clock size={12} color="#7D3BFF" strokeWidth={2.2} />
+              <Text style={styles.calendarPillText}>Select</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        <BirthDateTimePickerModal
+          visible={showDatePickerModal}
           value={dob}
-          onChangeText={setDob}
+          onClose={() => setShowDatePickerModal(false)}
+          onConfirm={(formattedStr) => {
+            setDob(formattedStr);
+          }}
         />
 
-        {/* Gestational Age & Birth Weight Row */}
-        <View style={styles.twoColRow}>
-          <View style={styles.colHalf}>
-            <View style={styles.gestationSplitRow}>
-              <View style={styles.splitInputCol}>
-                <CustomInput
-                  label="Weeks"
-                  labelStyle={styles.splitLabel}
-                  placeholder="e.g. 36"
-                  value={gestationalAge}
-                  onChangeText={setGestationalAge}
-                  keyboardType="numeric"
-                  maxLength={2}
-                />
-              </View>
-              <View style={styles.splitInputCol}>
-                <CustomInput
-                  label="Days (Optional)"
-                  labelStyle={styles.splitLabel}
-                  placeholder="0-6"
-                  value={gestationalDays}
-                  onChangeText={setGestationalDays}
-                  keyboardType="numeric"
-                  maxLength={1}
-                />
-              </View>
-            </View>
-          </View>
-          <View style={styles.colHalfRight}>
+        {/* Gestational Age & Birth Weight Row (3 Proportional Columns) */}
+        <View style={styles.threeColRow}>
+          <View style={styles.gestWeeksCol}>
             <CustomInput
-              label="Birth weight (kg)"
-              placeholder="e.g. 3.1"
+              label="Gest weeks"
+              labelStyle={styles.colLabel}
+              placeholder={isCompact ? "38" : "e.g. 38"}
+              compactPlaceholder="38"
+              compactThresholdWidth={105}
+              value={gestationalAge}
+              onChangeText={setGestationalAge}
+              keyboardType="numeric"
+              maxLength={2}
+            />
+          </View>
+          <View style={styles.gestDaysCol}>
+            <CustomInput
+              label={isCompact ? "Days" : "Days (opt)"}
+              labelStyle={styles.colLabel}
+              placeholder="0-6"
+              compactPlaceholder="0-6"
+              compactThresholdWidth={90}
+              value={gestationalDays}
+              onChangeText={setGestationalDays}
+              keyboardType="numeric"
+              maxLength={1}
+            />
+          </View>
+          <View style={styles.weightCol}>
+            <CustomInput
+              label={isCompact ? "Weight (kg)" : "Birth weight (kg)"}
+              labelStyle={styles.colLabel}
+              placeholder={isCompact ? "3.1" : "e.g. 3.1"}
+              compactPlaceholder="3.1"
+              compactThresholdWidth={115}
               value={birthWeight}
               onChangeText={setBirthWeight}
               keyboardType="decimal-pad"
@@ -256,10 +300,12 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           <View style={{ flex: 1 }}>
             <CustomInput
               label="UHID / Patient ID"
-              placeholder="UHID / Patient ID"
+              placeholder={isCompact ? "PGI-104921" : "e.g. PGI-104921"}
+              compactPlaceholder="PGI-104921"
               value={uhid}
               onChangeText={setUhid}
               autoCapitalize="characters"
+              containerStyle={{ marginBottom: 0 }}
             />
           </View>
           <TouchableOpacity
@@ -280,13 +326,56 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           <ChevronDown size={20} color="#94A3B8" />
         </TouchableOpacity>
 
-        <TouchableOpacity activeOpacity={0.7} style={styles.dropdownBox}>
+        {/* Assign Doctor Dropdown */}
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => setShowDoctorDropdown(!showDoctorDropdown)}
+          style={[styles.dropdownBox, showDoctorDropdown && styles.dropdownBoxActive]}
+          accessibilityLabel="Assign Doctor"
+        >
           <View>
-            <Text style={styles.dropdownLabel}>Select Healthcare Provider</Text>
+            <Text style={styles.dropdownLabel}>Assign Doctor</Text>
             <Text style={styles.dropdownSub}>{doctor}</Text>
           </View>
-          <ChevronDown size={20} color="#94A3B8" />
+          <ChevronDown
+            size={20}
+            color={showDoctorDropdown ? '#7D3BFF' : '#94A3B8'}
+            style={showDoctorDropdown ? { transform: [{ rotate: '180deg' }] } : undefined}
+          />
         </TouchableOpacity>
+
+        {showDoctorDropdown && (
+          <View style={styles.doctorDropdownList}>
+            {DOCTOR_OPTIONS.map((docName, idx) => {
+              const isSelected = doctor === docName;
+              return (
+                <TouchableOpacity
+                  key={docName}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    setDoctor(docName);
+                    setShowDoctorDropdown(false);
+                  }}
+                  style={[
+                    styles.doctorOptionItem,
+                    idx < DOCTOR_OPTIONS.length - 1 && styles.doctorOptionItemBorder,
+                    isSelected && styles.doctorOptionItemSelected,
+                  ]}
+                >
+                  <View style={styles.doctorOptionLeft}>
+                    <View style={[styles.doctorRadioCircle, isSelected && styles.doctorRadioCircleSelected]}>
+                      {isSelected && <View style={styles.doctorRadioDot} />}
+                    </View>
+                    <Text style={[styles.doctorOptionText, isSelected && styles.doctorOptionTextSelected]}>
+                      {docName}
+                    </Text>
+                  </View>
+                  {isSelected && <Check size={16} color="#7D3BFF" strokeWidth={2.5} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
 
         {/* Repeat Toggle */}
         <View style={styles.switchRow}>
@@ -349,45 +438,98 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.white,
   },
-  twoColRow: {
+  fieldContainer: {
+    marginBottom: moderateScale(14),
+  },
+  fieldLabel: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: moderateScale(6),
+    letterSpacing: -0.1,
+  },
+  datePickerBtn: {
+    minHeight: moderateScale(52),
+    height: moderateScale(52),
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: moderateScale(16),
+    backgroundColor: COLORS.white,
+    paddingHorizontal: moderateScale(14),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  datePickerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(10),
+    flex: 1,
+  },
+  calendarIconCircle: {
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(15),
+    backgroundColor: '#F5F3FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  datePickerValueText: {
+    fontSize: fontScale(14.5),
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+  },
+  calendarPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: moderateScale(10),
+    paddingVertical: moderateScale(5),
+    borderRadius: moderateScale(12),
+  },
+  calendarPillText: {
+    fontSize: fontScale(11.5),
+    fontWeight: '700',
+    color: '#7D3BFF',
+  },
+  threeColRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: moderateScale(12),
+    gap: moderateScale(8),
   },
-  colHalf: {
-    flex: 1,
+  gestWeeksCol: {
+    flex: 1.15,
   },
-  gestationSplitRow: {
-    flexDirection: 'row',
-    gap: moderateScale(6),
+  gestDaysCol: {
+    flex: 0.9,
   },
-  splitInputCol: {
-    flex: 1,
+  weightCol: {
+    flex: 1.25,
   },
-  splitLabel: {
-    fontSize: fontScale(11),
-  },
-  colHalfRight: {
-    flex: 1,
+  colLabel: {
+    fontSize: fontScale(12.5),
+    fontWeight: '700',
   },
   uhidRow: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     gap: moderateScale(8),
+    marginBottom: moderateScale(14),
   },
   genBtn: {
-    height: 56,
-    paddingHorizontal: moderateScale(14),
+    height: moderateScale(52),
+    minHeight: moderateScale(52),
+    paddingHorizontal: moderateScale(16),
     backgroundColor: COLORS.primaryBg,
-    borderRadius: moderateScale(18),
+    borderRadius: moderateScale(16),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: COLORS.primaryLight,
-    marginBottom: 16,
   },
   genBtnText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(12.5),
     fontWeight: '700',
     color: COLORS.primary,
   },
@@ -420,6 +562,70 @@ const styles = StyleSheet.create({
     fontSize: fontScale(11),
     color: '#94A3B8',
     marginTop: 2,
+  },
+  dropdownBoxActive: {
+    borderColor: '#7D3BFF',
+    backgroundColor: '#FAF5FF',
+    marginBottom: moderateScale(6),
+  },
+  doctorDropdownList: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: moderateScale(16),
+    marginBottom: SPACING.md,
+    overflow: 'hidden',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  doctorOptionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: moderateScale(12),
+    paddingHorizontal: moderateScale(14),
+  },
+  doctorOptionItemBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  doctorOptionItemSelected: {
+    backgroundColor: '#F5F3FF',
+  },
+  doctorOptionLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: moderateScale(10),
+  },
+  doctorRadioCircle: {
+    width: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
+    borderWidth: 1.5,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doctorRadioCircleSelected: {
+    borderColor: '#7D3BFF',
+  },
+  doctorRadioDot: {
+    width: moderateScale(8),
+    height: moderateScale(8),
+    borderRadius: moderateScale(4),
+    backgroundColor: '#7D3BFF',
+  },
+  doctorOptionText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '600',
+    color: '#334155',
+  },
+  doctorOptionTextSelected: {
+    color: '#7D3BFF',
+    fontWeight: '700',
   },
   switchRow: {
     flexDirection: 'row',

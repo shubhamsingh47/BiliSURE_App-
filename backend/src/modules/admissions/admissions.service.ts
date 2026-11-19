@@ -8,73 +8,46 @@ import { NotFoundError, BadRequestError } from '../../common/errors';
 
 const memoryAdmissions: IAdmission[] = [];
 
-// Seed initial admission for active hospital patient
-const SEED_ADMISSIONS = [
-  {
-    _id: 'adm_seed_001',
-    admissionId: 'ADM-2026-0041',
-    babyId: '651a00010000000000000001',
-    babyUhid: 'BS-IN-972612',
-    babyName: 'Sunita Devi',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    referralId: 'ref_seed_001',
-    physicalArrivalConfirmed: true,
-    arrivalConfirmedAt: new Date(Date.now() - 3600000 * 20),
-    arrivalConfirmedBy: 'Nurse Sarah',
-    ptStationId: 'st_pgi_01',
-    ptStationName: 'Double LED Tunnel A1',
-    admittedAt: new Date(Date.now() - 3600000 * 20),
-    admissionStatus: 'under_treatment' as const,
-    assignedDoctor: 'Dr. XYZ',
-    primaryNurse: 'Nurse Sarah',
-    initialAdmissionBilirubin: 14.8,
-    treatmentSessions: [
-      {
-        sessionId: 'sess_001',
-        startTime: new Date(Date.now() - 3600000 * 18),
-        endTime: new Date(Date.now() - 3600000 * 6),
-        durationMinutes: 720,
-        phototherapyType: 'Double Surface LED Tunnel',
-        irradianceMwCm2: 35,
-        nurseName: 'Nurse Sarah',
-        notes: 'Baby tolerated session well under continuous eye protection.',
-        status: 'completed' as const,
-      },
-      {
-        sessionId: 'sess_002',
-        startTime: new Date(Date.now() - 3600000 * 4),
-        endTime: new Date(Date.now() - 3600000 * 1),
-        durationMinutes: 180,
-        phototherapyType: 'Double Surface LED Tunnel',
-        irradianceMwCm2: 35,
-        nurseName: 'Nurse Sarah',
-        notes: 'Session completed. Bilirubin downward trend observed.',
-        status: 'completed' as const,
-      },
-    ],
-    stationReleased: false,
-    createdAt: new Date(Date.now() - 3600000 * 20),
-    updatedAt: new Date(),
-  },
-];
-
-if (memoryAdmissions.length === 0) {
-  memoryAdmissions.push(...(SEED_ADMISSIONS as any));
-}
-
 export class AdmissionsService {
   static async listAdmissions(query: { hospitalId?: string; status?: string; facility?: string }) {
+    if (isMongoConnected) {
+      try {
+        const filter: any = {};
+        const targetHosp =
+          query.facility ||
+          (query.hospitalId === 'hosp_kgmu'
+            ? 'KGMU'
+            : query.hospitalId === 'hosp_rml'
+              ? 'RML'
+              : query.hospitalId === 'hosp_pgi'
+                ? 'PGI'
+                : undefined);
+
+        if (query.hospitalId || targetHosp) {
+          const hospConditions: any[] = [];
+          if (query.hospitalId) hospConditions.push({ hospitalId: query.hospitalId });
+          if (targetHosp) hospConditions.push({ hospitalName: new RegExp(`^${targetHosp}$`, 'i') });
+          filter.$or = hospConditions;
+        }
+        if (query.status) {
+          filter.admissionStatus = query.status;
+        }
+        return await AdmissionModel.find(filter).lean();
+      } catch (err) {
+        // Fallback to memory
+      }
+    }
+
     let list = memoryAdmissions;
     const targetHosp =
       query.facility ||
       (query.hospitalId === 'hosp_kgmu'
         ? 'KGMU'
         : query.hospitalId === 'hosp_rml'
-        ? 'RML'
-        : query.hospitalId === 'hosp_pgi'
-        ? 'PGI'
-        : undefined);
+          ? 'RML'
+          : query.hospitalId === 'hosp_pgi'
+            ? 'PGI'
+            : undefined);
 
     if (query.hospitalId || targetHosp) {
       list = list.filter(
@@ -96,7 +69,7 @@ export class AdmissionsService {
     if (!found && isMongoConnected) {
       try {
         found = (await AdmissionModel.findOne({ $or: [{ _id: id }, { admissionId: id }] })) as any;
-      } catch {}
+      } catch { }
     }
     if (!found) throw new NotFoundError('Admission record not found');
     return found;
@@ -160,7 +133,7 @@ export class AdmissionsService {
       await HospitalModel.findByIdAndUpdate(newAdmission.hospitalId, {
         $inc: { reservedPTStations: -1 },
       });
-    } catch (e) {}
+    } catch (e) { }
 
     // Notify referring doctor and hospital team
     await NotificationsService.createNotification({
@@ -221,7 +194,7 @@ export class AdmissionsService {
           { status: 'under_treatment', currentStationId: station.stationId }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify care team
     await NotificationsService.createNotification({
@@ -305,7 +278,7 @@ export class AdmissionsService {
         admission = (await AdmissionModel.findOne({
           $or: [{ _id: admissionId }, { admissionId }],
         })) as any;
-      } catch {}
+      } catch { }
     }
 
     const start = new Date(data.startTime);
@@ -354,7 +327,7 @@ export class AdmissionsService {
       if (isMongoConnected) {
         try {
           await AdmissionModel.create(newAdmission);
-        } catch {}
+        } catch { }
       }
       return { admission: newAdmission, session: newSession };
     }
@@ -373,7 +346,7 @@ export class AdmissionsService {
             $set: { admissionStatus: 'under_treatment', updatedAt: new Date() },
           }
         );
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return { admission, session: newSession };
@@ -395,7 +368,7 @@ export class AdmissionsService {
         admission = (await AdmissionModel.findOne({
           $or: [{ _id: admissionId }, { admissionId }],
         })) as any;
-      } catch {}
+      } catch { }
     }
 
     if (!admission) throw new NotFoundError('Admission record not found');
@@ -422,7 +395,7 @@ export class AdmissionsService {
             },
           }
         );
-      } catch {}
+      } catch { }
     }
 
     return { admission, session };
@@ -511,7 +484,7 @@ export class AdmissionsService {
           }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify attending care team
     await NotificationsService.createNotification({
@@ -577,7 +550,7 @@ export class AdmissionsService {
           }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify referring doctor and care team
     await NotificationsService.createNotification({
