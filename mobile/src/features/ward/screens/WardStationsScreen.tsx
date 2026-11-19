@@ -22,6 +22,9 @@ import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/re
 interface WardStationsScreenProps {
   initialSegment?: 'allocation' | 'treatment';
   segmentTrigger?: number;
+  initialPatientToSend?: Baby | null;
+  initialPtFilter?: 'active' | 'concluded';
+  onPatientAllocated?: () => void;
   onOpenNotifications?: () => void;
   onRecordBilirubin?: (babyUhid: string) => void;
 }
@@ -29,21 +32,31 @@ interface WardStationsScreenProps {
 export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
   initialSegment = 'allocation',
   segmentTrigger,
+  initialPatientToSend = null,
+  initialPtFilter = 'active',
+  onPatientAllocated,
   onOpenNotifications,
   onRecordBilirubin,
 }) => {
   const insets = useSafeAreaInsets();
   const { stations, registerStation, notifications, admissions } = useNetworkStore();
   const { user } = useAuthStore();
-  const { babies, selectedBaby, selectBaby } = usePatientStore();
+  const { babies } = usePatientStore();
 
   const [activeSegment, setActiveSegment] = useState<'allocation' | 'treatment'>(initialSegment);
+
+  // Dedicated patient selection state for phototherapy - defaults to NONE (null)
+  const [ptSelectedBaby, setPtSelectedBaby] = useState<Baby | null>(initialPatientToSend || null);
 
   useEffect(() => {
     if (initialSegment) {
       setActiveSegment(initialSegment);
     }
   }, [initialSegment, segmentTrigger]);
+
+  useEffect(() => {
+    setPtSelectedBaby(initialPatientToSend || null);
+  }, [initialPatientToSend, segmentTrigger]);
 
   // Dynamic Baby Selection Modal State
   const [showPatientModal, setShowPatientModal] = useState(false);
@@ -203,24 +216,24 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
         {activeSegment === 'allocation' ? (
           <View style={{ flex: 1 }}>
             {/* Dynamic Baby Selector Banner for Phototherapy */}
-            {selectedBaby ? (
+            {ptSelectedBaby ? (
               <View style={styles.patientBannerCard}>
                 <View style={styles.patientBannerLeft}>
                   <View style={styles.patientAvatar}>
                     <Text style={styles.patientAvatarText}>
-                      {(selectedBaby.parentsName || selectedBaby.name).charAt(0).toUpperCase()}
+                      {(ptSelectedBaby.parentsName || ptSelectedBaby.name).charAt(0).toUpperCase()}
                     </Text>
                   </View>
                   <View style={styles.patientBannerInfo}>
                     <View style={styles.patientTagRow}>
                       <Text style={styles.patientBannerTag}>PATIENT TO SEND TO PHOTOTHERAPY</Text>
-                      {selectedBaby.severityState && (
+                      {ptSelectedBaby.severityState && (
                         <View
                           style={[
                             styles.severityMiniBadge,
                             {
                               backgroundColor:
-                                selectedBaby.severityState === 'critical' ? '#FEE2E2' : '#FEF3C7',
+                                ptSelectedBaby.severityState === 'critical' ? '#FEE2E2' : '#FEF3C7',
                             },
                           ]}
                         >
@@ -229,20 +242,20 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                               styles.severityMiniText,
                               {
                                 color:
-                                  selectedBaby.severityState === 'critical' ? '#DC2626' : '#D97706',
+                                  ptSelectedBaby.severityState === 'critical' ? '#DC2626' : '#D97706',
                               },
                             ]}
                           >
-                            {selectedBaby.severityState.toUpperCase()}
+                            {ptSelectedBaby.severityState.toUpperCase()}
                           </Text>
                         </View>
                       )}
                     </View>
                     <Text style={styles.patientBannerName} numberOfLines={1}>
-                      {selectedBaby.parentsName?.trim() || selectedBaby.name}
+                      {ptSelectedBaby.parentsName?.trim() || ptSelectedBaby.name}
                     </Text>
                     <Text style={styles.patientBannerMeta}>
-                      UHID: {selectedBaby.uhid} • {selectedBaby.gestationalAgeWeeks || 38}w • {selectedBaby.weight || 3.1}kg
+                      UHID: {ptSelectedBaby.uhid} • {ptSelectedBaby.gestationalAgeWeeks || 38}w • {ptSelectedBaby.weight || 3.1}kg
                     </Text>
                   </View>
                 </View>
@@ -261,7 +274,10 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
 
                   <TouchableOpacity
                     style={styles.deselectPatientBtn}
-                    onPress={() => selectBaby(null)}
+                    onPress={() => {
+                      setPtSelectedBaby(null);
+                      onPatientAllocated?.();
+                    }}
                     activeOpacity={0.8}
                     accessibilityLabel="Deselect Patient"
                   >
@@ -292,9 +308,10 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
 
             <NurseStationAllocationScreen
               embedded={true}
-              selectedBaby={selectedBaby}
+              selectedBaby={ptSelectedBaby}
               onBabyAllocated={() => {
-                selectBaby(null);
+                setPtSelectedBaby(null);
+                onPatientAllocated?.();
                 setActiveSegment('treatment');
               }}
             />
@@ -302,6 +319,8 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
         ) : (
           <NurseTreatmentTrackerScreen
             embedded={true}
+            initialPtFilter={initialPtFilter}
+            highlightBabyIdOrUhid={ptSelectedBaby?.uhid || ptSelectedBaby?.id}
             onRecordBilirubin={onRecordBilirubin}
           />
         )}
@@ -339,11 +358,12 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
             </View>
 
             {/* Quick Deselect Action in Modal */}
-            {selectedBaby && (
+            {ptSelectedBaby && (
               <TouchableOpacity
                 style={styles.modalDeselectBtn}
                 onPress={() => {
-                  selectBaby(null);
+                  setPtSelectedBaby(null);
+                  onPatientAllocated?.();
                   setShowPatientModal(false);
                 }}
                 activeOpacity={0.7}
@@ -358,7 +378,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
               keyExtractor={(item) => item.id}
               contentContainerStyle={{ paddingVertical: 8 }}
               renderItem={({ item }) => {
-                const isSelected = selectedBaby?.id === item.id;
+                const isSelected = ptSelectedBaby?.id === item.id;
                 const displayName = item.parentsName?.trim() || item.name;
 
                 return (
@@ -366,9 +386,10 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                     style={[styles.patientItemCard, isSelected && styles.patientItemCardSelected]}
                     onPress={() => {
                       if (isSelected) {
-                        selectBaby(null);
+                        setPtSelectedBaby(null);
+                        onPatientAllocated?.();
                       } else {
-                        selectBaby(item);
+                        setPtSelectedBaby(item);
                       }
                       setShowPatientModal(false);
                     }}

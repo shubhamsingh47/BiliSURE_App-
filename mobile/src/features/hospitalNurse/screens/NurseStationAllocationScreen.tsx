@@ -48,57 +48,13 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     );
   };
 
-  // Find admitted babies awaiting station allocation (excluding any baby already occupying a station)
-  const pendingAdmissions = hospitalAdmissions.filter(
-    (a) =>
-      a.admissionStatus === 'admitted' &&
-      !a.ptStationId &&
-      !isBabyAlreadyAllocated(a.babyUhid, a.babyId)
-  );
-
-  const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(
-    pendingAdmissions[0]?.admissionId || pendingAdmissions[0]?.id || null
-  );
-
-  // Sync selectedAdmissionId: if selected baby was allocated or no longer in pending, update immediately
-  useEffect(() => {
-    const isStillPending = pendingAdmissions.some(
-      (a) => (a.admissionId === selectedAdmissionId || a.id === selectedAdmissionId)
-    );
-    if (!isStillPending) {
-      setSelectedAdmissionId(pendingAdmissions[0]?.admissionId || pendingAdmissions[0]?.id || null);
-    }
-  }, [hospitalAdmissions, hospitalStations, pendingAdmissions.length, selectedAdmissionId]);
-
-  const selectedAdmission = pendingAdmissions.find(
-    (a) => a.admissionId === selectedAdmissionId || a.id === selectedAdmissionId
-  ) || null;
-
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAllocate = async (station: PTStation) => {
-    const matchingBaby = babies.find(
-      (b) =>
-        (selectedAdmission?.babyUhid && b.uhid === selectedAdmission.babyUhid) ||
-        (selectedAdmission?.babyId && b.id === selectedAdmission.babyId)
-    );
-    const resolvedInitial =
-      selectedAdmission?.initialAdmissionBilirubin ||
-      matchingBaby?.initialValue ||
-      undefined;
-
-    const targetBaby: Baby | null = embedded
-      ? selectedBaby
-      : selectedBaby || (selectedAdmission ? {
-          id: selectedAdmission.babyId || selectedAdmission.id,
-          uhid: selectedAdmission.babyUhid,
-          name: selectedAdmission.babyName,
-          parentsName: selectedAdmission.babyName,
-          initialValue: resolvedInitial,
-        } as Baby : null);
+    const targetBaby: Baby | null = selectedBaby;
 
     if (!targetBaby) {
-      Alert.alert('Select Patient', 'Please select a baby to send to phototherapy first.');
+      Alert.alert('No Baby Selected', 'Please select a baby to send to phototherapy first.');
       return;
     }
 
@@ -132,8 +88,12 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     try {
       await allocateBabyToStation(targetBaby, station.stationId || station.id, user.name);
       
+      await usePatientStore.getState().updateBaby(targetBaby.id, {
+        status: 'under_treatment',
+        currentStationId: `${station.name} (${station.stationId})`,
+      });
+
       usePatientStore.getState().selectBaby(null);
-      setSelectedAdmissionId(null);
 
       Alert.alert(
         'Station Allocated!',
@@ -264,39 +224,6 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
         </View>
       )}
 
-      {/* Admitted Patient Selector Banner */}
-      {pendingAdmissions.length > 0 && (
-        <View style={embedded ? styles.embeddedPatientBox : styles.patientSelectBox}>
-          <Text style={embedded ? styles.embeddedSelectLabel : styles.selectLabel}>
-            Select Admitted Patient to Assign Bed:
-          </Text>
-          <View style={styles.pillList}>
-            {pendingAdmissions.map((adm) => {
-              const isSel = selectedAdmission?.admissionId === adm.admissionId || selectedAdmission?.id === adm.id;
-              return (
-                <TouchableOpacity
-                  key={adm.admissionId || adm.id}
-                  onPress={() => setSelectedAdmissionId(adm.admissionId || adm.id)}
-                  style={[
-                    embedded ? styles.embeddedPatientPill : styles.patientPill,
-                    isSel && (embedded ? styles.embeddedPatientPillActive : styles.patientPillActive),
-                  ]}
-                >
-                  <Text
-                    style={[
-                      embedded ? styles.embeddedPatientPillText : styles.patientPillText,
-                      isSel && (embedded ? styles.embeddedPatientPillTextActive : styles.patientPillTextActive),
-                    ]}
-                  >
-                    {adm.babyName} ({adm.babyUhid})
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
-      )}
-
       {/* Station Cards Grid */}
       <FlatList
         data={hospitalStations}
@@ -339,13 +266,13 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
                     style={[
                       styles.compactAllocateBtn,
                       isProcessing && styles.allocateBtnDisabled,
-                      !(selectedBaby || selectedAdmission) && { backgroundColor: '#7D3BFF' },
+                      !selectedBaby && { backgroundColor: '#7D3BFF' },
                     ]}
                     disabled={isProcessing}
                     activeOpacity={0.8}
                   >
                     <Text style={styles.compactAllocateBtnText}>
-                      {selectedBaby || selectedAdmission ? 'Send Patient to Station →' : 'Select Baby to Allocate'}
+                      {selectedBaby ? 'Send Patient to Station →' : 'Select Baby to Allocate'}
                     </Text>
                   </TouchableOpacity>
                 </View>

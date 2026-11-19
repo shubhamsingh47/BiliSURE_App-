@@ -12,7 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus } from 'lucide-react-native';
+import { ChevronDown, ArrowLeft, Check, Edit3, X, Plus, CheckCircle2, RotateCcw, ArrowRight } from 'lucide-react-native';
 import { COLORS } from '../../../theme/colors';
 import { ChartCard, GraphReading } from '../../../components/ChartCard';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
@@ -32,6 +32,7 @@ interface PatientTrendsScreenProps {
   onSeeAllObservations: () => void;
   onOpenReferral?: () => void;
   onSendToPhototherapy?: (baby?: Baby) => void;
+  onViewPhototherapyTracker?: (baby: Baby, filter?: 'active' | 'concluded') => void;
 }
 
 export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
@@ -40,11 +41,12 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   onSeeAllObservations,
   onOpenReferral,
   onSendToPhototherapy,
+  onViewPhototherapyTracker,
 }) => {
   const insets = useSafeAreaInsets();
   const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
   const { user } = useAuthStore();
-  const { referrals, admissions } = useNetworkStore();
+  const { referrals, admissions, approveDischarge } = useNetworkStore();
   const activeBaby: Baby = selectedBaby || babies[0];
 
   const activeReferral = referrals.find(
@@ -54,14 +56,21 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       r.status !== 'completed'
   );
 
-  const activeAdmission = admissions.find(
+  // Find baby's admission (active, concluded, or observation)
+  const babyAdmission = admissions.find(
     (a) =>
-      (a.babyUhid === activeBaby?.uhid || a.babyId === activeBaby?.id) &&
-      a.admissionStatus !== 'discharged'
+      (a.babyUhid && a.babyUhid === activeBaby?.uhid) ||
+      (a.babyId && (a.babyId === activeBaby?.id || a.babyId === activeBaby?.uhid))
   );
 
-  // Only show active treatment banner if baby is actively undergoing phototherapy on a station
-  const isPhototherapyActive = activeAdmission?.admissionStatus === 'under_treatment' && !!activeAdmission?.ptStationId;
+  const ptSessions = babyAdmission?.treatmentSessions || [];
+  const totalPtMinutes = ptSessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+  const totalPtHours = (totalPtMinutes / 60).toFixed(1);
+  const isPhototherapyActive =
+    (babyAdmission?.admissionStatus === 'under_treatment' && !babyAdmission?.stationReleased) ||
+    activeBaby.status === 'under_treatment';
+  const isPhototherapyConcluded = ptSessions.length > 0 && !isPhototherapyActive;
+  const activeAdmission = babyAdmission;
   const [showBabyDropdown, setShowBabyDropdown] = useState(false);
 
   // Observation add/edit state
@@ -120,15 +129,46 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     }
   };
 
-  // Initial Bilirubin = baby's admission baseline initial value; Discharge = set via Discharge button
-  const babyObservations = observations
-    .filter((o) => o.babyId === activeBaby.id)
-    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  // Unified observations combining direct clinical observations + all bilirubin readings (from PT flowsheet or direct tests)
+  const unifiedObservations: ClinicalObservation[] = React.useMemo(() => {
+    const babyReadings = readings.filter(
+      (r) =>
+        (activeBaby.id && r.babyId === activeBaby.id) ||
+        (activeBaby.uhid && (r.babyUhid === activeBaby.uhid || r.babyId === activeBaby.uhid))
+    );
+    const existingObsIds = new Set(observations.map((o) => o.id));
+
+    const directObs = observations.filter(
+      (o) =>
+        (activeBaby.id && o.babyId === activeBaby.id) ||
+        (activeBaby.uhid && o.babyId === activeBaby.uhid)
+    );
+
+    const fromReadings: ClinicalObservation[] = babyReadings
+      .filter((r) => !existingObsIds.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        clientOperationId: r.clientOperationId,
+        babyId: activeBaby.id,
+        site: (r.measurementSite || 'Forehead').charAt(0).toUpperCase() + (r.measurementSite || 'Forehead').slice(1),
+        bilirubinValue: r.value,
+        timestamp: r.sampleTimestamp || r.timestamp,
+        observerName: r.operatorName || 'Nurse Staff',
+        clinicalNotes: `${r.method || 'TcB'}${r.phototherapyPhase ? ' • ' + r.phototherapyPhase.replace(/_/g, ' ') : ''}`,
+        syncStatus: r.syncStatus,
+      }));
+
+    return [...directObs, ...fromReadings].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [observations, readings, activeBaby.id, activeBaby.uhid]);
+
+  const babyObservations = unifiedObservations;
   const initialVal: number | null =
     activeBaby?.initialValue && activeBaby.initialValue > 0
       ? activeBaby.initialValue
-      : activeAdmission?.initialAdmissionBilirubin && activeAdmission.initialAdmissionBilirubin > 0
-      ? activeAdmission.initialAdmissionBilirubin
+      : babyAdmission?.initialAdmissionBilirubin && babyAdmission.initialAdmissionBilirubin > 0
+      ? babyAdmission.initialAdmissionBilirubin
       : babyObservations.length > 0
       ? babyObservations[babyObservations.length - 1].bilirubinValue
       : null;
@@ -136,15 +176,37 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
 
   const handleDischarge = async () => {
+    // 1. Mandatory constraint: Cannot discharge while phototherapy is active!
+    if (isPhototherapyActive) {
+      Alert.alert(
+        'Cannot Discharge Patient',
+        'Phototherapy is currently in progress. You must conclude the phototherapy course before approving discharge.'
+      );
+      return;
+    }
+
     if (babyObservations.length === 0) {
       Alert.alert('No readings', 'Add an observation before discharging.');
       return;
     }
+
     const lastVal = babyObservations[0].bilirubinValue;
+    const nowIso = new Date().toISOString();
+
     await updateBaby(activeBaby.id, {
       status: 'discharged',
       dischargeValue: lastVal,
+      dischargedAt: nowIso,
     });
+
+    if (babyAdmission) {
+      await approveDischarge(babyAdmission.id || babyAdmission.admissionId, {
+        doctorName: user?.name || 'Attending Pediatrician',
+        dischargeBilirubinValue: lastVal,
+        dischargeNotes: 'Discharge approved after concluding phototherapy.',
+      });
+    }
+
     Alert.alert('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
   };
 
@@ -355,15 +417,28 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            activeOpacity={0.8}
-            onPress={handleOpenEdit}
-            style={styles.editBtn}
-            accessibilityLabel="Edit Patient"
-          >
-            <Edit3 size={18} color="#7D3BFF" />
-          </TouchableOpacity>
+          {!isDischarged && (
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={handleOpenEdit}
+              style={styles.editBtn}
+              accessibilityLabel="Edit Patient"
+            >
+              <Edit3 size={18} color="#7D3BFF" />
+            </TouchableOpacity>
+          )}
         </View>
+
+        {isDischarged && (
+          <View style={styles.dischargedNoticeBanner}>
+            <View style={styles.dischargedNoticePill}>
+              <Text style={styles.dischargedNoticePillText}>DISCHARGED PATIENT</Text>
+            </View>
+            <Text style={styles.dischargedNoticeText}>
+              Patient is discharged. Clinical observations and phototherapy history are read-only.
+            </Text>
+          </View>
+        )}
 
         {/* Baby Filter Dropdown Modal */}
         <Modal visible={showBabyDropdown} transparent animationType="fade">
@@ -568,7 +643,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             <Text style={[styles.obsHeadText, { flex: 1.2 }]}>Site</Text>
             <Text style={[styles.obsHeadText, { flex: 1 }]}>Value</Text>
             <Text style={[styles.obsHeadText, { flex: 1.6 }]}>Date & Time</Text>
-            <View style={{ width: 28 }} />
+            <View style={{ width: isDischarged ? 0 : 28 }} />
           </View>
           {recentObservations.length === 0 ? (
             <Text style={styles.obsEmptyText}>No observations recorded</Text>
@@ -591,14 +666,16 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                   {', '}
                   {new Date(o.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
-                <TouchableOpacity
-                  onPress={() => handleOpenEditObs(o)}
-                  style={styles.obsEditBtn}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                  accessibilityLabel="Edit Observation"
-                >
-                  <Edit3 size={14} color="#7D3BFF" />
-                </TouchableOpacity>
+                {!isDischarged && (
+                  <TouchableOpacity
+                    onPress={() => handleOpenEditObs(o)}
+                    style={styles.obsEditBtn}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    accessibilityLabel="Edit Observation"
+                  >
+                    <Edit3 size={14} color="#7D3BFF" />
+                  </TouchableOpacity>
+                )}
               </TouchableOpacity>
             ))
           )}
@@ -615,36 +692,149 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           babyExactTimeOfBirth={activeBaby.exactTimeOfBirth}
         />
 
-        {/* Action Button: Send to Phototherapy / Active PT Status */}
-        {(onSendToPhototherapy || onOpenReferral) && (
-          isPhototherapyActive ? (
-            <TouchableOpacity
-              onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
-              style={[styles.referralActiveStatusCard, { marginTop: 16 }]}
-              activeOpacity={0.8}
-            >
-              <View style={styles.referralActiveHeader}>
-                <View style={styles.referralActivePulseDot} />
-                <Text style={styles.referralActiveTitle}>
-                  {activeAdmission?.admissionStatus === 'under_treatment'
-                    ? 'Phototherapy in Progress'
-                    : activeReferral?.status === 'accepted' || activeReferral?.status === 'arrived'
-                    ? 'Referral Accepted • Admitted'
-                    : 'Phototherapy Active'}
-                </Text>
-              </View>
-              <Text style={styles.referralActiveSub}>
-                {activeAdmission?.ptStationName
-                  ? `Station: ${activeAdmission.ptStationName} (${activeAdmission.hospitalName || 'Ward Station'})`
-                  : activeReferral?.receivingHospitalName
-                  ? `Destination: ${activeReferral.receivingHospitalName} (${(activeReferral.status || '').toUpperCase()})`
-                  : 'Active under phototherapy / hospital care.'}
+        {/* Phototherapy Status & Interactive Clinical Actions */}
+        {isPhototherapyActive ? (
+          <TouchableOpacity
+            onPress={() => {
+              if (onViewPhototherapyTracker) {
+                onViewPhototherapyTracker(activeBaby, 'active');
+              } else if (onSendToPhototherapy) {
+                onSendToPhototherapy(activeBaby);
+              } else {
+                onOpenReferral?.();
+              }
+            }}
+            style={[styles.referralActiveStatusCard, { marginTop: 16 }]}
+            activeOpacity={0.8}
+          >
+            <View style={styles.referralActiveHeader}>
+              <View style={styles.referralActivePulseDot} />
+              <Text style={styles.referralActiveTitle}>
+                Phototherapy in Progress • {totalPtHours} hrs
               </Text>
-              <Text style={styles.referralActiveHint}>
-                Tap to monitor active phototherapy in Ward & Stations →
+            </View>
+            <Text style={styles.referralActiveSub}>
+              {babyAdmission?.ptStationName
+                ? `Station: ${babyAdmission.ptStationName} (${babyAdmission.hospitalName || 'Ward Station'})`
+                : 'Active under phototherapy continuous monitoring.'}
+            </Text>
+            <Text style={styles.referralActiveHint}>
+              Tap to view patient card in Phototherapy Monitoring →
+            </Text>
+          </TouchableOpacity>
+        ) : isPhototherapyConcluded ? (
+          <View style={[styles.ptOutcomeCard, { marginTop: 16 }]}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => {
+                if (onViewPhototherapyTracker) {
+                  onViewPhototherapyTracker(activeBaby, 'concluded');
+                } else if (onSendToPhototherapy) {
+                  onSendToPhototherapy(activeBaby);
+                } else {
+                  onOpenReferral?.();
+                }
+              }}
+            >
+              <View style={styles.ptOutcomeHeader}>
+                <View style={styles.ptOutcomeIconCircle}>
+                  <CheckCircle2 size={18} color="#00A569" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 10 }}>
+                  <Text style={styles.ptOutcomeTitle}>Phototherapy Course Concluded</Text>
+                  <Text style={styles.ptOutcomeSub}>
+                    {totalPtHours} hrs cumulative exposure • {ptSessions.length} session(s)
+                  </Text>
+                </View>
+                <View style={styles.ptOutcomeBadge}>
+                  <Text style={styles.ptOutcomeBadgeText}>CONCLUDED</Text>
+                </View>
+              </View>
+
+              {/* Bilirubin Reduction Efficacy Grid */}
+              <View style={styles.ptEfficacyRow}>
+                <View style={styles.ptEfficacyCol}>
+                  <Text style={styles.ptEfficacyLabel}>Initial TSB</Text>
+                  <Text style={styles.ptEfficacyVal}>
+                    {initialVal !== null ? `${initialVal.toFixed(1)} mg/dL` : '--'}
+                  </Text>
+                </View>
+
+                <View style={styles.ptEfficacyArrowCol}>
+                  <ArrowRight size={18} color="#7D3BFF" />
+                  {initialVal !== null && babyObservations.length > 0 && (
+                    <View
+                      style={[
+                        styles.reductionPill,
+                        {
+                          backgroundColor:
+                            initialVal - babyObservations[0].bilirubinValue >= 0 ? '#DCFCE7' : '#FEE2E2',
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.reductionPillText,
+                          {
+                            color:
+                              initialVal - babyObservations[0].bilirubinValue >= 0 ? '#16A34A' : '#DC2626',
+                          },
+                        ]}
+                      >
+                        {initialVal - babyObservations[0].bilirubinValue >= 0 ? '↓ -' : '↑ +'}
+                        {Math.abs(initialVal - babyObservations[0].bilirubinValue).toFixed(1)} mg/dL
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <View style={styles.ptEfficacyCol}>
+                  <Text style={styles.ptEfficacyLabel}>Post-PT Latest</Text>
+                  <Text style={[styles.ptEfficacyVal, { color: '#00A569' }]}>
+                    {babyObservations[0] ? `${babyObservations[0].bilirubinValue.toFixed(1)} mg/dL` : '--'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text style={styles.ptOutcomeHint}>
+                Tap to view patient card in Concluded History →
               </Text>
             </TouchableOpacity>
-          ) : (
+
+            {/* Doctor Decision & Actions */}
+            <View style={styles.ptActionRow}>
+              {!isDischarged ? (
+                <>
+                  <TouchableOpacity
+                    style={styles.ptDischargeBtn}
+                    onPress={handleDischarge}
+                    activeOpacity={0.8}
+                  >
+                    <Check size={16} color="#FFFFFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                    <Text style={styles.ptDischargeBtnText}>Approve Discharge</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.ptResumeBtn}
+                    onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
+                    activeOpacity={0.8}
+                  >
+                    <RotateCcw size={14} color="#7D3BFF" style={{ marginRight: 4 }} />
+                    <Text style={styles.ptResumeBtnText}>Resume PT</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <View style={styles.dischargedPillRow}>
+                  <Check size={16} color="#00A569" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                  <Text style={styles.dischargedCompletedText}>
+                    Discharge Approved{activeBaby.dischargedAt ? ` • ${new Date(activeBaby.dischargedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true })}` : ''}
+                  </Text>
+                </View>
+              )}
+            </View>
+          </View>
+        ) : (onSendToPhototherapy || onOpenReferral) ? (
+          !isDischarged ? (
             <TouchableOpacity
               onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
               style={[styles.referralCalloutBtn, { marginTop: 16 }]}
@@ -652,8 +842,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             >
               <Text style={styles.referralCalloutText}>Send to Phototherapy →</Text>
             </TouchableOpacity>
-          )
-        )}
+          ) : null
+        ) : null}
 
         {/* Mandatory Feature: Bhutani Bilirubin Risk Assessment Section (last) */}
         <View style={styles.nomogramSection}>
@@ -985,6 +1175,139 @@ const styles = StyleSheet.create({
     borderColor: '#DDD6FE',
     marginBottom: SPACING.md,
   },
+  ptOutcomeCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(16),
+    padding: moderateScale(16),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginBottom: SPACING.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  ptOutcomeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  ptOutcomeIconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#DCFCE7',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ptOutcomeTitle: {
+    fontSize: fontScale(13),
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  ptOutcomeSub: {
+    fontSize: fontScale(11),
+    color: '#64748B',
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  ptOutcomeBadge: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+  },
+  ptOutcomeBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#16A34A',
+    letterSpacing: 0.4,
+  },
+  ptEfficacyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginBottom: 12,
+  },
+  ptEfficacyCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  ptEfficacyLabel: {
+    fontSize: fontScale(10),
+    color: '#64748B',
+    fontWeight: '600',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+  },
+  ptEfficacyVal: {
+    fontSize: fontScale(14),
+    fontWeight: '800',
+    color: '#1E293B',
+  },
+  ptEfficacyArrowCol: {
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  reductionPill: {
+    marginTop: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  reductionPillText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+  },
+  ptOutcomeHint: {
+    fontSize: fontScale(11),
+    color: '#7D3BFF',
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  ptActionRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ptDischargeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#00A569',
+    borderRadius: moderateScale(10),
+    paddingVertical: 10,
+  },
+  ptDischargeBtnText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  ptResumeBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F3E8FF',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#E9D5FF',
+  },
+  ptResumeBtnText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#7D3BFF',
+  },
   referralActiveHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1273,5 +1596,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+  },
+  dischargedNoticeBanner: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: moderateScale(12),
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  dischargedNoticePill: {
+    backgroundColor: '#E2E8F0',
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginBottom: 4,
+  },
+  dischargedNoticePillText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#334155',
+    letterSpacing: 0.5,
+  },
+  dischargedNoticeText: {
+    fontSize: fontScale(12),
+    color: '#64748B',
+    lineHeight: 17,
+  },
+  dischargedPillRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#DCFCE7',
+    paddingVertical: 10,
+    borderRadius: moderateScale(10),
+    borderWidth: 1,
+    borderColor: '#86EFAC',
+  },
+  dischargedCompletedText: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#15803D',
   },
 });

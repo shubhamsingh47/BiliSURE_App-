@@ -39,6 +39,10 @@ interface NurseTreatmentTrackerScreenProps {
   onRecordBilirubin?: (babyUhid: string) => void;
   onOpenNotifications?: () => void;
   embedded?: boolean;
+  initialAdmission?: Admission | null;
+  initialBabyIdOrUhid?: string | null;
+  initialPtFilter?: 'active' | 'concluded';
+  highlightBabyIdOrUhid?: string | null;
 }
 
 // Flowsheet unified row entry
@@ -84,15 +88,19 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   onRecordBilirubin,
   onOpenNotifications,
   embedded = false,
+  initialAdmission = null,
+  initialBabyIdOrUhid = null,
+  initialPtFilter = 'active',
+  highlightBabyIdOrUhid = null,
 }) => {
   const insets = useSafeAreaInsets();
   const { admissions, logTreatmentSession, approveDischarge, updateAdmission, updateTreatmentSession, notifications } = useNetworkStore();
   const { user } = useAuthStore();
-  const { babies, readings, addReading, updateReading, observations } = usePatientStore();
+  const { babies, readings, addReading, updateReading, observations, updateBaby } = usePatientStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   // Selected patient for detailed Flowsheet Table view
-  const [detailedAdmission, setDetailedAdmission] = useState<Admission | null>(null);
+  const [detailedAdmission, setDetailedAdmission] = useState<Admission | null>(initialAdmission || null);
 
   // Modals state
   const [logModalVisible, setLogModalVisible] = useState(false);
@@ -191,15 +199,67 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   const currentHosp = (user?.facility || 'PGI').toUpperCase();
   const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
 
-  const treatedPatients = useMemo(
+  // Phototherapy patient filter: active treatments vs concluded courses
+  const [ptListFilter, setPtListFilter] = useState<'active' | 'concluded'>(initialPtFilter || 'active');
+
+  useEffect(() => {
+    if (initialPtFilter) {
+      setPtListFilter(initialPtFilter);
+    }
+  }, [initialPtFilter]);
+
+  const activePatients = useMemo(
     () =>
       admissions.filter(
         (a) =>
           a.admissionStatus === 'under_treatment' &&
+          !a.stationReleased &&
           (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
       ),
     [admissions, currentHospId, currentHosp]
   );
+
+  const concludedPatients = useMemo(
+    () =>
+      admissions.filter(
+        (a) =>
+          (a.treatmentSessions || []).length > 0 &&
+          (a.stationReleased || a.admissionStatus === 'in_observation' || a.admissionStatus === 'discharged') &&
+          (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
+      ),
+    [admissions, currentHospId, currentHosp]
+  );
+
+  const targetHighlight = highlightBabyIdOrUhid || initialBabyIdOrUhid;
+
+  const treatedPatients = useMemo(() => {
+    const list = ptListFilter === 'active' ? activePatients : concludedPatients;
+    if (!targetHighlight) return list;
+
+    return [...list].sort((a, b) => {
+      const aMatch =
+        (a.babyUhid && a.babyUhid === targetHighlight) ||
+        (a.babyId && a.babyId === targetHighlight) ||
+        (a.admissionId && a.admissionId === targetHighlight) ||
+        (a.id && a.id === targetHighlight);
+      const bMatch =
+        (b.babyUhid && b.babyUhid === targetHighlight) ||
+        (b.babyId && b.babyId === targetHighlight) ||
+        (b.admissionId && b.admissionId === targetHighlight) ||
+        (b.id && b.id === targetHighlight);
+
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  }, [ptListFilter, activePatients, concludedPatients, targetHighlight]);
+
+  // Sync initial target admission only if explicitly provided
+  useEffect(() => {
+    if (initialAdmission) {
+      setDetailedAdmission(initialAdmission);
+    }
+  }, [initialAdmission]);
 
   // Keep detailedAdmission in sync with updated store state
   useEffect(() => {
@@ -621,6 +681,21 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                 dischargeBilirubinValue: latestVal,
                 dischargeNotes: `Concluded phototherapy course. Total exposure: ${totalHours} hrs.`,
               });
+
+              // Synchronize matching baby in usePatientStore so baby card updates immediately
+              const matchingBaby = babies.find(
+                (b) =>
+                  (admission.babyUhid && b.uhid === admission.babyUhid) ||
+                  (admission.babyId && (b.id === admission.babyId || b.uhid === admission.babyId))
+              );
+              if (matchingBaby) {
+                await updateBaby(matchingBaby.id, {
+                  dischargeValue: latestVal,
+                  status: 'in_observation',
+                  currentStationId: undefined,
+                });
+              }
+
               setDetailedAdmission(null);
               Alert.alert('Treatment Concluded', `Phototherapy finished. Station released to cleaning pool.`);
             } catch {
@@ -646,12 +721,22 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
         (r.babyUhid && r.babyUhid === detailedAdmission.babyUhid) ||
         (r.babyId && r.babyId === detailedAdmission.babyId)
     );
+    const matchingBaby = babies.find(
+      (b) =>
+        (detailedAdmission.babyUhid && b.uhid === detailedAdmission.babyUhid) ||
+        (detailedAdmission.babyId && (b.id === detailedAdmission.babyId || b.uhid === detailedAdmission.babyId))
+    );
+    const isAdmissionDischarged =
+      detailedAdmission.admissionStatus === 'discharged' ||
+      matchingBaby?.status === 'discharged';
+
     return {
       totalHours,
       flowsheetRows,
       latestReading: patientReadings[0],
+      isAdmissionDischarged,
     };
-  }, [detailedAdmission, readings]);
+  }, [detailedAdmission, readings, babies]);
 
   return (
     <View style={styles.container}>
@@ -694,12 +779,12 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               <View style={styles.kpiDivider} />
               <TouchableOpacity
                 style={styles.kpiCol}
-                onPress={handleOpenEditAdmissionTsb}
-                activeOpacity={0.7}
+                onPress={!detailedFlowsheetData.isAdmissionDischarged ? handleOpenEditAdmissionTsb : undefined}
+                activeOpacity={!detailedFlowsheetData.isAdmissionDischarged ? 0.7 : 1}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                   <Text style={styles.kpiLabel}>Initial Bilirubin</Text>
-                  <Edit3 size={11} color="#7D3BFF" />
+                  {!detailedFlowsheetData.isAdmissionDischarged && <Edit3 size={11} color="#7D3BFF" />}
                 </View>
                 <Text style={styles.kpiVal}>
                   {(() => {
@@ -717,28 +802,36 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               </View>
             </View>
 
-            {/* Quick Actions Row */}
-            <View style={styles.flowsheetActionRow}>
-              <TouchableOpacity
-                style={styles.actionBtnPt}
-                onPress={() => handleOpenLogPt(detailedAdmission)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <Clock size={15} color="#FFFFFF" />
-                <Text style={styles.actionBtnText}>+ Log PT Time</Text>
-              </TouchableOpacity>
+            {/* Quick Actions Row or Locked Banner */}
+            {!detailedFlowsheetData.isAdmissionDischarged ? (
+              <View style={styles.flowsheetActionRow}>
+                <TouchableOpacity
+                  style={styles.actionBtnPt}
+                  onPress={() => handleOpenLogPt(detailedAdmission)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <Clock size={15} color="#FFFFFF" />
+                  <Text style={styles.actionBtnText}>+ Log PT Time</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.actionBtnBili}
-                onPress={() => handleOpenBiliModal(detailedAdmission)}
-                activeOpacity={0.7}
-                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-              >
-                <FlaskConical size={15} color="#7D3BFF" />
-                <Text style={styles.actionBtnBiliText}>+ Add Bilirubin</Text>
-              </TouchableOpacity>
-            </View>
+                <TouchableOpacity
+                  style={styles.actionBtnBili}
+                  onPress={() => handleOpenBiliModal(detailedAdmission)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  <FlaskConical size={15} color="#7D3BFF" />
+                  <Text style={styles.actionBtnBiliText}>+ Add Bilirubin</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.dischargedFlowsheetBanner}>
+                <Text style={styles.dischargedFlowsheetBannerText}>
+                  🔒 Patient Discharged • Treatment records are locked and read-only.
+                </Text>
+              </View>
+            )}
 
             {/* The Unified Clinical Flowsheet Table */}
             <View style={styles.tableCard}>
@@ -748,15 +841,17 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                   <Text style={styles.tableCardTitle}>Clinical Flowsheet</Text>
                   <Text style={styles.tableCardSub}>Hourly treatment and lab observations</Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.cardEditPencilBtn}
-                  onPress={() => setManageRecordsModalVisible(true)}
-                  activeOpacity={0.7}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <Edit3 size={14} color="#7D3BFF" />
-                  <Text style={styles.cardEditText}>Edit</Text>
-                </TouchableOpacity>
+                {!detailedFlowsheetData.isAdmissionDischarged && (
+                  <TouchableOpacity
+                    style={styles.cardEditPencilBtn}
+                    onPress={() => setManageRecordsModalVisible(true)}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <Edit3 size={14} color="#7D3BFF" />
+                    <Text style={styles.cardEditText}>Edit</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Table Header: 3 clean, spacious, dynamic columns */}
@@ -794,16 +889,16 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                       {row.durationHoursText ? (
                         <TouchableOpacity
                           style={styles.ptDurationBadge}
-                          onPress={() => handleEditPtSession(row)}
-                          activeOpacity={0.7}
+                          onPress={!detailedFlowsheetData.isAdmissionDischarged ? () => handleEditPtSession(row) : undefined}
+                          activeOpacity={!detailedFlowsheetData.isAdmissionDischarged ? 0.7 : 1}
                         >
                           <Text style={styles.ptDurationText}>{row.durationHoursText}</Text>
                         </TouchableOpacity>
                       ) : (
                         <TouchableOpacity
                           style={styles.emptyCellTouch}
-                          onPress={() => handleAddPtToRow(row)}
-                          activeOpacity={0.7}
+                          onPress={!detailedFlowsheetData.isAdmissionDischarged ? () => handleAddPtToRow(row) : undefined}
+                          activeOpacity={!detailedFlowsheetData.isAdmissionDischarged ? 0.7 : 1}
                         >
                           <Text style={styles.tdDash}>—</Text>
                         </TouchableOpacity>
@@ -815,8 +910,8 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                       {row.bilirubinValue != null ? (
                         <TouchableOpacity
                           style={styles.biliTablePill}
-                          onPress={() => handleEditBilirubin(row)}
-                          activeOpacity={0.7}
+                          onPress={!detailedFlowsheetData.isAdmissionDischarged ? () => handleEditBilirubin(row) : undefined}
+                          activeOpacity={!detailedFlowsheetData.isAdmissionDischarged ? 0.7 : 1}
                         >
                           <Text style={styles.biliValText}>{row.bilirubinValue.toFixed(1)} mg/dL</Text>
                           {row.method === 'TSB' && (
@@ -826,8 +921,8 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                       ) : (
                         <TouchableOpacity
                           style={styles.emptyCellTouch}
-                          onPress={() => handleAddBiliToRow(row)}
-                          activeOpacity={0.7}
+                          onPress={!detailedFlowsheetData.isAdmissionDischarged ? () => handleAddBiliToRow(row) : undefined}
+                          activeOpacity={!detailedFlowsheetData.isAdmissionDischarged ? 0.7 : 1}
                         >
                           <Text style={styles.tdDash}>—</Text>
                         </TouchableOpacity>
@@ -838,15 +933,24 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               )}
             </View>
 
-            {/* Conclude Phototherapy Action */}
-            <TouchableOpacity
-              style={styles.concludeBtn}
-              onPress={() => handleConcludeTreatment(detailedAdmission)}
-              activeOpacity={0.8}
-            >
-              <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
-              <Text style={styles.concludeBtnText}>Conclude Phototherapy & Free Station</Text>
-            </TouchableOpacity>
+            {/* Conclude Phototherapy Action or Discharged Notice */}
+            {!detailedFlowsheetData.isAdmissionDischarged ? (
+              <TouchableOpacity
+                style={styles.concludeBtn}
+                onPress={() => handleConcludeTreatment(detailedAdmission)}
+                activeOpacity={0.8}
+              >
+                <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
+                <Text style={styles.concludeBtnText}>Conclude Phototherapy & Free Station</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.concludedDischargedCard}>
+                <Check size={16} color="#00A569" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                <Text style={styles.concludedDischargedText}>
+                  Phototherapy Concluded & Patient Discharged
+                </Text>
+              </View>
+            )}
           </ScrollView>
         </View>
       ) : (
@@ -866,12 +970,36 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                     Phototherapy Monitoring
                   </Text>
                   <Text style={styles.headerSubtitle} numberOfLines={1}>
-                    {treatedPatients.length} Active Patients Under Treatment
+                    {ptListFilter === 'active'
+                      ? `${activePatients.length} Active Patients Under Treatment`
+                      : 'Concluded Treatment Records'}
                   </Text>
                 </View>
               </View>
             </View>
           )}
+
+          {/* Active vs Concluded Filter Tabs */}
+          <View style={styles.ptListFilterRow}>
+            <TouchableOpacity
+              onPress={() => setPtListFilter('active')}
+              style={[styles.filterPill, ptListFilter === 'active' && styles.filterPillActive]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterPillText, ptListFilter === 'active' && styles.filterPillTextActive]}>
+                Active Treatment ({activePatients.length})
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setPtListFilter('concluded')}
+              style={[styles.filterPill, ptListFilter === 'concluded' && styles.filterPillActive]}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.filterPillText, ptListFilter === 'concluded' && styles.filterPillTextActive]}>
+                Concluded History
+              </Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Patient List */}
           <FlatList
@@ -881,9 +1009,15 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>💡</Text>
-                <Text style={styles.emptyTitle}>No Active Sessions</Text>
-                <Text style={styles.emptySub}>No patients currently undergoing phototherapy in this unit.</Text>
+                <Text style={styles.emptyIcon}>{ptListFilter === 'active' ? '💡' : '📋'}</Text>
+                <Text style={styles.emptyTitle}>
+                  {ptListFilter === 'active' ? 'No Active Sessions' : 'No Concluded Sessions'}
+                </Text>
+                <Text style={styles.emptySub}>
+                  {ptListFilter === 'active'
+                    ? 'No patients currently undergoing phototherapy in this unit.'
+                    : 'No phototherapy treatment histories found.'}
+                </Text>
               </View>
             }
             renderItem={({ item }) => {
@@ -898,10 +1032,23 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                   (r.babyId && r.babyId === item.babyId)
               );
               const latestReading = patientReadings[0];
+              const itemMatchingBaby = babies.find(
+                (b) => (item.babyUhid && b.uhid === item.babyUhid) || (item.babyId && b.id === item.babyId)
+              );
+              const isItemDischarged =
+                item.admissionStatus === 'discharged' ||
+                itemMatchingBaby?.status === 'discharged';
+
+              const isHighlighted =
+                !!targetHighlight &&
+                ((item.babyUhid && item.babyUhid === targetHighlight) ||
+                 (item.babyId && item.babyId === targetHighlight) ||
+                 (item.admissionId && item.admissionId === targetHighlight) ||
+                 (item.id && item.id === targetHighlight));
 
               return (
                 <TouchableOpacity
-                  style={styles.card}
+                  style={[styles.card, isHighlighted && styles.cardHighlighted]}
                   onPress={() => setDetailedAdmission(item)}
                   activeOpacity={0.88}
                 >
@@ -912,6 +1059,11 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                         📍 {item.ptStationName || 'Station Assigned'}
                       </Text>
                     </View>
+                    {isHighlighted && (
+                      <View style={styles.targetBadge}>
+                        <Text style={styles.targetBadgeText}>SELECTED PATIENT</Text>
+                      </View>
+                    )}
                     <View style={[styles.totalBadge, Number(totalHours) === 0 && { backgroundColor: '#F1F5F9' }]}>
                       <Text style={[styles.totalBadgeText, Number(totalHours) === 0 && { color: '#64748B' }]}>
                         {Number(totalHours) > 0 ? `${totalHours}h Total` : '0.0h'}
@@ -971,31 +1123,39 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
 
                   {/* Card Action Row: Quick Entry + Tap to View Detailed Table */}
                   <View style={styles.cardActionsRow}>
-                    <TouchableOpacity
-                      style={styles.quickLogBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleOpenLogPt(item);
-                      }}
-                      activeOpacity={0.75}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    >
-                      <Clock size={15} color="#7D3BFF" />
-                      <Text style={styles.quickLogText}>+ Log PT</Text>
-                    </TouchableOpacity>
+                    {!isItemDischarged ? (
+                      <>
+                        <TouchableOpacity
+                          style={styles.quickLogBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleOpenLogPt(item);
+                          }}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <Clock size={15} color="#7D3BFF" />
+                          <Text style={styles.quickLogText}>+ Log PT</Text>
+                        </TouchableOpacity>
 
-                    <TouchableOpacity
-                      style={styles.quickBiliBtn}
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        handleOpenBiliModal(item);
-                      }}
-                      activeOpacity={0.75}
-                      hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
-                    >
-                      <Plus size={15} color="#00A569" />
-                      <Text style={styles.quickBiliText}>+ Bilirubin</Text>
-                    </TouchableOpacity>
+                        <TouchableOpacity
+                          style={styles.quickBiliBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleOpenBiliModal(item);
+                          }}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <Plus size={15} color="#00A569" />
+                          <Text style={styles.quickBiliText}>+ Bilirubin</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : (
+                      <View style={styles.dischargedItemBadge}>
+                        <Text style={styles.dischargedItemBadgeText}>DISCHARGED</Text>
+                      </View>
+                    )}
 
                     <View style={styles.viewFlowsheetLink}>
                       <Text style={styles.viewFlowsheetText}>Flowsheet</Text>
@@ -2338,5 +2498,107 @@ const styles = StyleSheet.create({
     color: '#64748B',
     textAlign: 'center',
     marginTop: 4,
+  },
+  ptListFilterRow: {
+    flexDirection: 'row',
+    backgroundColor: '#F1F5F9',
+    padding: 4,
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  filterPill: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterPillActive: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  filterPillText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  filterPillTextActive: {
+    color: '#7D3BFF',
+  },
+  cardHighlighted: {
+    borderColor: '#7D3BFF',
+    borderWidth: 2,
+    backgroundColor: '#FAF5FF',
+    shadowColor: '#7D3BFF',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  targetBadge: {
+    backgroundColor: '#7D3BFF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  targetBadgeText: {
+    color: '#FFFFFF',
+    fontSize: fontScale(9),
+    fontWeight: '800',
+    letterSpacing: 0.4,
+  },
+  dischargedFlowsheetBanner: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+    marginVertical: 10,
+    alignItems: 'center',
+  },
+  dischargedFlowsheetBannerText: {
+    fontSize: fontScale(12),
+    fontWeight: '700',
+    color: '#64748B',
+    textAlign: 'center',
+  },
+  concludedDischargedCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F0FDF4',
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginVertical: 10,
+  },
+  concludedDischargedText: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#16A34A',
+    marginLeft: 6,
+  },
+  dischargedItemBadge: {
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+  },
+  dischargedItemBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#475569',
+    letterSpacing: 0.3,
   },
 });

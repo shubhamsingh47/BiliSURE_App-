@@ -32,7 +32,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNewRegistration,
 }) => {
   const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
-  const { referrals } = useNetworkStore();
+  const { referrals, admissions } = useNetworkStore();
   const { user } = useAuthStore();
   const currentHospital = (user?.facility || 'PGI').toUpperCase();
 
@@ -66,6 +66,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenEdit = (baby: Baby) => {
+    if (baby.status === 'discharged') {
+      Alert.alert('Record Locked', 'This patient has been discharged and their record is locked.');
+      return;
+    }
     setEditingBaby(baby);
     const mName = baby.parentsName?.trim() || baby.name;
     setEditName(mName);
@@ -157,13 +161,59 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     return colors[idx % colors.length];
   };
 
-  const getLatestSample = (babyId: string) => {
+  const getPhototherapyInfo = (baby: Baby) => {
+    const adm = admissions.find(
+      (a) =>
+        (a.babyId && a.babyId === baby.id) ||
+        (a.babyUhid && a.babyUhid === baby.uhid) ||
+        (baby.uhid && a.admissionId === baby.uhid)
+    );
+
+    if (adm) {
+      const isConcluded = adm.stationReleased || adm.admissionStatus === 'in_observation' || adm.admissionStatus === 'discharged';
+      const sessions = adm.treatmentSessions || [];
+      const totalMinutes = sessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+      const totalHours = (totalMinutes / 60).toFixed(1);
+
+      if (!isConcluded && (adm.admissionStatus as string) === 'under_treatment') {
+        return {
+          status: 'in_treatment' as const,
+          stationName: adm.ptStationName || baby.currentStationId || 'Station',
+          hours: totalHours,
+        };
+      }
+
+      if (sessions.length > 0) {
+        return {
+          status: 'concluded' as const,
+          hours: totalHours,
+        };
+      }
+    }
+
+    if (baby.status === 'under_treatment') {
+      return {
+        status: 'in_treatment' as const,
+        stationName: baby.currentStationId || 'Station',
+      };
+    }
+
+    if (baby.dischargeValue) {
+      return {
+        status: 'concluded' as const,
+      };
+    }
+
+    return null;
+  };
+
+  const getLatestSample = (baby: Baby) => {
     const babyObs = observations
-      .filter((o) => o.babyId === babyId)
+      .filter((o) => o.babyId === baby.id || (baby.uhid && (o as any).babyUhid === baby.uhid))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const babyRdgs = readings
-      .filter((r) => r.babyId === babyId)
+      .filter((r) => r.babyId === baby.id || (baby.uhid && r.babyUhid === baby.uhid))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
     const latestObs = babyObs[0];
@@ -361,7 +411,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <BabyCard
                   key={baby.id + '_today_' + idx}
                   baby={baby}
-                  latestSample={getLatestSample(baby.id)}
+                  latestSample={getLatestSample(baby)}
+                  phototherapyInfo={getPhototherapyInfo(baby)}
                   pillColor={getPillColor(idx)}
                   referredToHospital={getReferredHospital(baby)}
                   onPress={() => onSelectBaby(baby)}
@@ -384,7 +435,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                 <BabyCard
                   key={baby.id + '_yesterday_' + idx}
                   baby={baby}
-                  latestSample={getLatestSample(baby.id)}
+                  latestSample={getLatestSample(baby)}
+                  phototherapyInfo={getPhototherapyInfo(baby)}
                   pillColor={getPillColor(idx + 3)}
                   referredToHospital={getReferredHospital(baby)}
                   onPress={() => onSelectBaby(baby)}
