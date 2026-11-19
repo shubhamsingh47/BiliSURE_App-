@@ -26,6 +26,7 @@ interface PatientState {
     timestamp?: string
   ) => Promise<ClinicalObservation>;
   updateObservation: (observationId: string, updates: { site?: string; bilirubinValue?: number }) => void;
+  updateReading: (readingId: string, updates: Partial<BilirubinReading>) => void;
 }
 
 export const usePatientStore = create<PatientState>((set, get) => ({
@@ -204,24 +205,28 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
   addReading: async (readingData) => {
     const activeBaby = get().selectedBaby || get().babies[0];
-    if (!activeBaby) {
+    const babyId = readingData.babyId || activeBaby?.id || (activeBaby as any)?._id || 'baby_unknown';
+    const babyUhid = readingData.babyUhid || activeBaby?.uhid || 'UHID-0000';
+    const targetBaby = get().babies.find((b) => b.id === babyId || b.uhid === babyUhid) || activeBaby;
+
+    if (!targetBaby && !readingData.babyId) {
       throw new Error('No patient selected to record reading');
     }
 
     const clientOpId = 'op_rdg_' + Date.now();
     const value = readingData.value || 10.0;
     const unit = readingData.unit || 'mg/dL';
-    const method = readingData.method || 'TSB';
+    const method = readingData.method || 'TcB';
 
     // Clinical Bhutani stratification
     const bhutaniAssessment = evaluateBhutaniRisk({
-      dateOfBirth: activeBaby.dateOfBirth,
-      exactTimeOfBirth: activeBaby.exactTimeOfBirth || '08:00',
+      dateOfBirth: targetBaby?.dateOfBirth || new Date(Date.now() - 3600000 * 24).toISOString(),
+      exactTimeOfBirth: targetBaby?.exactTimeOfBirth || '08:00',
       sampleTimestamp: readingData.sampleTimestamp || new Date().toISOString(),
       value,
       unit,
       method,
-      gestationalAgeWeeks: activeBaby.gestationalAgeWeeks || 38,
+      gestationalAgeWeeks: targetBaby?.gestationalAgeWeeks || 38,
     });
 
     const bhutaniZone = bhutaniAssessment.zone;
@@ -229,10 +234,13 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     if (bhutaniZone === 'high') riskLevel = 'high';
     else if (bhutaniZone === 'high_intermediate' || bhutaniZone === 'low_intermediate') riskLevel = 'intermediate';
 
+    const rawSite = readingData.measurementSite || 'forehead';
+    const normalizedSite = rawSite.toLowerCase().replace(/[\s-]+/g, '_');
+
     const payload: Partial<BilirubinReading> = {
       clientOperationId: clientOpId,
-      babyId: activeBaby.id || (activeBaby as any)._id,
-      babyUhid: activeBaby.uhid,
+      babyId,
+      babyUhid,
       value,
       valueMgDl: unit === 'µmol/L' ? Number((value / 17.1).toFixed(1)) : value,
       unit,
@@ -242,7 +250,7 @@ export const usePatientStore = create<PatientState>((set, get) => ({
       bhutaniZone,
       bhutaniPercentileApprox: bhutaniAssessment.percentileApprox,
       phototherapyPhase: readingData.phototherapyPhase || 'pre_phototherapy',
-      measurementSite: readingData.measurementSite || 'palms_and_soles',
+      measurementSite: normalizedSite,
       source: readingData.source || 'manual_entry',
       operatorName: readingData.operatorName || 'Nurse Staff',
       symptoms: readingData.symptoms || '',
@@ -264,12 +272,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
 
     set((state) => {
       const updatedBabies = state.babies.map((b) =>
-        b.id === activeBaby.id || b.uhid === activeBaby.uhid ? { ...b, severityState: updatedSeverity } : b
+        b.id === babyId || b.uhid === babyUhid ? { ...b, severityState: updatedSeverity } : b
       );
       return {
         readings: [readingToStore, ...state.readings],
         babies: updatedBabies,
-        selectedBaby: { ...activeBaby, severityState: updatedSeverity },
+        selectedBaby: targetBaby && (targetBaby.id === babyId || targetBaby.uhid === babyUhid)
+          ? { ...targetBaby, severityState: updatedSeverity }
+          : state.selectedBaby,
       };
     });
 
@@ -305,6 +315,14 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     set((state) => ({
       observations: state.observations.map((o) =>
         o.id === observationId ? { ...o, ...updates } : o
+      ),
+    }));
+  },
+
+  updateReading: (readingId, updates) => {
+    set((state) => ({
+      readings: state.readings.map((r) =>
+        r.id === readingId ? { ...r, ...updates } : r
       ),
     }));
   },

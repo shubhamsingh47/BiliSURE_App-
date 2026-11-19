@@ -11,7 +11,9 @@ router.get('/baby/:babyId', AdmissionsController.getByBabyId);
 router.post('/confirm-arrival', authenticate, AdmissionsController.confirmArrival);
 router.post('/:id/allocate-station', authenticate, AdmissionsController.allocateStation);
 router.post('/:id/sessions/start', authenticate, AdmissionsController.startSession);
+router.post('/:id/sessions/log', authenticate, AdmissionsController.logSession);
 router.post('/:id/sessions/:sessionId/end', authenticate, AdmissionsController.endSession);
+router.patch('/:id/sessions/:sessionId', authenticate, AdmissionsController.updateSession);
 router.post('/:id/discharge', authenticate, AdmissionsController.completeDischarge);
 
 export { router as admissionRoutes };

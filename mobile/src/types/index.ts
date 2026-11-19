@@ -271,7 +271,7 @@ export interface Admission {
   admissionStatus: PatientStatus;
   assignedDoctor: string;
   primaryNurse: string;
-  initialAdmissionBilirubin: number;
+  initialAdmissionBilirubin?: number;
   treatmentSessions: TreatmentSession[];
   dischargeApprovedByDoctor?: string;
   dischargeApprovedAt?: string;

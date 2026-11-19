@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
-import { useAuthStore } from '../../../store/useAuthStore';
 import { usePatientStore } from '../../../store/usePatientStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { PTStation, Admission, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 
@@ -23,6 +23,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   onBabyAllocated,
 }) => {
   const { stations, admissions, allocateStation, allocateBabyToStation, updateStationStatus, notifications } = useNetworkStore();
+  const { babies } = usePatientStore();
   const { user } = useAuthStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -76,6 +77,16 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
   const [isProcessing, setIsProcessing] = useState(false);
 
   const handleAllocate = async (station: PTStation) => {
+    const matchingBaby = babies.find(
+      (b) =>
+        (selectedAdmission?.babyUhid && b.uhid === selectedAdmission.babyUhid) ||
+        (selectedAdmission?.babyId && b.id === selectedAdmission.babyId)
+    );
+    const resolvedInitial =
+      selectedAdmission?.initialAdmissionBilirubin ||
+      matchingBaby?.initialValue ||
+      undefined;
+
     const targetBaby: Baby | null = embedded
       ? selectedBaby
       : selectedBaby || (selectedAdmission ? {
@@ -83,7 +94,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
           uhid: selectedAdmission.babyUhid,
           name: selectedAdmission.babyName,
           parentsName: selectedAdmission.babyName,
-          initialValue: selectedAdmission.initialAdmissionBilirubin || 14.5,
+          initialValue: resolvedInitial,
         } as Baby : null);
 
     if (!targetBaby) {

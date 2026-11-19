@@ -24,7 +24,7 @@ export interface IBilirubinReading extends Document {
   sampleTimestamp: Date;
   postnatalAgeHours: number; // Postnatal age in exact hours at sample collection
   measurementSite: 'palms_and_soles' | 'face' | 'forehead' | 'sternum' | 'abdomen';
-  source: 'manual_entry' | 'device_transcutaneous' | 'serum_lab';
+  source: 'manual_entry' | 'device_transcutaneous' | 'serum_lab' | 'clinical_flowsheet';
   bhutaniZone: BhutaniRiskZone;
   bhutaniPercentileApprox?: number;
   phototherapyPhase: PhototherapyPhase;
@@ -67,7 +67,7 @@ const BilirubinReadingSchema = new Schema<IBilirubinReading>(
     },
     source: {
       type: String,
-      enum: ['manual_entry', 'device_transcutaneous', 'serum_lab'],
+      enum: ['manual_entry', 'device_transcutaneous', 'serum_lab', 'clinical_flowsheet'],
       default: 'manual_entry',
     },
     bhutaniZone: {

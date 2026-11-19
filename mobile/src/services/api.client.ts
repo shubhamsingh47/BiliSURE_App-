@@ -19,7 +19,7 @@ const getBackendBaseUrl = (): string => {
         return `http://${hostIp}:5000/api/v1`;
       }
     }
-  } catch {}
+  } catch { }
 
   // Fallback to PC Wi-Fi IP so physical Android/iOS devices connect reliably
   return `http://${DEV_LAN_IP}:5000/api/v1`;
@@ -75,7 +75,7 @@ apiClient.interceptors.response.use(
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return apiClient(originalRequest);
         }
-      } catch {}
+      } catch { }
     }
     return Promise.reject(error);
   }

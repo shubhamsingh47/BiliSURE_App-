@@ -44,11 +44,13 @@ const SEED_ADMISSIONS = [
       {
         sessionId: 'sess_002',
         startTime: new Date(Date.now() - 3600000 * 4),
+        endTime: new Date(Date.now() - 3600000 * 1),
+        durationMinutes: 180,
         phototherapyType: 'Double Surface LED Tunnel',
         irradianceMwCm2: 35,
         nurseName: 'Nurse Sarah',
-        notes: 'Session in progress. Bilirubin downward trend observed.',
-        status: 'active' as const,
+        notes: 'Session completed. Bilirubin downward trend observed.',
+        status: 'completed' as const,
       },
     ],
     stationReleased: false,
@@ -88,9 +90,14 @@ export class AdmissionsService {
   }
 
   static async getById(id: string) {
-    const found = memoryAdmissions.find(
-      (a) => (a as any)._id === id || a.admissionId === id || a.id === id
+    let found = memoryAdmissions.find(
+      (a) => (a as any)._id === id || a.admissionId === id || (a as any).id === id
     );
+    if (!found && isMongoConnected) {
+      try {
+        found = (await AdmissionModel.findOne({ $or: [{ _id: id }, { admissionId: id }] })) as any;
+      } catch {}
+    }
     if (!found) throw new NotFoundError('Admission record not found');
     return found;
   }
@@ -270,6 +277,155 @@ export class AdmissionsService {
     admission.updatedAt = new Date();
 
     return { admission, session: newSession };
+  }
+
+  /**
+   * Log completed treatment session directly (e.g. from nurse flowsheet)
+   */
+  static async logTreatmentSession(
+    admissionId: string,
+    data: {
+      startTime: string | Date;
+      endTime: string | Date;
+      durationMinutes?: number;
+      phototherapyType?: string;
+      irradianceMwCm2?: number;
+      nurseName?: string;
+      notes?: string;
+      babyId?: string;
+      babyUhid?: string;
+      babyName?: string;
+    }
+  ) {
+    let admission = memoryAdmissions.find(
+      (a) => (a as any)._id === admissionId || a.admissionId === admissionId || (a as any).id === admissionId
+    );
+    if (!admission && isMongoConnected) {
+      try {
+        admission = (await AdmissionModel.findOne({
+          $or: [{ _id: admissionId }, { admissionId }],
+        })) as any;
+      } catch {}
+    }
+
+    const start = new Date(data.startTime);
+    const end = new Date(data.endTime);
+    const durationMinutes =
+      data.durationMinutes !== undefined && !isNaN(Number(data.durationMinutes))
+        ? Number(data.durationMinutes)
+        : Math.max(1, Math.round((end.getTime() - start.getTime()) / 60000));
+
+    const newSession: ITreatmentSession = {
+      sessionId: 'sess_' + Date.now(),
+      startTime: start,
+      endTime: end,
+      durationMinutes,
+      phototherapyType: data.phototherapyType || 'Double Surface LED',
+      irradianceMwCm2: data.irradianceMwCm2 || 35,
+      nurseName: data.nurseName || 'Nurse Staff',
+      notes: data.notes || '',
+      status: 'completed',
+    };
+
+    if (!admission) {
+      // Auto-instantiate admission record in memory/db if initiated from client
+      const newAdmission: any = {
+        _id: admissionId,
+        admissionId: admissionId.startsWith('ADM-') ? admissionId : `ADM-${Date.now().toString().slice(-4)}`,
+        babyId: data.babyId || 'unknown',
+        babyUhid: data.babyUhid || 'UNKNOWN',
+        babyName: data.babyName || 'Baby Patient',
+        hospitalId: 'hosp_pgi',
+        hospitalName: 'PGI',
+        physicalArrivalConfirmed: true,
+        arrivalConfirmedAt: new Date(),
+        arrivalConfirmedBy: data.nurseName || 'Nurse Staff',
+        admittedAt: new Date(),
+        admissionStatus: 'under_treatment',
+        assignedDoctor: 'Dr. Hospital Paediatrician',
+        primaryNurse: data.nurseName || 'Nurse Staff',
+        initialAdmissionBilirubin: 14.0,
+        treatmentSessions: [newSession],
+        stationReleased: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+      memoryAdmissions.push(newAdmission);
+      if (isMongoConnected) {
+        try {
+          await AdmissionModel.create(newAdmission);
+        } catch {}
+      }
+      return { admission: newAdmission, session: newSession };
+    }
+
+    admission.treatmentSessions = admission.treatmentSessions || [];
+    admission.treatmentSessions.push(newSession);
+    admission.admissionStatus = 'under_treatment';
+    admission.updatedAt = new Date();
+
+    if (isMongoConnected) {
+      try {
+        await AdmissionModel.findOneAndUpdate(
+          { $or: [{ _id: admissionId }, { admissionId }] },
+          {
+            $push: { treatmentSessions: newSession },
+            $set: { admissionStatus: 'under_treatment', updatedAt: new Date() },
+          }
+        );
+      } catch (e) {}
+    }
+
+    return { admission, session: newSession };
+  }
+
+  /**
+   * Update an existing treatment session
+   */
+  static async updateTreatmentSession(
+    admissionId: string,
+    sessionId: string,
+    updates: Partial<ITreatmentSession>
+  ) {
+    let admission = memoryAdmissions.find(
+      (a) => (a as any)._id === admissionId || a.admissionId === admissionId || (a as any).id === admissionId
+    );
+    if (!admission && isMongoConnected) {
+      try {
+        admission = (await AdmissionModel.findOne({
+          $or: [{ _id: admissionId }, { admissionId }],
+        })) as any;
+      } catch {}
+    }
+
+    if (!admission) throw new NotFoundError('Admission record not found');
+
+    const session = admission.treatmentSessions.find((s) => s.sessionId === sessionId);
+    if (!session) throw new NotFoundError('Treatment session not found');
+
+    if (updates.startTime) session.startTime = new Date(updates.startTime);
+    if (updates.endTime) session.endTime = new Date(updates.endTime);
+    if (updates.durationMinutes !== undefined) session.durationMinutes = Number(updates.durationMinutes);
+    if (updates.phototherapyType) session.phototherapyType = updates.phototherapyType;
+    if (updates.notes !== undefined) session.notes = updates.notes;
+    if (updates.status) session.status = updates.status;
+    admission.updatedAt = new Date();
+
+    if (isMongoConnected) {
+      try {
+        await AdmissionModel.findOneAndUpdate(
+          { $or: [{ _id: admissionId }, { admissionId }], 'treatmentSessions.sessionId': sessionId },
+          {
+            $set: {
+              'treatmentSessions.$': session,
+              updatedAt: new Date(),
+            },
+          }
+        );
+      } catch {}
+    }
+
+    return { admission, session };
   }
 
   /**

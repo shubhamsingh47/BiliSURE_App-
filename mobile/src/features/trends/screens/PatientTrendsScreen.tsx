@@ -120,12 +120,18 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     }
   };
 
-  // Initial = first value entered for this baby; Discharge = set via Discharge button
+  // Initial Bilirubin = baby's admission baseline initial value; Discharge = set via Discharge button
   const babyObservations = observations
     .filter((o) => o.babyId === activeBaby.id)
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   const initialVal: number | null =
-    babyObservations.length > 0 ? babyObservations[babyObservations.length - 1].bilirubinValue : null;
+    activeBaby?.initialValue && activeBaby.initialValue > 0
+      ? activeBaby.initialValue
+      : activeAdmission?.initialAdmissionBilirubin && activeAdmission.initialAdmissionBilirubin > 0
+      ? activeAdmission.initialAdmissionBilirubin
+      : babyObservations.length > 0
+      ? babyObservations[babyObservations.length - 1].bilirubinValue
+      : null;
   const isDischarged = activeBaby.status === 'discharged';
   const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
 
@@ -517,8 +523,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             onPress={() => initialVal !== null && onOpenReadingDetail(initialVal, 'Palms and soles')}
             style={[styles.statCard, { backgroundColor: '#00A569' }]}
           >
-            <Text style={styles.statCardLabel}>Initial Value</Text>
-            <Text style={styles.statCardValue}>{initialVal !== null ? `${initialVal.toFixed(1)}mg/dL` : '--'}</Text>
+            <Text style={styles.statCardLabel}>Initial Bilirubin</Text>
+            <Text style={styles.statCardValue}>{initialVal !== null ? `${initialVal.toFixed(1)} mg/dL` : ''}</Text>
           </TouchableOpacity>
 
           {/* Discharge Value Card (Red/Coral) */}

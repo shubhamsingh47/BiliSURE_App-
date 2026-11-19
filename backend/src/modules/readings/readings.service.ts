@@ -1,13 +1,25 @@
+import { Types } from 'mongoose';
 import { BilirubinReadingModel, IBilirubinReading } from '../../models/BilirubinReading';
 import { BabyModel } from '../../models/Baby';
 import { evaluateBhutaniRisk, calculatePostnatalAgeHours, mgDlToUmolL, umolLToMgDl } from '../clinical/bhutani.engine';
 import { NotificationsService } from '../notifications/notifications.service';
+import { isMongoConnected } from '../../config/database';
+
+const memoryReadings: any[] = [];
 
 export class ReadingsService {
   static async getReadingsForBaby(babyId: string, timeRange?: string) {
-    const query: any = { $or: [{ babyId }, { babyUhid: babyId }] };
-    const readings = await BilirubinReadingModel.find(query).sort({ timestamp: -1 }).lean();
-    return this.filterByTimeRange(readings, timeRange);
+    if (isMongoConnected) {
+      try {
+        const query: any = { $or: [{ babyId }, { babyUhid: babyId }] };
+        const readings = await BilirubinReadingModel.find(query).sort({ timestamp: -1 }).lean();
+        if (readings && readings.length > 0) {
+          return this.filterByTimeRange(readings, timeRange);
+        }
+      } catch {}
+    }
+    const mem = memoryReadings.filter((r) => r.babyId === babyId || r.babyUhid === babyId);
+    return this.filterByTimeRange(mem, timeRange);
   }
 
   static async getLatestReadingForBaby(babyId: string) {
@@ -24,9 +36,15 @@ export class ReadingsService {
 
     // Fetch baby record to calculate exact postnatal age and gestational eligibility
     let baby: any = null;
-    try {
-      baby = await BabyModel.findOne({ $or: [{ _id: data.babyId }, { uhid: data.babyId }] });
-    } catch {}
+    if (isMongoConnected) {
+      try {
+        const searchConditions: any[] = [{ uhid: data.babyId }, { uhid: data.babyUhid }];
+        if (Types.ObjectId.isValid(data.babyId)) {
+          searchConditions.unshift({ _id: data.babyId });
+        }
+        baby = await BabyModel.findOne({ $or: searchConditions });
+      } catch {}
+    }
 
     const dob = baby?.dateOfBirth || data.dateOfBirth || new Date(Date.now() - 3600000 * 24);
     const exactTime = baby?.exactTimeOfBirth || data.exactTimeOfBirth || '09:00';
@@ -57,12 +75,29 @@ export class ReadingsService {
 
     const phototherapyPhase = data.phototherapyPhase || 'pre_phototherapy';
 
+    // Normalize measurementSite
+    let site = (data.measurementSite || 'forehead').toLowerCase().replace(/[\s-]+/g, '_');
+    if (!['palms_and_soles', 'face', 'forehead', 'sternum', 'abdomen'].includes(site)) {
+      site = 'forehead';
+    }
+
+    // Normalize source
+    let source = data.source || 'manual_entry';
+    if (!['manual_entry', 'device_transcutaneous', 'serum_lab', 'clinical_flowsheet'].includes(source)) {
+      source = 'manual_entry';
+    }
+
     const readingPayload: any = {
       ...data,
+      clientOperationId: data.clientOperationId || 'op_rdg_' + Date.now(),
+      babyId: data.babyId,
+      babyUhid: data.babyUhid || baby?.uhid,
       value: valueNum,
       valueMgDl,
       unit,
       method,
+      measurementSite: site,
+      source,
       sampleTimestamp,
       postnatalAgeHours,
       bhutaniZone,
@@ -85,35 +120,49 @@ export class ReadingsService {
       }).catch(() => null);
     }
 
-    if (data.clientOperationId) {
-      const existing = await BilirubinReadingModel.findOne({ clientOperationId: data.clientOperationId });
-      if (existing) return existing.toObject();
+    if (isMongoConnected) {
+      try {
+        if (data.clientOperationId) {
+          const existing = await BilirubinReadingModel.findOne({ clientOperationId: data.clientOperationId });
+          if (existing) return existing.toObject();
+        }
+
+        const reading = await BilirubinReadingModel.create(readingPayload);
+
+        const severityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
+        if (Types.ObjectId.isValid(data.babyId)) {
+          await BabyModel.findByIdAndUpdate(data.babyId, {
+            severityState,
+            ...(data.isInitial ? { initialValue: valueMgDl } : {}),
+            ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
+          }).catch(() => {});
+        } else if (data.babyUhid || data.babyId) {
+          await BabyModel.findOneAndUpdate({ uhid: data.babyUhid || data.babyId }, {
+            severityState,
+            ...(data.isInitial ? { initialValue: valueMgDl } : {}),
+            ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
+          }).catch(() => {});
+        }
+
+        return { ...reading.toObject(), bhutaniAssessment: bhutaniResult };
+      } catch (err) {
+        // Fall back to memory storage on Mongo failure
+      }
     }
 
-    const reading = await BilirubinReadingModel.create(readingPayload);
-
-    try {
-      const severityState = riskLevel === 'high' ? 'critical' : riskLevel === 'intermediate' ? 'moderate' : 'normal';
-      await BabyModel.findByIdAndUpdate(data.babyId, {
-        severityState,
-        ...(data.isInitial ? { initialValue: valueMgDl } : {}),
-        ...(data.isDischarge ? { dischargeValue: valueMgDl } : {}),
-      });
-    } catch {}
-
-
-
-
-
-
-
-
-
-
-
-    
-
-    return { ...reading.toObject(), bhutaniAssessment: bhutaniResult };
+    // In-memory persistence fallback
+    const existingIndex = memoryReadings.findIndex((r) => r.clientOperationId === readingPayload.clientOperationId);
+    if (existingIndex >= 0) {
+      return { ...memoryReadings[existingIndex], bhutaniAssessment: bhutaniResult };
+    }
+    const memRecord = {
+      ...readingPayload,
+      _id: 'rdg_' + Date.now(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    memoryReadings.unshift(memRecord);
+    return { ...memRecord, bhutaniAssessment: bhutaniResult };
   }
 
   private static filterByTimeRange(readings: any[], timeRange?: string) {

@@ -87,8 +87,10 @@ export const DischargeApprovalScreen: React.FC<DischargeApprovalScreenProps> = (
 
         <View style={styles.statsRow}>
           <View style={styles.statBox}>
-            <Text style={styles.statVal}>{admission.initialAdmissionBilirubin || 14.8} mg/dL</Text>
-            <Text style={styles.statLbl}>Initial TSB</Text>
+            <Text style={styles.statVal}>
+              {admission.initialAdmissionBilirubin != null ? `${admission.initialAdmissionBilirubin.toFixed(1)} mg/dL` : ''}
+            </Text>
+            <Text style={styles.statLbl}>Initial Bilirubin</Text>
           </View>
           <View style={styles.statBox}>
             <Text style={[styles.statVal, { color: '#00A569' }]}>{totalHours} hrs</Text>

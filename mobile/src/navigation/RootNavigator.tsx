@@ -52,8 +52,8 @@ type ScreenRoute =
 export const RootNavigator: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<ScreenRoute>('splash');
   const [activeTab, setActiveTab] = useState<TabName>('babies');
-  const [wardSegment, setWardSegment] = useState<'treatment' | 'allocation'>('treatment');
-  const [wardSegmentTrigger, setWardSegmentTrigger] = useState<number>(0);
+  const [wardSegment, setWardSegment] = useState<'allocation' | 'treatment'>('allocation');
+  const [wardNavTimestamp, setWardNavTimestamp] = useState<number>(Date.now());
   const [readingVal, setReadingVal] = useState<number>(14.8);
   const [readingSite, setReadingSite] = useState<string>('Forehead');
   const [registeredUhid, setRegisteredUhid] = useState<string>('BS-IN-100001');
@@ -205,7 +205,7 @@ export const RootNavigator: React.FC = () => {
                 selectBaby(babyToAllocate);
               }
               setWardSegment('allocation');
-              setWardSegmentTrigger((prev) => prev + 1);
+              setWardNavTimestamp(Date.now());
               setActiveTab('ward_stations');
               setCurrentRoute('main');
             }}
@@ -214,7 +214,7 @@ export const RootNavigator: React.FC = () => {
                 selectBaby(selectedBaby);
               }
               setWardSegment('allocation');
-              setWardSegmentTrigger((prev) => prev + 1);
+              setWardNavTimestamp(Date.now());
               setActiveTab('ward_stations');
               setCurrentRoute('main');
             }}
@@ -252,7 +252,7 @@ export const RootNavigator: React.FC = () => {
             return (
               <WardStationsScreen
                 initialSegment={wardSegment}
-                segmentTrigger={wardSegmentTrigger}
+                segmentTrigger={wardNavTimestamp}
                 onOpenNotifications={() => setCurrentRoute('notifications')}
                 onRecordBilirubin={(uhid) => {
                   setReadingVal(12.4);
@@ -270,6 +270,8 @@ export const RootNavigator: React.FC = () => {
                   setCurrentRoute('create_referral');
                 }}
                 onArrivalConfirmed={(admId) => {
+                  setWardSegment('allocation');
+                  setWardNavTimestamp(Date.now());
                   setActiveTab('ward_stations');
                 }}
               />
@@ -280,7 +282,7 @@ export const RootNavigator: React.FC = () => {
             return (
               <DashboardScreen
                 onSelectBaby={handleSelectBaby}
-                onOpenReportStories={() => {}}
+                onOpenReportStories={() => { }}
                 onOpenNewRegistration={() => setCurrentRoute('new_registration')}
               />
             );

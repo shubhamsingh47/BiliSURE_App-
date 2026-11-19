@@ -82,6 +82,36 @@ export class AdmissionsController {
     }
   }
 
+  static async logSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const nurseName = (req as any).user?.name || req.body.nurseName || 'Nurse Staff';
+      const result = await AdmissionsService.logTreatmentSession(String(req.params.id), {
+        ...req.body,
+        nurseName,
+      });
+      return sendSuccess(res, result, 201, 'Phototherapy treatment session logged successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async updateSession(req: Request, res: Response, next: NextFunction) {
+    try {
+      const nurseName = (req as any).user?.name || req.body.nurseName || 'Nurse Staff';
+      const result = await AdmissionsService.updateTreatmentSession(
+        String(req.params.id),
+        String(req.params.sessionId),
+        {
+          ...req.body,
+          nurseName,
+        }
+      );
+      return sendSuccess(res, result, 200, 'Treatment session updated successfully');
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async endSession(req: Request, res: Response, next: NextFunction) {
     try {
       const nurseName = (req as any).user?.name || req.body.nurseName || 'Nurse Staff';

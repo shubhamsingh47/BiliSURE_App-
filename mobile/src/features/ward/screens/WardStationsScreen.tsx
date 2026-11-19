@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -20,26 +20,26 @@ import { NurseTreatmentTrackerScreen } from '../../hospitalNurse/screens/NurseTr
 import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/responsive';
 
 interface WardStationsScreenProps {
+  initialSegment?: 'allocation' | 'treatment';
+  segmentTrigger?: number;
   onOpenNotifications?: () => void;
   onRecordBilirubin?: (babyUhid: string) => void;
-  initialSegment?: 'treatment' | 'allocation';
-  segmentTrigger?: number;
 }
 
 export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
+  initialSegment = 'allocation',
+  segmentTrigger,
   onOpenNotifications,
   onRecordBilirubin,
-  initialSegment,
-  segmentTrigger,
 }) => {
   const insets = useSafeAreaInsets();
   const { stations, registerStation, notifications, admissions } = useNetworkStore();
   const { user } = useAuthStore();
   const { babies, selectedBaby, selectBaby } = usePatientStore();
 
-  const [activeSegment, setActiveSegment] = useState<'treatment' | 'allocation'>(initialSegment || 'treatment');
+  const [activeSegment, setActiveSegment] = useState<'allocation' | 'treatment'>(initialSegment);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (initialSegment) {
       setActiveSegment(initialSegment);
     }

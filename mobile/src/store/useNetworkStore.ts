@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Hospital, PTStation, Referral, Admission, InAppNotification, ReferralStatus, ReferralUrgency, Baby } from '../types';
+import { Hospital, PTStation, Referral, Admission, TreatmentSession, InAppNotification, ReferralStatus, ReferralUrgency, Baby } from '../types';
 import { apiClient } from '../services/api.client';
 import { usePatientStore } from './usePatientStore';
 
@@ -23,7 +23,10 @@ interface NetworkState {
   allocateBabyToStation: (baby: Baby, stationId: string, nurseName: string) => Promise<void>;
   startTreatmentSession: (admissionId: string, data: { phototherapyType?: string; irradianceMwCm2?: number; nurseName: string; notes?: string }) => Promise<void>;
   endTreatmentSession: (admissionId: string, sessionId: string, nurseName: string, notes?: string) => Promise<void>;
+  logTreatmentSession: (admissionId: string, data: { startTime: string; endTime: string; durationMinutes: number; phototherapyType?: string; nurseName: string; notes?: string }) => Promise<void>;
   approveDischarge: (admissionId: string, data: { doctorName: string; dischargeBilirubinValue: number; dischargeNotes?: string; followUpPlan?: string }) => Promise<void>;
+  updateAdmission: (admissionId: string, updates: Partial<Admission>) => Promise<void>;
+  updateTreatmentSession: (admissionId: string, sessionId: string, updates: Partial<TreatmentSession>) => Promise<void>;
   updateStationStatus: (stationId: string, status: any, meta?: any) => Promise<void>;
   registerStation: (stationData: any) => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
@@ -539,6 +542,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     } else {
       const newAdmId = 'adm_' + Date.now();
       const newAdmCode = 'ADM-' + Math.floor(10000 + Math.random() * 90000);
+      // Dynamic baseline TSB from baby card / first reading (never hardcoded 14.5)
+      let resolvedInitialBili: number | undefined = undefined;
+      if (baby.initialValue && baby.initialValue > 0) {
+        resolvedInitialBili = baby.initialValue;
+      }
+
       const newAdmission: Admission = {
         id: newAdmId,
         admissionId: newAdmCode,
@@ -555,18 +564,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         primaryNurse: nurseName,
         ptStationId: stationId,
         ptStationName: `${targetStation.name} (${targetStation.stationId})`,
-        initialAdmissionBilirubin: baby.initialValue || 14.5,
-        treatmentSessions: [
-          {
-            sessionId: 'sess_' + Date.now(),
-            startTime: new Date().toISOString(),
-            phototherapyType: targetStation.type === 'double_surface' ? 'Double Surface High-Intensity LED' : 'Single Surface Overhead LED',
-            irradianceMwCm2: 35,
-            nurseName,
-            notes: 'Phototherapy session started directly upon bed assignment.',
-            status: 'active',
-          },
-        ],
+        initialAdmissionBilirubin: resolvedInitialBili,
+        treatmentSessions: [],
       };
 
       const updatedStations = state.stations.map((s) =>
@@ -643,6 +642,66 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     }));
 
     apiClient.post(`/admissions/${admissionId}/sessions/${sessionId}/end`, { nurseName, notes }).catch(() => {});
+  },
+
+  logTreatmentSession: async (admissionId, data) => {
+    const targetAdmission = get().admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
+    const newSession = {
+      sessionId: 'sess_' + Date.now(),
+      startTime: data.startTime,
+      endTime: data.endTime,
+      durationMinutes: data.durationMinutes,
+      phototherapyType: data.phototherapyType || 'Double Surface High-Intensity LED',
+      nurseName: data.nurseName,
+      notes: data.notes || '',
+      status: 'completed' as const,
+    };
+
+    set((state) => ({
+      admissions: state.admissions.map((a) =>
+        a.id === admissionId || a.admissionId === admissionId
+          ? {
+              ...a,
+              admissionStatus: 'under_treatment' as const,
+              treatmentSessions: [...a.treatmentSessions, newSession],
+            }
+          : a
+      ),
+    }));
+
+    apiClient
+      .post(`/admissions/${admissionId}/sessions/log`, {
+        ...data,
+        babyId: targetAdmission?.babyId,
+        babyUhid: targetAdmission?.babyUhid,
+        babyName: targetAdmission?.babyName,
+      })
+      .catch(() => {});
+  },
+
+  updateAdmission: async (admissionId, updates) => {
+    set((state) => ({
+      admissions: state.admissions.map((a) =>
+        a.id === admissionId || a.admissionId === admissionId ? { ...a, ...updates } : a
+      ),
+    }));
+  },
+
+  updateTreatmentSession: async (admissionId, sessionId, updates) => {
+    set((state) => ({
+      admissions: state.admissions.map((a) =>
+        a.id === admissionId || a.admissionId === admissionId
+          ? {
+              ...a,
+              treatmentSessions: a.treatmentSessions.map((s) =>
+                s.sessionId === sessionId ? { ...s, ...updates } : s
+              ),
+            }
+          : a
+      ),
+    }));
+
+    apiClient.patch(`/admissions/${admissionId}/sessions/${sessionId}`, updates).catch(() => {});
   },
 
   approveDischarge: async (admissionId, data) => {
