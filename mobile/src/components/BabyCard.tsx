@@ -60,8 +60,8 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   const sample = latestSample !== undefined
     ? latestSample
     : latestReading
-    ? { value: latestReading.value, timestamp: latestReading.timestamp }
-    : null;
+      ? { value: latestReading.value, timestamp: latestReading.timestamp }
+      : null;
 
   const displayName = getDisplayName(baby);
 
@@ -106,10 +106,10 @@ export const BabyCard: React.FC<BabyCardProps> = ({
         isReferred
           ? `${displayName}, ${badgeLabel}`
           : isBabyDischarged
-          ? `${displayName}, Discharged`
-          : isBabyInPt && activeStationName
-          ? `${displayName}, PT, ${activeStationName}`
-          : `${displayName}`
+            ? `${displayName}, Discharged`
+            : isBabyInPt && activeStationName
+              ? `${displayName}, PT, ${activeStationName}`
+              : `${displayName}`
       }
     >
       {/* UHID Pill */}
@@ -145,6 +145,10 @@ export const BabyCard: React.FC<BabyCardProps> = ({
                 Discharged{dischargeTimeStr ? ` • ${dischargeTimeStr}` : ''}
               </Text>
             </View>
+          ) : isReferred ? (
+            <Text style={styles.metaSubText} numberOfLines={1}>
+              {baby.uhid ? `UHID: ${baby.uhid}` : ''}
+            </Text>
           ) : isBabyInPt && activeStationName ? (
             <View style={styles.inPtBadge}>
               <Text style={styles.inPtBadgeText}>
@@ -157,13 +161,9 @@ export const BabyCard: React.FC<BabyCardProps> = ({
                 ✓ PT Completed{phototherapyInfo?.hours ? ` (${phototherapyInfo.hours}h)` : ''}
               </Text>
             </View>
-          ) : isReferred ? (
-            <Text style={styles.metaSubText} numberOfLines={1}>
-              {badgeLabel}
-            </Text>
           ) : (
             <Text style={styles.metaSubText} numberOfLines={1}>
-              {baby.uhid ? `UHID: ${baby.uhid}` : ''}{baby.gestationalAgeWeeks ? ` • ${baby.gestationalAgeWeeks}w${baby.gestationalAgeDays ? ` ${baby.gestationalAgeDays}d` : ''}` : ''}
+              {baby.uhid ? `UHID: ${baby.uhid}` : ''}
             </Text>
           )}
         </View>
@@ -175,7 +175,11 @@ export const BabyCard: React.FC<BabyCardProps> = ({
           /* Referred / Transferred State: Badge and sent timestamp */
           <View style={styles.referredRightCol}>
             <View style={[styles.referredTagBadge, isTransferred && styles.transferredTagBadge]}>
-              <Text style={[styles.referredTagText, isTransferred && styles.transferredTagText]} numberOfLines={1}>
+              <Text
+                style={[styles.referredTagText, isTransferred && styles.transferredTagText]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
                 {badgeLabel}
               </Text>
             </View>
@@ -213,7 +217,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
     borderRadius: moderateScale(16),
     paddingVertical: moderateScale(12),
-    paddingHorizontal: moderateScale(14),
+    paddingHorizontal: moderateScale(12),
     marginBottom: moderateScale(10),
     minHeight: moderateScale(70),
     flexDirection: 'row',
@@ -227,23 +231,23 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   uhidPill: {
-    width: moderateScale(60),
-    height: moderateScale(44),
-    borderRadius: moderateScale(14),
+    width: moderateScale(48),
+    height: moderateScale(40),
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     justifyContent: 'center',
   },
   uhidText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(11),
     fontWeight: '800',
     color: '#334155',
     letterSpacing: 0.5,
   },
   middleSection: {
     flex: 1,
-    marginLeft: moderateScale(12),
-    marginRight: moderateScale(8),
-    minWidth: 0,
+    marginLeft: moderateScale(10),
+    marginRight: moderateScale(6),
+    minWidth: moderateScale(110),
     justifyContent: 'center',
   },
   nameRow: {
@@ -379,37 +383,41 @@ const styles = StyleSheet.create({
     color: '#475569',
   },
   rightSectionReferred: {
-    minWidth: moderateScale(130),
+    minWidth: moderateScale(68),
+    maxWidth: moderateScale(112),
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   referredRightCol: {
     alignItems: 'flex-end',
     justifyContent: 'center',
+    maxWidth: '100%',
   },
   referredTagBadge: {
-    backgroundColor: '#E2E8F0',
-    paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(4),
-    borderRadius: moderateScale(8),
+    backgroundColor: '#EDE9FE',
+    paddingHorizontal: moderateScale(6),
+    paddingVertical: moderateScale(3),
+    borderRadius: moderateScale(7),
     borderWidth: 1,
-    borderColor: '#CBD5E1',
-    marginBottom: moderateScale(3),
+    borderColor: '#DDD6FE',
+    marginBottom: moderateScale(2),
+    maxWidth: '100%',
   },
   referredTagText: {
-    fontSize: fontScale(10.5),
+    fontSize: fontScale(9.5),
     fontWeight: '700',
-    color: '#0F172A',
-    letterSpacing: 0.2,
+    color: '#6D28D9',
+    letterSpacing: 0.1,
   },
   transferredTagBadge: {
-    backgroundColor: '#E2E8F0',
-    borderColor: '#94A3B8',
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
   },
   transferredTagText: {
-    color: '#1E293B',
+    color: '#475569',
   },
   referralSentDateText: {
-    fontSize: fontScale(10),
+    fontSize: fontScale(9.5),
     fontWeight: '600',
     color: '#64748B',
     marginTop: 1,
