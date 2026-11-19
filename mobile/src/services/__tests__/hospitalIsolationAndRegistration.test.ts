@@ -242,4 +242,199 @@ describe('Hospital Isolation, Session Guards, and Registration Defaults', () => 
       expect(isValidWeight('2.85')).toBe(true);
     });
   });
+
+  describe('5. Referral Patient Retention Across Hospitals', () => {
+    it('keeps referred patient visible at referring hospital during pending state', async () => {
+      useAuthStore.getState().setUser(HOSPITAL_USERS.PGI, 'mock_jwt_token_pgi');
+
+      const pgiBabyPendingRef: Baby = {
+        id: 'baby_pgi_ref_1',
+        uhid: 'PGI-100201',
+        name: 'Baby Aarti',
+        dateOfBirth: new Date().toISOString(),
+        currentHospital: 'PGI',
+        facility: 'PGI',
+        referralStatus: 'pending',
+        referredToHospitalName: 'RML',
+        referralSentAt: new Date().toISOString(),
+        severityState: 'normal',
+        status: 'admitted',
+      };
+
+      jest.spyOn(PatientsApi, 'getBabies').mockResolvedValueOnce([pgiBabyPendingRef]);
+      jest.spyOn(PatientsApi, 'getReadings').mockResolvedValue([]);
+      jest.spyOn(PatientsApi, 'getObservations').mockResolvedValue([]);
+
+      await usePatientStore.getState().loadBabies();
+      expect(usePatientStore.getState().babies).toHaveLength(1);
+      expect(usePatientStore.getState().babies[0].uhid).toBe('PGI-100201');
+      expect(usePatientStore.getState().babies[0].referralStatus).toBe('pending');
+      expect(usePatientStore.getState().babies[0].referredToHospitalName).toBe('RML');
+    });
+
+    it('keeps referred patient visible at referring hospital after acceptance (transferred out)', async () => {
+      useAuthStore.getState().setUser(HOSPITAL_USERS.PGI, 'mock_jwt_token_pgi');
+
+      const pgiBabyAcceptedAtRml: Baby = {
+        id: 'baby_pgi_ref_1',
+        uhid: 'PGI-100201',
+        name: 'Baby Aarti',
+        dateOfBirth: new Date().toISOString(),
+        currentHospital: 'RML', // Ownership is at RML
+        facility: 'PGI',
+        isTransferredOut: true,
+        isHistoricalOnly: true,
+        referralStatus: 'accepted',
+        referredToHospitalName: 'RML',
+        referralSentAt: new Date().toISOString(),
+        severityState: 'normal',
+        status: 'admitted',
+      };
+
+      jest.spyOn(PatientsApi, 'getBabies').mockResolvedValueOnce([pgiBabyAcceptedAtRml]);
+      jest.spyOn(PatientsApi, 'getReadings').mockResolvedValue([]);
+      jest.spyOn(PatientsApi, 'getObservations').mockResolvedValue([]);
+
+      await usePatientStore.getState().loadBabies();
+      expect(usePatientStore.getState().babies).toHaveLength(1);
+      expect(usePatientStore.getState().babies[0].uhid).toBe('PGI-100201');
+      expect(usePatientStore.getState().babies[0].isTransferredOut).toBe(true);
+      expect(usePatientStore.getState().babies[0].isHistoricalOnly).toBe(true);
+      expect(usePatientStore.getState().babies[0].referredToHospitalName).toBe('RML');
+    });
+
+    it('supports multi-hop referral chains (PGI -> RML -> KGMU) without disappearing from intermediate referring hospital (RML)', async () => {
+      // User is logged into RML
+      useAuthStore.getState().setUser(HOSPITAL_USERS.RML, 'mock_jwt_token_rml');
+
+      // Baby was originally born at PGI, transferred to RML, and now RML transferred it to KGMU
+      const multiHopBaby: Baby = {
+        id: 'baby_chain_1',
+        uhid: 'PGI-889900',
+        name: 'Baby Chain',
+        dateOfBirth: new Date().toISOString(),
+        currentHospital: 'KGMU', // Accepted by KGMU
+        facility: 'PGI', // Born at PGI
+        isTransferredOut: true, // Tagged by backend as transferred out from RML
+        isHistoricalOnly: true,
+        referralStatus: 'accepted',
+        referredToHospitalName: 'KGMU',
+        referralSentAt: new Date().toISOString(),
+        severityState: 'normal',
+        status: 'admitted',
+      };
+
+      jest.spyOn(PatientsApi, 'getBabies').mockResolvedValueOnce([multiHopBaby]);
+      jest.spyOn(PatientsApi, 'getReadings').mockResolvedValue([]);
+      jest.spyOn(PatientsApi, 'getObservations').mockResolvedValue([]);
+
+      await usePatientStore.getState().loadBabies();
+      // Must NOT be dropped even though facility is PGI and currentHospital is KGMU!
+      expect(usePatientStore.getState().babies).toHaveLength(1);
+      expect(usePatientStore.getState().babies[0].uhid).toBe('PGI-889900');
+      expect(usePatientStore.getState().babies[0].referredToHospitalName).toBe('KGMU');
+    });
+  });
+
+  describe('6. Gestational Age Weeks and Optional Days Validation', () => {
+    const validateGestation = (weeksStr: string, daysStr: string) => {
+      if (!weeksStr.trim()) {
+        return { valid: false, error: 'Weeks required' };
+      }
+      const parsedWeeks = parseInt(weeksStr.trim(), 10);
+      if (isNaN(parsedWeeks) || parsedWeeks < 20 || parsedWeeks > 46) {
+        return { valid: false, error: 'Weeks must be between 20 and 46' };
+      }
+
+      let parsedDays: number | undefined = undefined;
+      if (daysStr.trim()) {
+        const trimmed = daysStr.trim();
+        // Reject negative numbers, decimals, and values > 6
+        if (!/^[0-6]$/.test(trimmed)) {
+          return { valid: false, error: 'Days must be a whole number between 0 and 6' };
+        }
+        parsedDays = parseInt(trimmed, 10);
+      }
+
+      return { valid: true, weeks: parsedWeeks, days: parsedDays };
+    };
+
+    it('accepts 36 weeks and 4 days', () => {
+      const result = validateGestation('36', '4');
+      expect(result.valid).toBe(true);
+      expect(result.weeks).toBe(36);
+      expect(result.days).toBe(4);
+    });
+
+    it('accepts 37 weeks and empty days', () => {
+      const result = validateGestation('37', '');
+      expect(result.valid).toBe(true);
+      expect(result.weeks).toBe(37);
+      expect(result.days).toBeUndefined();
+    });
+
+    it('accepts 35 weeks and 0 days', () => {
+      const result = validateGestation('35', '0');
+      expect(result.valid).toBe(true);
+      expect(result.weeks).toBe(35);
+      expect(result.days).toBe(0);
+    });
+
+    it('rejects invalid day values (decimals, negative, > 6, non-numeric)', () => {
+      expect(validateGestation('36', '7').valid).toBe(false);
+      expect(validateGestation('36', '-1').valid).toBe(false);
+      expect(validateGestation('36', '4.5').valid).toBe(false);
+      expect(validateGestation('36', 'abc').valid).toBe(false);
+    });
+  });
+
+  describe('7. Hospital-Specific UHID Prefix Generation & Compatibility', () => {
+    const generateUhidForHospital = (facilityName: string) => {
+      const raw = facilityName.toUpperCase();
+      const prefix = raw.includes('KGMU') ? 'KGMU' : raw.includes('RML') ? 'RML' : 'PGI';
+      const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+      return `${prefix}-${randomSuffix}`;
+    };
+
+    it('generates PGI prefix for PGI session', () => {
+      const uhid = generateUhidForHospital('Postgraduate Institute (PGI)');
+      expect(uhid.startsWith('PGI-')).toBe(true);
+      expect(uhid).toMatch(/^PGI-\d{6}$/);
+    });
+
+    it('generates KGMU prefix for KGMU session', () => {
+      const uhid = generateUhidForHospital('King George Medical University (KGMU)');
+      expect(uhid.startsWith('KGMU-')).toBe(true);
+      expect(uhid).toMatch(/^KGMU-\d{6}$/);
+    });
+
+    it('generates RML prefix for RML session', () => {
+      const uhid = generateUhidForHospital('Dr. Ram Manohar Lohia Institute (RML)');
+      expect(uhid.startsWith('RML-')).toBe(true);
+      expect(uhid).toMatch(/^RML-\d{6}$/);
+    });
+
+    it('preserves compatibility with legacy BS- prefixed patient records', async () => {
+      useAuthStore.getState().setUser(HOSPITAL_USERS.PGI, 'mock_jwt_token_pgi');
+
+      const legacyBaby: Baby = {
+        id: 'legacy_baby_1',
+        uhid: 'BS-IN-972612',
+        name: 'Legacy Baby',
+        dateOfBirth: new Date().toISOString(),
+        currentHospital: 'PGI',
+        facility: 'PGI',
+        severityState: 'normal',
+        status: 'admitted',
+      };
+
+      jest.spyOn(PatientsApi, 'getBabies').mockResolvedValueOnce([legacyBaby]);
+      jest.spyOn(PatientsApi, 'getReadings').mockResolvedValue([]);
+      jest.spyOn(PatientsApi, 'getObservations').mockResolvedValue([]);
+
+      await usePatientStore.getState().loadBabies();
+      expect(usePatientStore.getState().babies).toHaveLength(1);
+      expect(usePatientStore.getState().babies[0].uhid).toBe('BS-IN-972612');
+    });
+  });
 });

@@ -1,16 +1,18 @@
 {
   "expo": {
-    "name": "BiliSURE",
-    "slug": "bilisure",
+    "name": "NeoMed",
+    "slug": "neomed",
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "bilisure",
     "userInterfaceStyle": "light",
     "newArchEnabled": false,
+    "icon": "./assets/icon.png",
     "android": {
       "package": "com.bilisure",
       "adaptiveIcon": {
-        "backgroundColor": "#7D3BFF"
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#632DAA"
       }
     }
   }

@@ -163,7 +163,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             </Text>
           ) : (
             <Text style={styles.metaSubText} numberOfLines={1}>
-              {baby.uhid ? `UHID: ${baby.uhid}` : ''}{baby.gestationalAgeWeeks ? ` • ${baby.gestationalAgeWeeks}w` : ''}
+              {baby.uhid ? `UHID: ${baby.uhid}` : ''}{baby.gestationalAgeWeeks ? ` • ${baby.gestationalAgeWeeks}w${baby.gestationalAgeDays ? ` ${baby.gestationalAgeDays}d` : ''}` : ''}
             </Text>
           )}
         </View>

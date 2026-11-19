@@ -89,6 +89,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const [dob, setDob] = useState(formatCurrentDateTime());
   const [uhid, setUhid] = useState('');
   const [gestationalAge, setGestationalAge] = useState('');
+  const [gestationalDays, setGestationalDays] = useState('');
   const [birthWeight, setBirthWeight] = useState('');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
   const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
@@ -101,8 +102,10 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const insets = useSafeAreaInsets();
 
   const generateUhid = () => {
+    const rawFac = (user?.facility || facility || 'PGI').toUpperCase();
+    const prefix = rawFac.includes('KGMU') ? 'KGMU' : rawFac.includes('RML') ? 'RML' : 'PGI';
     const randomSuffix = Math.floor(100000 + Math.random() * 900000);
-    setUhid(`BS-${randomSuffix}`);
+    setUhid(`${prefix}-${randomSuffix}`);
   };
 
   const handleContinue = async () => {
@@ -122,6 +125,16 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       return;
     }
 
+    let parsedGestDays: number | undefined = undefined;
+    if (gestationalDays.trim()) {
+      const daysTrimmed = gestationalDays.trim();
+      if (!/^[0-6]$/.test(daysTrimmed)) {
+        Alert.alert('Invalid Gestational Days', 'Days must be a whole number between 0 and 6.');
+        return;
+      }
+      parsedGestDays = parseInt(daysTrimmed, 10);
+    }
+
     if (!birthWeight.trim()) {
       Alert.alert('Required Field', 'Please enter birth weight in kg.');
       return;
@@ -137,7 +150,16 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
     try {
       const now = new Date();
       const parsedBirth = parseInputDateTime(dob);
-      const finalUhid = uhid.trim() || `BS-${Math.floor(100000 + Math.random() * 900000)}`;
+      const rawFac = (user?.facility || facility || 'PGI').toUpperCase();
+      const defaultPrefix = rawFac.includes('KGMU') ? 'KGMU' : rawFac.includes('RML') ? 'RML' : 'PGI';
+      let finalUhid = uhid.trim();
+      if (!finalUhid) {
+        finalUhid = `${defaultPrefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+      } else if (finalUhid.startsWith('BS-') || !finalUhid.startsWith(`${defaultPrefix}-`)) {
+        const suffix = finalUhid.includes('-') ? finalUhid.split('-').slice(1).join('-') : finalUhid;
+        finalUhid = `${defaultPrefix}-${suffix}`;
+      }
+
       const created = await registerBaby({
         name: motherName.trim(),
         parentsName: motherName.trim(),
@@ -146,6 +168,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         facility,
         severityState: 'normal',
         gestationalAgeWeeks: parsedGestAge,
+        ...(parsedGestDays !== undefined ? { gestationalAgeDays: parsedGestDays } : {}),
         weight: parsedWeight,
         dateOfBirth: parsedBirth.isoDate,
         exactTimeOfBirth: parsedBirth.timeStr,
@@ -192,14 +215,30 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         {/* Gestational Age & Birth Weight Row */}
         <View style={styles.twoColRow}>
           <View style={styles.colHalf}>
-            <CustomInput
-              label="Gestation (weeks)"
-              placeholder="e.g. 38"
-              value={gestationalAge}
-              onChangeText={setGestationalAge}
-              keyboardType="numeric"
-              maxLength={2}
-            />
+            <View style={styles.gestationSplitRow}>
+              <View style={styles.splitInputCol}>
+                <CustomInput
+                  label="Weeks"
+                  labelStyle={styles.splitLabel}
+                  placeholder="e.g. 36"
+                  value={gestationalAge}
+                  onChangeText={setGestationalAge}
+                  keyboardType="numeric"
+                  maxLength={2}
+                />
+              </View>
+              <View style={styles.splitInputCol}>
+                <CustomInput
+                  label="Days (Optional)"
+                  labelStyle={styles.splitLabel}
+                  placeholder="0-6"
+                  value={gestationalDays}
+                  onChangeText={setGestationalDays}
+                  keyboardType="numeric"
+                  maxLength={1}
+                />
+              </View>
+            </View>
           </View>
           <View style={styles.colHalfRight}>
             <CustomInput
@@ -317,6 +356,16 @@ const styles = StyleSheet.create({
   },
   colHalf: {
     flex: 1,
+  },
+  gestationSplitRow: {
+    flexDirection: 'row',
+    gap: moderateScale(6),
+  },
+  splitInputCol: {
+    flex: 1,
+  },
+  splitLabel: {
+    fontSize: fontScale(11),
   },
   colHalfRight: {
     flex: 1,

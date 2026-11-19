@@ -113,8 +113,8 @@ export const usePatientStore = create<PatientState>((set, get) => ({
             const babyHosp = (b.currentHospital || b.facility || '').toUpperCase();
             const isAtCurrentHospital = !babyHosp || babyHosp === currentHosp;
             const isHistoricalTransfer =
-              (b.isTransferredOut || b.isHistoricalOnly || b.referralStatus === 'pending') &&
-              (!b.facility || b.facility.toUpperCase() === currentHosp);
+              Boolean(b.isTransferredOut || b.isHistoricalOnly) ||
+              (b.referralStatus === 'pending' && (!babyHosp || babyHosp === currentHosp));
             return isAtCurrentHospital || isHistoricalTransfer;
           })
         : [];
@@ -207,14 +207,18 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   },
 
   registerBaby: async (babyData) => {
+    const currentHosp = (babyData.facility || useAuthStore.getState().user?.facility || 'PGI').toUpperCase();
+    const defaultPrefix = currentHosp.includes('KGMU') ? 'KGMU' : currentHosp.includes('RML') ? 'RML' : 'PGI';
+
     const payload: Partial<Baby> = {
-      uhid: babyData.uhid || `UHID_${Date.now().toString().slice(-6)}`,
+      uhid: babyData.uhid || `${defaultPrefix}-${Math.floor(100000 + Math.random() * 900000)}`,
       bilisureId: babyData.bilisureId || `BS-2026-${Math.floor(1000 + Math.random() * 9000)}`,
       name: babyData.name || 'New Patient',
       parentsName: babyData.parentsName || '',
       dateOfBirth: babyData.dateOfBirth || new Date().toISOString(),
       exactTimeOfBirth: babyData.exactTimeOfBirth || '09:00',
       gestationalAgeWeeks: babyData.gestationalAgeWeeks || 38,
+      gestationalAgeDays: babyData.gestationalAgeDays !== undefined ? babyData.gestationalAgeDays : 0,
       weight: babyData.weight || 3.0,
       height: babyData.height || 48.0,
       assignedDoctor: babyData.assignedDoctor || 'Dr. Priya Sharma',

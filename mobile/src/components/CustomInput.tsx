@@ -1,21 +1,27 @@
 import React from 'react';
-import { View, Text, TextInput, StyleSheet, TextInputProps } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TextInputProps, StyleProp, TextStyle } from 'react-native';
 import { COLORS } from '../theme/colors';
 
 interface CustomInputProps extends TextInputProps {
   label?: string;
+  labelStyle?: StyleProp<TextStyle>;
   error?: string;
 }
 
 export const CustomInput: React.FC<CustomInputProps> = ({
   label,
+  labelStyle,
   error,
   style,
   ...props
 }) => {
   return (
     <View style={styles.container}>
-      {label && <Text style={styles.label}>{label}</Text>}
+      {label && (
+        <Text style={[styles.label, labelStyle]} numberOfLines={1} adjustsFontSizeToFit>
+          {label}
+        </Text>
+      )}
       <View style={[styles.inputContainer, error ? styles.inputError : null]}>
         <TextInput
           placeholderTextColor={COLORS.textMuted}

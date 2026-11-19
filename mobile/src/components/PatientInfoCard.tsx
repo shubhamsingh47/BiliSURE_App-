@@ -9,6 +9,7 @@ interface PatientInfoCardProps {
   uhid: string;
   postnatalAgeHours?: number;
   gestationalAgeWeeks?: number;
+  gestationalAgeDays?: number;
   birthWeightKg?: number;
   riskStatus?: 'low' | 'low_intermediate' | 'high_intermediate' | 'high';
   onPress?: () => void;
@@ -20,6 +21,7 @@ export const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
   uhid,
   postnatalAgeHours,
   gestationalAgeWeeks,
+  gestationalAgeDays,
   birthWeightKg,
   riskStatus = 'low',
   onPress,
@@ -81,7 +83,9 @@ export const PatientInfoCard: React.FC<PatientInfoCardProps> = ({
         {gestationalAgeWeeks !== undefined && (
           <View style={styles.metricItem}>
             <Text style={styles.metricLabel}>GA:</Text>
-            <Text style={styles.metricText}>{gestationalAgeWeeks}w</Text>
+            <Text style={styles.metricText}>
+              {gestationalAgeWeeks}w{gestationalAgeDays ? ` ${gestationalAgeDays}d` : ''}
+            </Text>
           </View>
         )}
         {birthWeightKg !== undefined && (

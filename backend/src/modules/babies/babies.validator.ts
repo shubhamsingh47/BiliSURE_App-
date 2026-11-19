@@ -6,6 +6,7 @@ export const CreateBabySchema = z.object({
   parentsName: z.string().min(1),
   dateOfBirth: z.string().datetime().or(z.string().min(4)),
   gestationalAgeWeeks: z.number().optional(),
+  gestationalAgeDays: z.number().int().min(0).max(6).optional(),
   birthWeightGrams: z.number().optional(),
   currentWeightGrams: z.number().optional(),
   weight: z.number().optional(),

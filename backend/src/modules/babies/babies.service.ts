@@ -22,19 +22,18 @@ export class BabiesService {
     const query: any = {};
     const andClauses: any[] = [];
 
-    // Collect uhids of babies previously referred out and accepted from this facility
+    // Collect uhids of babies previously referred out from this facility (pending or accepted)
     let transferredOutRefsMap = new Map<string, any>();
     let transferredOutUhids: string[] = [];
 
     if (userFacility) {
       try {
-        const acceptedOutgoing = await ReferralModel.find({
+        const outgoingRefs = await ReferralModel.find({
           referringCentreName: new RegExp(`^${userFacility}$`, 'i'),
-          status: 'accepted',
         }).sort({ createdAt: -1 }).lean();
 
-        if (acceptedOutgoing && acceptedOutgoing.length > 0) {
-          for (const r of acceptedOutgoing) {
+        if (outgoingRefs && outgoingRefs.length > 0) {
+          for (const r of outgoingRefs) {
             if (!transferredOutRefsMap.has(r.babyUhid)) {
               transferredOutRefsMap.set(r.babyUhid, r);
             }
@@ -131,12 +130,12 @@ export class BabiesService {
               (baby as any).isHistoricalOnly = false;
             }
           } else {
-            // Case 2: Facility is NOT active owner, but previously transferred this baby out (accepted)
+            // Case 2: Facility is NOT active owner, but previously referred this baby out
             const transferredRef = transferredOutRefsMap.get((baby as any).uhid);
             if (transferredRef) {
               (baby as any).isTransferredOut = true;
               (baby as any).isHistoricalOnly = true;
-              (baby as any).referralStatus = 'accepted';
+              (baby as any).referralStatus = transferredRef.status;
               (baby as any).referredToHospitalName = transferredRef.receivingHospitalName;
               (baby as any).referredToHospitalId = transferredRef.receivingHospitalId;
               (baby as any).referralSentAt = transferredRef.createdAt;
@@ -165,18 +164,31 @@ export class BabiesService {
     if (userFacility) {
       const uFac = userFacility.trim().toUpperCase();
       const owner = (baby.currentHospital || baby.facility || '').trim().toUpperCase();
+      const originFac = (baby.facility || '').trim().toUpperCase();
       if (owner && owner !== uFac) {
-        // Allow access only if the requesting facility currently has an active pending referral for this baby
-        const hasPendingRef = await ReferralModel.findOne({
+        // Allow access if requesting facility is original birth hospital OR was referring/receiving hospital in any referral
+        const referralAccess: any = await ReferralModel.findOne({
           babyUhid: baby.uhid,
-          referringCentreName: new RegExp(`^${userFacility}$`, 'i'),
-          status: 'pending',
-        }).lean();
+          $or: [
+            { referringCentreName: new RegExp(`^${userFacility}$`, 'i') },
+            { receivingHospitalName: new RegExp(`^${userFacility}$`, 'i') },
+          ],
+        }).sort({ createdAt: -1 }).lean();
 
-        if (!hasPendingRef) {
+        if (!referralAccess && originFac !== uFac) {
           throw new ForbiddenError(
             'Access denied: Patient is not currently admitted or active under your hospital'
           );
+        }
+
+        if (referralAccess && (referralAccess.referringCentreName || '').trim().toUpperCase() === uFac) {
+          (baby as any).isTransferredOut = true;
+          (baby as any).isHistoricalOnly = true;
+          (baby as any).referralStatus = referralAccess.status;
+          (baby as any).referredToHospitalName = referralAccess.receivingHospitalName;
+          (baby as any).referredToHospitalId = referralAccess.receivingHospitalId;
+          (baby as any).referralSentAt = referralAccess.createdAt;
+          (baby as any).activeReferralId = referralAccess.referralId;
         }
       }
     }
@@ -185,14 +197,25 @@ export class BabiesService {
   }
 
   static async createBaby(data: any, user?: any) {
-    const uhid = data.uhid ? data.uhid.toUpperCase().trim() : ('BS-IN-' + Math.floor(100000 + Math.random() * 900000));
+    const facility = user?.facility || data.facility || 'PGI';
+    const facilityUpper = facility.trim().toUpperCase();
+    const hospitalPrefix = facilityUpper.includes('KGMU') ? 'KGMU' : facilityUpper.includes('RML') ? 'RML' : 'PGI';
+
+    let uhid = data.uhid ? data.uhid.toUpperCase().trim() : '';
+    // Enforce the authenticated hospital's prefix for new registrations
+    if (!uhid) {
+      uhid = `${hospitalPrefix}-${Math.floor(100000 + Math.random() * 900000)}`;
+    } else if (uhid.startsWith('BS-') || !uhid.startsWith(`${hospitalPrefix}-`)) {
+      const suffix = uhid.includes('-') ? uhid.split('-').slice(1).join('-') : uhid;
+      uhid = `${hospitalPrefix}-${suffix}`;
+    }
+
     const existing = await BabyModel.findOne({ uhid });
     if (existing) {
       throw new ConflictError(`Baby with UHID ${uhid} already exists`);
     }
 
-    const facility = user?.facility || data.facility || 'PGI';
-    const facilityId = user?.facilityId || data.facilityId || 'hosp_pgi';
+    const facilityId = user?.facilityId || data.facilityId || (hospitalPrefix === 'KGMU' ? 'hosp_kgmu' : hospitalPrefix === 'RML' ? 'hosp_rml' : 'hosp_pgi');
 
     const baby = await BabyModel.create({
       ...data,
@@ -200,6 +223,8 @@ export class BabiesService {
       facilityId,
       currentHospital: facility,
       uhid,
+      gestationalAgeWeeks: data.gestationalAgeWeeks || 38,
+      gestationalAgeDays: data.gestationalAgeDays !== undefined ? data.gestationalAgeDays : 0,
       registeredBy: user?.userId,
     });
     return baby.toObject();

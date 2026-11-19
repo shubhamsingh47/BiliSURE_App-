@@ -150,9 +150,9 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const authorizedBabies = babies.filter((b) => {
     const babyHosp = (b.currentHospital || b.facility || '').toUpperCase();
     if (babyHosp && babyHosp !== currentHospital) {
-      const isHistoricalOutgoing =
-        (b.isTransferredOut || b.isHistoricalOnly || b.referralStatus === 'pending') &&
-        (!b.facility || b.facility.toUpperCase() === currentHospital);
+      const isHistoricalOutgoing = Boolean(
+        b.isTransferredOut || b.isHistoricalOnly || b.referralStatus === 'pending'
+      );
       return isHistoricalOutgoing;
     }
     return true;
