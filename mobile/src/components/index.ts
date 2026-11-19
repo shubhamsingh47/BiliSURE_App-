@@ -42,6 +42,7 @@ export { DropdownField } from './DropdownField';
 
 // 14. Date and Time Pickers
 export { DateTimePickerField } from './DateTimePickerField';
+export { BirthDateTimePickerModal } from './BirthDateTimePickerModal';
 
 // 15. Confirmation Dialogs
 export { ConfirmationDialog } from './ConfirmationDialog';

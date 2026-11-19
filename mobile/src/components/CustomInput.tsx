@@ -1,31 +1,72 @@
-import React from 'react';
-import { View, Text, TextInput, StyleSheet, TextInputProps, StyleProp, TextStyle } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  TextInputProps,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
+  Platform,
+} from 'react-native';
 import { COLORS } from '../theme/colors';
+import { fontScale, moderateScale } from '../theme/responsive';
 
 interface CustomInputProps extends TextInputProps {
   label?: string;
   labelStyle?: StyleProp<TextStyle>;
+  containerStyle?: StyleProp<ViewStyle>;
+  inputContainerStyle?: StyleProp<ViewStyle>;
+  compactPlaceholder?: string;
+  compactThresholdWidth?: number;
   error?: string;
 }
 
 export const CustomInput: React.FC<CustomInputProps> = ({
   label,
   labelStyle,
+  containerStyle,
+  inputContainerStyle,
+  compactPlaceholder,
+  compactThresholdWidth = 110,
   error,
   style,
+  placeholder,
   ...props
 }) => {
+  const [containerWidth, setContainerWidth] = useState<number>(0);
+
+  // Dynamic placeholder selection based on measured box width
+  const isNarrowBox = containerWidth > 0 && containerWidth < compactThresholdWidth;
+  const resolvedPlaceholder =
+    isNarrowBox && compactPlaceholder ? compactPlaceholder : placeholder;
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, containerStyle]}>
       {label && (
-        <Text style={[styles.label, labelStyle]} numberOfLines={1} adjustsFontSizeToFit>
+        <Text
+          style={[styles.label, labelStyle]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+        >
           {label}
         </Text>
       )}
-      <View style={[styles.inputContainer, error ? styles.inputError : null]}>
+      <View
+        onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+        style={[
+          styles.inputContainer,
+          isNarrowBox && styles.inputContainerNarrow,
+          error ? styles.inputError : null,
+          inputContainerStyle,
+        ]}
+      >
         <TextInput
+          placeholder={resolvedPlaceholder}
           placeholderTextColor={COLORS.textMuted}
-          style={[styles.input, style]}
+          style={[styles.input, isNarrowBox && styles.inputNarrow, style]}
           {...props}
         />
       </View>
@@ -36,34 +77,44 @@ export const CustomInput: React.FC<CustomInputProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    marginBottom: 16,
+    marginBottom: moderateScale(14),
   },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: 8,
+    marginBottom: moderateScale(6),
+    letterSpacing: -0.1,
   },
   inputContainer: {
-    height: 56,
+    minHeight: moderateScale(52),
+    height: moderateScale(52),
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: 18,
+    borderRadius: moderateScale(16),
     backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
+    paddingHorizontal: moderateScale(14),
     justifyContent: 'center',
+  },
+  inputContainerNarrow: {
+    paddingHorizontal: moderateScale(8),
   },
   inputError: {
     borderColor: COLORS.critical,
   },
   input: {
-    fontSize: 16,
+    fontSize: fontScale(15),
     color: COLORS.textPrimary,
+    paddingVertical: Platform.OS === 'android' ? 4 : 0,
+  },
+  inputNarrow: {
+    fontSize: fontScale(14),
   },
   errorText: {
     color: COLORS.critical,
-    fontSize: 12,
+    fontSize: fontScale(12),
     marginTop: 4,
     marginLeft: 4,
+    fontWeight: '600',
   },
 });

@@ -18,10 +18,10 @@ export class AdmissionsService {
           (query.hospitalId === 'hosp_kgmu'
             ? 'KGMU'
             : query.hospitalId === 'hosp_rml'
-            ? 'RML'
-            : query.hospitalId === 'hosp_pgi'
-            ? 'PGI'
-            : undefined);
+              ? 'RML'
+              : query.hospitalId === 'hosp_pgi'
+                ? 'PGI'
+                : undefined);
 
         if (query.hospitalId || targetHosp) {
           const hospConditions: any[] = [];
@@ -44,10 +44,10 @@ export class AdmissionsService {
       (query.hospitalId === 'hosp_kgmu'
         ? 'KGMU'
         : query.hospitalId === 'hosp_rml'
-        ? 'RML'
-        : query.hospitalId === 'hosp_pgi'
-        ? 'PGI'
-        : undefined);
+          ? 'RML'
+          : query.hospitalId === 'hosp_pgi'
+            ? 'PGI'
+            : undefined);
 
     if (query.hospitalId || targetHosp) {
       list = list.filter(
@@ -69,7 +69,7 @@ export class AdmissionsService {
     if (!found && isMongoConnected) {
       try {
         found = (await AdmissionModel.findOne({ $or: [{ _id: id }, { admissionId: id }] })) as any;
-      } catch {}
+      } catch { }
     }
     if (!found) throw new NotFoundError('Admission record not found');
     return found;
@@ -133,7 +133,7 @@ export class AdmissionsService {
       await HospitalModel.findByIdAndUpdate(newAdmission.hospitalId, {
         $inc: { reservedPTStations: -1 },
       });
-    } catch (e) {}
+    } catch (e) { }
 
     // Notify referring doctor and hospital team
     await NotificationsService.createNotification({
@@ -194,7 +194,7 @@ export class AdmissionsService {
           { status: 'under_treatment', currentStationId: station.stationId }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify care team
     await NotificationsService.createNotification({
@@ -278,7 +278,7 @@ export class AdmissionsService {
         admission = (await AdmissionModel.findOne({
           $or: [{ _id: admissionId }, { admissionId }],
         })) as any;
-      } catch {}
+      } catch { }
     }
 
     const start = new Date(data.startTime);
@@ -327,7 +327,7 @@ export class AdmissionsService {
       if (isMongoConnected) {
         try {
           await AdmissionModel.create(newAdmission);
-        } catch {}
+        } catch { }
       }
       return { admission: newAdmission, session: newSession };
     }
@@ -346,7 +346,7 @@ export class AdmissionsService {
             $set: { admissionStatus: 'under_treatment', updatedAt: new Date() },
           }
         );
-      } catch (e) {}
+      } catch (e) { }
     }
 
     return { admission, session: newSession };
@@ -368,7 +368,7 @@ export class AdmissionsService {
         admission = (await AdmissionModel.findOne({
           $or: [{ _id: admissionId }, { admissionId }],
         })) as any;
-      } catch {}
+      } catch { }
     }
 
     if (!admission) throw new NotFoundError('Admission record not found');
@@ -395,7 +395,7 @@ export class AdmissionsService {
             },
           }
         );
-      } catch {}
+      } catch { }
     }
 
     return { admission, session };
@@ -484,7 +484,7 @@ export class AdmissionsService {
           }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify attending care team
     await NotificationsService.createNotification({
@@ -550,7 +550,7 @@ export class AdmissionsService {
           }
         );
       }
-    } catch {}
+    } catch { }
 
     // Notify referring doctor and care team
     await NotificationsService.createNotification({

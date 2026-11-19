@@ -379,7 +379,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       arrivalConfirmedBy: nurseName,
       admittedAt: new Date().toISOString(),
       admissionStatus: 'admitted',
-      assignedDoctor: 'Dr. Rajesh Verma',
+      assignedDoctor: '',
       primaryNurse: nurseName,
       initialAdmissionBilirubin: ref?.latestBilirubinValue || 15.0,
       treatmentSessions: [],
@@ -393,7 +393,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       ),
     }));
 
-    apiClient.post('/admissions/confirm-arrival', { referralId, nurseName, hospitalId }).catch(() => {});
+    apiClient.post('/admissions/confirm-arrival', { referralId, nurseName, hospitalId }).catch(() => { });
     return newAdm;
   },
 
@@ -418,7 +418,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       (s) =>
         s.operationalStatus === 'occupied' &&
         ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
-         (admission.babyId && s.currentBabyId === admission.babyId))
+          (admission.babyId && s.currentBabyId === admission.babyId))
     );
     if (alreadyAllocated) {
       throw new Error(`Patient ${admission.babyName} (${admission.babyUhid}) is already allocated to station ${alreadyAllocated.stationId}`);
@@ -433,7 +433,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           (s.id === admission.ptStationId || s.stationId === admission.ptStationId) &&
           s.operationalStatus === 'occupied' &&
           ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
-           (admission.babyId && s.currentBabyId === admission.babyId))
+            (admission.babyId && s.currentBabyId === admission.babyId))
       );
 
     if (hasActiveOccupiedStation) {
@@ -443,27 +443,27 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const updatedStations = state.stations.map((s) =>
       s.id === stationId || s.stationId === stationId
         ? {
-            ...s,
-            operationalStatus: 'occupied' as const,
-            currentBabyId: admission.babyId,
-            currentBabyName: admission.babyName,
-            currentBabyUhid: admission.babyUhid,
-            allocatedAt: new Date().toISOString(),
-          }
+          ...s,
+          operationalStatus: 'occupied' as const,
+          currentBabyId: admission.babyId,
+          currentBabyName: admission.babyName,
+          currentBabyUhid: admission.babyUhid,
+          allocatedAt: new Date().toISOString(),
+        }
         : s
     );
 
     const updatedAdmissions = state.admissions.map((a) =>
       a.id === admissionId || a.admissionId === admissionId
         ? {
-            ...a,
-            hospitalId: targetStation.hospitalId,
-            hospitalName: targetStation.hospitalName,
-            ptStationId: stationId,
-            ptStationName: targetStation.name || targetStation.stationId,
-            admissionStatus: 'under_treatment' as const,
-            stationReleased: false,
-          }
+          ...a,
+          hospitalId: targetStation.hospitalId,
+          hospitalName: targetStation.hospitalName,
+          ptStationId: stationId,
+          ptStationName: targetStation.name || targetStation.stationId,
+          admissionStatus: 'under_treatment' as const,
+          stationReleased: false,
+        }
         : a
     );
 
@@ -477,10 +477,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       usePatientStore.getState().updateBaby(admission.babyId, {
         status: 'under_treatment',
         currentStationId: targetStation.name || targetStation.stationId,
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
-    apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => {});
+    apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => { });
   },
 
   allocateBabyToStation: async (baby, stationId, nurseName) => {
@@ -532,7 +532,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         admittedAt: new Date().toISOString(),
         physicalArrivalConfirmed: true,
         stationReleased: false,
-        assignedDoctor: 'Attending Pediatrician',
+        assignedDoctor: '',
         primaryNurse: nurseName,
         ptStationId: stationId,
         ptStationName: targetStation.name || targetStation.stationId,
@@ -543,13 +543,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       const updatedStations = state.stations.map((s) =>
         s.id === stationId || s.stationId === stationId
           ? {
-              ...s,
-              operationalStatus: 'occupied' as const,
-              currentBabyId: baby.id,
-              currentBabyName: babyName,
-              currentBabyUhid: baby.uhid,
-              allocatedAt: new Date().toISOString(),
-            }
+            ...s,
+            operationalStatus: 'occupied' as const,
+            currentBabyId: baby.id,
+            currentBabyName: babyName,
+            currentBabyUhid: baby.uhid,
+            allocatedAt: new Date().toISOString(),
+          }
           : s
       );
 
@@ -563,7 +563,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         usePatientStore.getState().updateBaby(baby.id, {
           status: 'under_treatment',
           currentStationId: targetStation.name || targetStation.stationId,
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
   },
@@ -583,18 +583,18 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admissions: state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
-              ...a,
-              admissionStatus: 'under_treatment',
-              treatmentSessions: [
-                ...a.treatmentSessions.map((s) => (s.status === 'active' ? { ...s, status: 'completed' as const, endTime: new Date().toISOString() } : s)),
-                newSession,
-              ],
-            }
+            ...a,
+            admissionStatus: 'under_treatment',
+            treatmentSessions: [
+              ...a.treatmentSessions.map((s) => (s.status === 'active' ? { ...s, status: 'completed' as const, endTime: new Date().toISOString() } : s)),
+              newSession,
+            ],
+          }
           : a
       ),
     }));
 
-    apiClient.post(`/admissions/${admissionId}/sessions/start`, data).catch(() => {});
+    apiClient.post(`/admissions/${admissionId}/sessions/start`, data).catch(() => { });
   },
 
   endTreatmentSession: async (admissionId, sessionId, nurseName, notes) => {
@@ -620,7 +620,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }),
     }));
 
-    apiClient.post(`/admissions/${admissionId}/sessions/${sessionId}/end`, { nurseName, notes }).catch(() => {});
+    apiClient.post(`/admissions/${admissionId}/sessions/${sessionId}/end`, { nurseName, notes }).catch(() => { });
   },
 
   logTreatmentSession: async (admissionId, data) => {
@@ -640,10 +640,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admissions: state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
-              ...a,
-              admissionStatus: 'under_treatment' as const,
-              treatmentSessions: [...a.treatmentSessions, newSession],
-            }
+            ...a,
+            admissionStatus: 'under_treatment' as const,
+            treatmentSessions: [...a.treatmentSessions, newSession],
+          }
           : a
       ),
     }));
@@ -655,7 +655,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         babyUhid: targetAdmission?.babyUhid,
         babyName: targetAdmission?.babyName,
       })
-      .catch(() => {});
+      .catch(() => { });
   },
 
   updateAdmission: async (admissionId, updates) => {
@@ -671,16 +671,16 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admissions: state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
-              ...a,
-              treatmentSessions: a.treatmentSessions.map((s) =>
-                s.sessionId === sessionId ? { ...s, ...updates } : s
-              ),
-            }
+            ...a,
+            treatmentSessions: a.treatmentSessions.map((s) =>
+              s.sessionId === sessionId ? { ...s, ...updates } : s
+            ),
+          }
           : a
       ),
     }));
 
-    apiClient.patch(`/admissions/${admissionId}/sessions/${sessionId}`, updates).catch(() => {});
+    apiClient.patch(`/admissions/${admissionId}/sessions/${sessionId}`, updates).catch(() => { });
   },
 
   concludePhototherapy: async (admissionId) => {
@@ -692,28 +692,28 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       const updatedAdmissions = state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
-              ...a,
-              admissionStatus: 'in_observation' as const,
-              stationReleased: true,
-              ptStationId: undefined,
-              ptStationName: undefined,
-            }
+            ...a,
+            admissionStatus: 'in_observation' as const,
+            stationReleased: true,
+            ptStationId: undefined,
+            ptStationName: undefined,
+          }
           : a
       );
 
       // Release station to cleaning_prep
       const updatedStations = state.stations.map((s) =>
         (stationIdToRelease && (s.id === stationIdToRelease || s.stationId === stationIdToRelease)) ||
-        (admission?.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
-        (admission?.babyId && s.currentBabyId === admission.babyId)
+          (admission?.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
+          (admission?.babyId && s.currentBabyId === admission.babyId)
           ? {
-              ...s,
-              operationalStatus: 'cleaning_prep' as const,
-              currentBabyId: null,
-              currentBabyName: null,
-              currentBabyUhid: null,
-              notes: `Freed upon phototherapy conclusion for ${admission?.babyName || 'patient'}. Ready for sanitization.`,
-            }
+            ...s,
+            operationalStatus: 'cleaning_prep' as const,
+            currentBabyId: null,
+            currentBabyName: null,
+            currentBabyUhid: null,
+            notes: `Freed upon phototherapy conclusion for ${admission?.babyName || 'patient'}. Ready for sanitization.`,
+          }
           : s
       );
 
@@ -738,7 +738,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       });
     }
 
-    apiClient.post(`/admissions/${admissionId}/conclude-phototherapy`, {}).catch(() => {});
+    apiClient.post(`/admissions/${admissionId}/conclude-phototherapy`, {}).catch(() => { });
   },
 
   approveDischarge: async (admissionId, data) => {
@@ -748,18 +748,18 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       const updatedAdmissions = state.admissions.map((a) =>
         a.id === admissionId || a.admissionId === admissionId
           ? {
-              ...a,
-              admissionStatus: 'discharged' as const,
-              dischargeApprovedByDoctor: data.doctorName,
-              dischargeApprovedAt: new Date().toISOString(),
-              dischargeBilirubinValue: data.dischargeBilirubinValue,
-              dischargeNotes: data.dischargeNotes,
-              followUpPlan: data.followUpPlan,
-              dischargedAt: new Date().toISOString(),
-              stationReleased: true,
-              ptStationId: undefined,
-              ptStationName: undefined,
-            }
+            ...a,
+            admissionStatus: 'discharged' as const,
+            dischargeApprovedByDoctor: data.doctorName,
+            dischargeApprovedAt: new Date().toISOString(),
+            dischargeBilirubinValue: data.dischargeBilirubinValue,
+            dischargeNotes: data.dischargeNotes,
+            followUpPlan: data.followUpPlan,
+            dischargedAt: new Date().toISOString(),
+            stationReleased: true,
+            ptStationId: undefined,
+            ptStationName: undefined,
+          }
           : a
       );
 
@@ -767,22 +767,22 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       const updatedStations = state.stations.map((s) =>
         s.id === admission?.ptStationId || s.stationId === admission?.ptStationId
           ? {
-              ...s,
-              operationalStatus: 'cleaning_prep' as const,
-              currentBabyId: null,
-              currentBabyName: null,
-              currentBabyUhid: null,
-              notes: `Freed upon discharge of ${admission?.babyName}. Ready for sanitization.`,
-            }
+            ...s,
+            operationalStatus: 'cleaning_prep' as const,
+            currentBabyId: null,
+            currentBabyName: null,
+            currentBabyUhid: null,
+            notes: `Freed upon discharge of ${admission?.babyName}. Ready for sanitization.`,
+          }
           : s
       );
 
       // Update matching referral for this baby to completed
       const updatedReferrals = state.referrals.map((r) =>
         r.referralId === admission?.referralId ||
-        r.id === admission?.referralId ||
-        (admission?.babyUhid && r.babyUhid === admission.babyUhid) ||
-        (admission?.babyId && r.babyId === admission.babyId)
+          r.id === admission?.referralId ||
+          (admission?.babyUhid && r.babyUhid === admission.babyUhid) ||
+          (admission?.babyId && r.babyId === admission.babyId)
           ? { ...r, status: 'completed' as const }
           : r
       );
@@ -795,7 +795,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       };
     });
 
-    apiClient.post(`/admissions/${admissionId}/discharge`, data).catch(() => {});
+    apiClient.post(`/admissions/${admissionId}/discharge`, data).catch(() => { });
   },
 
   updateStationStatus: async (stationId, status, meta) => {
@@ -820,7 +820,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       };
     });
 
-    apiClient.patch(`/hospitals/hosp_001/stations/${stationId}/status`, { status, ...meta }).catch(() => {});
+    apiClient.patch(`/hospitals/hosp_001/stations/${stationId}/status`, { status, ...meta }).catch(() => { });
   },
 
   registerStation: async (stationData) => {
@@ -845,14 +845,14 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       };
     });
 
-    apiClient.post(`/hospitals/${stationData.hospitalId}/stations`, stationData).catch(() => {});
+    apiClient.post(`/hospitals/${stationData.hospitalId}/stations`, stationData).catch(() => { });
   },
 
   markNotificationRead: async (id) => {
     set((state) => ({
       notifications: state.notifications.map((n) => (n.id === id || n._id === id ? { ...n, isRead: true } : n)),
     }));
-    apiClient.patch(`/notifications/${id}/read`).catch(() => {});
+    apiClient.patch(`/notifications/${id}/read`).catch(() => { });
   },
 }));
 

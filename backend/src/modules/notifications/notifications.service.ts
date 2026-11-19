@@ -31,7 +31,7 @@ export class NotificationsService {
     if (isMongoConnected) {
       try {
         await NotificationModel.create(newNotif);
-      } catch {}
+      } catch { }
     }
 
     memoryNotifications.unshift(newNotif);

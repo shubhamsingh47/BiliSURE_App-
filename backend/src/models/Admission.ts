@@ -86,7 +86,7 @@ const AdmissionSchema = new Schema<IAdmission>(
       default: 'admitted',
       index: true,
     },
-    assignedDoctor: { type: String, default: 'Dr. Hospital Paediatrician' },
+    assignedDoctor: { type: String, trim: true },
     primaryNurse: { type: String, default: 'Nurse' },
     initialAdmissionBilirubin: { type: Number, default: 0 },
     cumulativeTreatmentMinutes: { type: Number, default: 0 },

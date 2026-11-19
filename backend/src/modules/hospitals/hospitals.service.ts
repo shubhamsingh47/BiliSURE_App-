@@ -136,7 +136,7 @@ export class HospitalsService {
         if (type) query.type = type;
         const list = await HospitalModel.find(query).sort({ availablePTStations: -1 });
         if (list.length > 0) return list;
-      } catch {}
+      } catch { }
     }
 
     let filtered = memoryHospitals;
@@ -151,7 +151,7 @@ export class HospitalsService {
       try {
         const hosp = await HospitalModel.findById(id);
         if (hosp) return hosp;
-      } catch {}
+      } catch { }
     }
     const found = memoryHospitals.find((h) => (h as any)._id === id || h.id === id);
     if (!found) throw new NotFoundError('Hospital not found');
@@ -213,7 +213,7 @@ export class HospitalsService {
     if (isMongoConnected) {
       try {
         await PTStationModel.create(newStation);
-      } catch {}
+      } catch { }
     }
 
     memoryStations.push(newStation);
@@ -270,7 +270,7 @@ export class HospitalsService {
     if (isMongoConnected) {
       try {
         await PTStationModel.findByIdAndUpdate(station._id, station);
-      } catch {}
+      } catch { }
     }
 
     await this.refreshCapacity(String(station.hospitalId));
@@ -286,7 +286,7 @@ export class HospitalsService {
     if (isMongoConnected) {
       try {
         await HospitalModel.findByIdAndUpdate(hospital._id, hospital);
-      } catch {}
+      } catch { }
     }
 
     return hospital;

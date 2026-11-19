@@ -131,19 +131,61 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setShowDeptDropdown(false);
   };
 
+  const parseDateSafe = (val: any): Date | null => {
+    if (!val) return null;
+    if (val instanceof Date && !isNaN(val.getTime())) return val;
+    if (typeof val === 'number') {
+      const d = new Date(val);
+      return isNaN(d.getTime()) ? null : d;
+    }
+    if (typeof val === 'string') {
+      const str = val.trim();
+      const direct = new Date(str);
+      if (!isNaN(direct.getTime())) return direct;
+
+      // Handle DD/MM/YYYY or DD-MM-YYYY formats with optional time
+      const match = str.match(
+        /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([AaPp][Mm]))?)?/
+      );
+      if (match) {
+        const day = parseInt(match[1], 10);
+        const month = parseInt(match[2], 10) - 1;
+        const year = parseInt(match[3], 10);
+        let hours = match[4] ? parseInt(match[4], 10) : 0;
+        const minutes = match[5] ? parseInt(match[5], 10) : 0;
+        const seconds = match[6] ? parseInt(match[6], 10) : 0;
+        const ampm = match[7]?.toUpperCase();
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        const d = new Date(year, month, day, hours, minutes, seconds);
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  };
+
   const getBabyTimestamp = (baby: Baby): number => {
-    // Referral acceptance timestamp takes precedence for referred babies so they appear in Today/Yesterday
-    // based on acceptance date/time, then registration timestamp (createdAt/registeredAt/dateOfBirth)
-    const ts = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt || baby.dateOfBirth;
-    if (ts) {
-      const parsed = new Date(ts).getTime();
-      if (!isNaN(parsed)) return parsed;
+    // Referral acceptance timestamp takes precedence for referred babies so they appear in Today/Yesterday/Dated
+    // based on acceptance date/time, then registration timestamp (registeredAt/createdAt/dateOfBirth)
+    const candidates = [
+      baby.referralAcceptedAt,
+      baby.acceptedAt,
+      baby.registeredAt,
+      baby.createdAt,
+      baby.dateOfBirth,
+    ];
+    for (const cand of candidates) {
+      if (cand) {
+        const d = parseDateSafe(cand);
+        if (d) return d.getTime();
+      }
     }
     return 0;
   };
 
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0).getTime();
+  const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0).getTime();
 
   // Strict hospital data isolation guard: only babies belonging to current hospital
   // or historical outgoing referrals from this hospital may be present
@@ -176,11 +218,50 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     (a, b) => getBabyTimestamp(b) - getBabyTimestamp(a)
   );
 
-  // Split strictly by date and time:
-  // Today = registered/born on or after start of today
-  // Yesterday = registered/born before start of today
+  interface PreviousDateGroup {
+    dayKey: string;
+    title: string;
+    orderTimestamp: number;
+    babies: Baby[];
+  }
+
+  // 1. Today = registered/born on or after start of today
   const todayBabies = sortedBabies.filter((b) => getBabyTimestamp(b) >= startOfToday);
-  const yesterdayBabies = sortedBabies.filter((b) => getBabyTimestamp(b) < startOfToday);
+
+  // 2. Yesterday = registered/born on or after start of yesterday and before start of today
+  const yesterdayBabies = sortedBabies.filter((b) => {
+    const ts = getBabyTimestamp(b);
+    return ts >= startOfYesterday && ts < startOfToday;
+  });
+
+  // 3. Older dates = registered/born before start of yesterday, grouped by date (e.g. "15-11-2026")
+  const olderBabies = sortedBabies.filter((b) => getBabyTimestamp(b) < startOfYesterday);
+
+  const olderGroupsMap = new Map<string, PreviousDateGroup>();
+  for (const baby of olderBabies) {
+    const ts = getBabyTimestamp(baby);
+    const d = ts > 0 ? new Date(ts) : now;
+    const dayStr = String(d.getDate()).padStart(2, '0');
+    const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+    const yearStr = d.getFullYear();
+    const formattedTitle = `${dayStr}-${monthStr}-${yearStr}`;
+    const dayKey = `date_${yearStr}_${monthStr}_${dayStr}`;
+    const startOfDay = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0).getTime();
+
+    if (!olderGroupsMap.has(dayKey)) {
+      olderGroupsMap.set(dayKey, {
+        dayKey,
+        title: formattedTitle,
+        orderTimestamp: startOfDay,
+        babies: [],
+      });
+    }
+    olderGroupsMap.get(dayKey)!.babies.push(baby);
+  }
+
+  const previousDateGroups = Array.from(olderGroupsMap.values()).sort(
+    (a, b) => b.orderTimestamp - a.orderTimestamp
+  );
 
   const getPillColor = (idx: number) => {
     const colors = [COLORS.pillBeige, COLORS.pillBeige, COLORS.pillPink, COLORS.pillGreen, COLORS.pillBlue];
@@ -461,29 +542,50 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             )}
 
             {/* Section: Yesterday */}
-            <View style={[styles.sectionHeader, { marginTop: 18 }]}>
-              <Text style={styles.sectionTitle}>Yesterday</Text>
-            </View>
+            {yesterdayBabies.length > 0 && (
+              <>
+                <View style={[styles.sectionHeader, { marginTop: 18 }]}>
+                  <Text style={styles.sectionTitle}>Yesterday</Text>
+                </View>
 
-            {yesterdayBabies.length > 0 ? (
-              yesterdayBabies.map((baby, idx) => (
-                <BabyCard
-                  key={baby.id + '_yesterday_' + idx}
-                  baby={baby}
-                  latestSample={getLatestSample(baby)}
-                  phototherapyInfo={getPhototherapyInfo(baby)}
-                  pillColor={getPillColor(idx + 3)}
-                  referredToHospital={getReferredHospital(baby)}
-                  referralSentAt={getReferralSentAt(baby)}
-                  onPress={() => onSelectBaby(baby)}
-                  onEditPress={() => handleOpenEdit(baby)}
-                />
-              ))
-            ) : (
-              <View style={styles.emptySection}>
-                <Text style={styles.emptySectionText}>No previous patient records</Text>
-              </View>
+                {yesterdayBabies.map((baby, idx) => (
+                  <BabyCard
+                    key={baby.id + '_yesterday_' + idx}
+                    baby={baby}
+                    latestSample={getLatestSample(baby)}
+                    phototherapyInfo={getPhototherapyInfo(baby)}
+                    pillColor={getPillColor(idx + 3)}
+                    referredToHospital={getReferredHospital(baby)}
+                    referralSentAt={getReferralSentAt(baby)}
+                    onPress={() => onSelectBaby(baby)}
+                    onEditPress={() => handleOpenEdit(baby)}
+                  />
+                ))}
+              </>
             )}
+
+            {/* Previous Dated Sections (e.g. 15-11-2026) */}
+            {previousDateGroups.map((group, groupIdx) => (
+              <View key={group.dayKey}>
+                <View style={[styles.sectionHeader, { marginTop: 18 }]}>
+                  <Text style={styles.sectionTitle}>{group.title}</Text>
+                </View>
+
+                {group.babies.map((baby, idx) => (
+                  <BabyCard
+                    key={baby.id + '_' + group.dayKey + '_' + idx}
+                    baby={baby}
+                    latestSample={getLatestSample(baby)}
+                    phototherapyInfo={getPhototherapyInfo(baby)}
+                    pillColor={getPillColor(groupIdx * 3 + idx + 1)}
+                    referredToHospital={getReferredHospital(baby)}
+                    referralSentAt={getReferralSentAt(baby)}
+                    onPress={() => onSelectBaby(baby)}
+                    onEditPress={() => handleOpenEdit(baby)}
+                  />
+                ))}
+              </View>
+            ))}
           </>
         )}
 
