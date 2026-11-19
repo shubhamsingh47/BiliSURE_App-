@@ -268,6 +268,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   },
 
   createReferral: async (data) => {
+    const currentHosp = (useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
     const newRef: Referral = {
       id: 'ref_' + Date.now(),
       referralId: `REF-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -278,8 +279,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       gestationalAgeWeeks: data.gestationalAgeWeeks || 38,
       referringDoctorName: data.referringDoctorName || 'Dr. Referring Doctor',
       referringCentreName: data.referringCentreName || 'Community Health Centre',
-      receivingHospitalId: data.receivingHospitalId || 'hosp_001',
-      receivingHospitalName: data.receivingHospitalName || 'District Civil Hospital',
+      receivingHospitalId: data.receivingHospitalId || (currentHosp === 'PGI' ? 'hosp_rml' : 'hosp_pgi'),
+      receivingHospitalName: data.receivingHospitalName || (currentHosp === 'PGI' ? 'RML' : 'PGI'),
       status: 'pending',
       urgency: data.urgency || 'routine',
       clinicalSummary: data.clinicalSummary || '',
@@ -362,6 +363,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   },
 
   confirmArrival: async (referralId, nurseName, hospitalId) => {
+    const currentHosp = (useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
     const ref = get().referrals.find((r) => r.referralId === referralId || r.id === referralId);
     const admissionId = `ADM-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
@@ -372,7 +374,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       babyUhid: ref?.babyUhid || 'UHID-0000',
       babyName: ref?.babyName || 'Newborn Patient',
       hospitalId,
-      hospitalName: ref?.receivingHospitalName || 'District Civil Hospital',
+      hospitalName: ref?.receivingHospitalName || (currentHosp === 'PGI' ? 'RML' : 'PGI'),
       referralId: ref?.referralId,
       physicalArrivalConfirmed: true,
       arrivalConfirmedAt: new Date().toISOString(),
@@ -824,11 +826,12 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   },
 
   registerStation: async (stationData) => {
+    const currentHosp = (useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
     const newStation: PTStation = {
       id: 'st_' + Date.now(),
       stationId: stationData.stationId.toUpperCase(),
       hospitalId: stationData.hospitalId,
-      hospitalName: stationData.hospitalName || 'District Civil Hospital',
+      hospitalName: stationData.hospitalName || (currentHosp === 'PGI' ? 'PGI' : currentHosp),
       name: stationData.name,
       type: stationData.type || 'double_surface',
       location: stationData.location || 'NICU Ward',

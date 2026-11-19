@@ -23,9 +23,8 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
     primaryRole === 'receiving_hospital' ||
     user?.role === 'receiving_hospital' ||
     user?.primaryRole === 'receiving_hospital';
-  const displayName = isReceiving
-    ? 'District Civil Hospital (NICU / Pediatrics)'
-    : user.name;
+  const displayName = user.name || (user.facility ? `${user.facility} Hospital` : 'Hospital Staff');
+  const facilitySub = `${user.facility || 'Hospital'} • ${user.department || 'Pediatrics'}`;
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
@@ -47,9 +46,7 @@ export const RoleSwitcherBar: React.FC<RoleSwitcherBarProps> = ({
               {displayName}
             </Text>
             <Text style={styles.facilityText} numberOfLines={1}>
-              {isReceiving
-                ? 'District Civil Hospital • Neonatal Intensive Care & PT Unit'
-                : `${user.facility} • ${user.department}`}
+              {facilitySub}
             </Text>
           </View>
         )}
