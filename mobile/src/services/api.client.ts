@@ -38,9 +38,15 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     try {
-      const token = await AsyncStorage.getItem('@bilisure_access_token');
+      const [token, facility] = await Promise.all([
+        AsyncStorage.getItem('@bilisure_access_token'),
+        AsyncStorage.getItem('@bilisure_user_facility'),
+      ]);
       if (config.headers) {
         config.headers.Authorization = `Bearer ${token || 'mock_jwt_token'}`;
+        if (facility) {
+          config.headers['X-Hospital-Facility'] = facility;
+        }
       }
     } catch {
       if (config.headers) {

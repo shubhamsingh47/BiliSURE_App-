@@ -74,11 +74,6 @@ export const RegisterPatientScreen: React.FC<RegisterPatientScreenProps> = ({
           value={doctor}
           onChangeText={setDoctor}
         />
-        <CustomInput
-          placeholder="Severity State"
-          value={severity}
-          onChangeText={setSeverity}
-        />
 
         <PrimaryButton
           title="Register"

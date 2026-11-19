@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Baby, BilirubinReading, ClinicalObservation, SeverityState } from '../types';
 import { PatientsApi } from '../services/patients.api';
 import { evaluateBhutaniRisk } from '../services/bhutani.service';
+import { useAuthStore, registerAuthResetListener } from './useAuthStore';
 
 interface PatientState {
   babies: Baby[];
@@ -10,6 +11,9 @@ interface PatientState {
   observations: ClinicalObservation[];
   selectedDepartment: string;
   isLoading: boolean;
+  loadedHospital: string | null;
+  activeSessionId: string | null;
+  reset: () => void;
   loadBabies: () => Promise<void>;
   selectBaby: (baby: Baby | null) => void;
   deselectBaby: () => void;
@@ -36,64 +40,149 @@ export const usePatientStore = create<PatientState>((set, get) => ({
   observations: [],
   selectedDepartment: 'Deppt',
   isLoading: false,
+  loadedHospital: null,
+  activeSessionId: null,
+
+  reset: () => {
+    set({
+      babies: [],
+      selectedBaby: null,
+      readings: [],
+      observations: [],
+      selectedDepartment: 'Deppt',
+      isLoading: false,
+      loadedHospital: null,
+      activeSessionId: null,
+    });
+  },
 
   loadBabies: async () => {
-    set({ isLoading: true });
+    const authState = useAuthStore.getState();
+    const currentHosp = (authState.user?.facility || authState.activeHospital || '').toUpperCase();
+    const requestSessionId = authState.authSessionId;
+
+    if (!authState.isAuthenticated || !currentHosp) {
+      set({
+        babies: [],
+        selectedBaby: null,
+        readings: [],
+        observations: [],
+        isLoading: false,
+        loadedHospital: null,
+        activeSessionId: null,
+      });
+      return;
+    }
+
+    // Immediately purge any stale hospital data if session or hospital identity changed
+    if (get().loadedHospital !== currentHosp || get().activeSessionId !== requestSessionId) {
+      set({
+        babies: [],
+        selectedBaby: null,
+        readings: [],
+        observations: [],
+        isLoading: true,
+        loadedHospital: currentHosp,
+        activeSessionId: requestSessionId,
+      });
+    } else {
+      set({ isLoading: true });
+    }
+
     try {
       const dept = get().selectedDepartment;
       const onlineBabies = await PatientsApi.getBabies(
         dept !== 'Deppt' && dept !== 'All' ? dept : undefined
       );
 
-      // If online babies were fetched, update state
-      if (Array.isArray(onlineBabies)) {
-        if (onlineBabies.length > 0) {
-          const finalBabies = onlineBabies;
-          const currentSelected = get().selectedBaby;
-          const activeBaby = currentSelected
-            ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
-            : null;
-          const effectiveBaby = activeBaby || null;
+      // Verify session validity: Discard response if user switched hospital or logged out while in-flight
+      const latestAuth = useAuthStore.getState();
+      const latestHosp = (latestAuth.user?.facility || latestAuth.activeHospital || '').toUpperCase();
+      if (
+        !latestAuth.isAuthenticated ||
+        latestAuth.authSessionId !== requestSessionId ||
+        latestHosp !== currentHosp
+      ) {
+        console.warn(`[usePatientStore] Discarded stale babies response for ${currentHosp} (active session: ${latestHosp})`);
+        return;
+      }
 
-          // Load readings for every baby (so each list card can show its own latest sample)
-          const [readingsPerBaby, allObservations] = await Promise.all([
-            Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
-            PatientsApi.getObservations(),
-          ]);
+      // Client-side defense-in-depth isolation filter
+      const scopedBabies = Array.isArray(onlineBabies)
+        ? onlineBabies.filter((b) => {
+            const babyHosp = (b.currentHospital || b.facility || '').toUpperCase();
+            const isAtCurrentHospital = !babyHosp || babyHosp === currentHosp;
+            const isHistoricalTransfer =
+              (b.isTransferredOut || b.isHistoricalOnly || b.referralStatus === 'pending') &&
+              (!b.facility || b.facility.toUpperCase() === currentHosp);
+            return isAtCurrentHospital || isHistoricalTransfer;
+          })
+        : [];
 
-          set({
-            babies: finalBabies,
-            readings: readingsPerBaby.flat(),
-            observations: allObservations || [],
-            selectedBaby: effectiveBaby,
-          });
-        } else {
-          // Legitimate empty state for hospitals with no patients (e.g. RML, KGMU initially)
-          set({
-            babies: [],
-            selectedBaby: null,
-            readings: [],
-            observations: [],
-          });
+      if (scopedBabies.length > 0) {
+        const finalBabies = scopedBabies;
+        const currentSelected = get().selectedBaby;
+        const activeBaby = currentSelected
+          ? finalBabies.find((b) => b.id === currentSelected.id || b.uhid === currentSelected.uhid)
+          : null;
+        const effectiveBaby = activeBaby || null;
+
+        // Load readings for every baby
+        const [readingsPerBaby, allObservations] = await Promise.all([
+          Promise.all(finalBabies.map((b) => PatientsApi.getReadings(b.id || b.uhid))),
+          PatientsApi.getObservations(),
+        ]);
+
+        // Second verification check after secondary fetches
+        const postFetchAuth = useAuthStore.getState();
+        if (
+          !postFetchAuth.isAuthenticated ||
+          postFetchAuth.authSessionId !== requestSessionId
+        ) {
+          return;
         }
+
+        set({
+          babies: finalBabies,
+          readings: readingsPerBaby.flat(),
+          observations: allObservations || [],
+          selectedBaby: effectiveBaby,
+          loadedHospital: currentHosp,
+          activeSessionId: requestSessionId,
+        });
+      } else {
+        set({
+          babies: [],
+          selectedBaby: null,
+          readings: [],
+          observations: [],
+          loadedHospital: currentHosp,
+          activeSessionId: requestSessionId,
+        });
       }
     } catch (err) {
       console.error('Error loading babies from backend:', err);
     } finally {
-      set({ isLoading: false });
+      // Only reset isLoading if this turn belongs to the active session
+      if (useAuthStore.getState().authSessionId === requestSessionId) {
+        set({ isLoading: false });
+      }
     }
   },
 
   selectBaby: async (baby) => {
     set({ selectedBaby: baby });
     if (!baby) return;
+    const requestSessionId = useAuthStore.getState().authSessionId;
     try {
       const babyIdentifier = baby.id || baby.uhid;
       const [readings, observations] = await Promise.all([
         PatientsApi.getReadings(babyIdentifier),
         PatientsApi.getObservations(babyIdentifier),
       ]);
-      // Refresh only this baby's entries; keep other babies' data for the list view
+      // Discard if session changed
+      if (useAuthStore.getState().authSessionId !== requestSessionId) return;
+
       set((state) => ({
         readings: [
           ...(readings || []),
@@ -341,3 +430,8 @@ export const usePatientStore = create<PatientState>((set, get) => ({
     }));
   },
 }));
+
+// Automatically register to reset patient store whenever auth logout or hospital change occurs
+registerAuthResetListener(() => {
+  usePatientStore.getState().reset();
+});

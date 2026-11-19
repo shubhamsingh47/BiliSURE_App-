@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   useWindowDimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronRight, Check, X, Search, User, Plus } from 'lucide-react-native';
@@ -31,10 +32,10 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenReportStories,
   onOpenNewRegistration,
 }) => {
-  const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
+  const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings, isLoading } = usePatientStore();
   const { referrals, admissions, stations } = useNetworkStore();
-  const { user } = useAuthStore();
-  const currentHospital = (user?.facility || 'PGI').toUpperCase();
+  const { user, activeHospital } = useAuthStore();
+  const currentHospital = (user?.facility || activeHospital || 'PGI').toUpperCase();
 
   const getReferredHospital = (baby: Baby): string | null => {
     // A baby is in the referred state on the sender's dashboard only while its outgoing referral is pending
@@ -107,6 +108,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
+        severityState: editingBaby.severityState || 'normal',
       });
       setEditingBaby(null);
       Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
@@ -119,7 +121,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
 
   useEffect(() => {
     loadBabies();
-  }, []);
+  }, [currentHospital]);
 
   const departments = ['Deppt', 'NICU', 'Maternity', 'Pediatrics'];
 
@@ -143,8 +145,21 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
+  // Strict hospital data isolation guard: only babies belonging to current hospital
+  // or historical outgoing referrals from this hospital may be present
+  const authorizedBabies = babies.filter((b) => {
+    const babyHosp = (b.currentHospital || b.facility || '').toUpperCase();
+    if (babyHosp && babyHosp !== currentHospital) {
+      const isHistoricalOutgoing =
+        (b.isTransferredOut || b.isHistoricalOnly || b.referralStatus === 'pending') &&
+        (!b.facility || b.facility.toUpperCase() === currentHospital);
+      return isHistoricalOutgoing;
+    }
+    return true;
+  });
+
   // Filter by selected department and search keyword
-  const filteredBabies = babies.filter((b) => {
+  const filteredBabies = authorizedBabies.filter((b) => {
     const matchesDept = !activeDept || activeDept === 'Deppt' || b.department === activeDept;
     const s = search.trim().toLowerCase();
     const matchesSearch =
@@ -404,12 +419,18 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
           <ChevronRight size={20} color="#7C3AED" />
         </TouchableOpacity>
 
-        {filteredBabies.length === 0 ? (
+        {isLoading && authorizedBabies.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <ActivityIndicator size="small" color="#7D3BFF" style={{ marginBottom: 8 }} />
+            <Text style={styles.emptyTitle}>Loading Patient Records...</Text>
+            <Text style={styles.emptySub}>Fetching authorized data for {currentHospital}</Text>
+          </View>
+        ) : filteredBabies.length === 0 ? (
           <View style={styles.emptyContainer}>
             <User size={36} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Patients Found</Text>
             <Text style={styles.emptySub}>
-              {search ? `No patient records match "${search}".` : 'No patient records available.'}
+              {search ? `No patient records match "${search}".` : `No patients recorded for ${currentHospital}.`}
             </Text>
           </View>
         ) : (

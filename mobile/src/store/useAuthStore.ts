@@ -47,6 +47,26 @@ export const ALL_HOSPITAL_PERMISSIONS: HospitalPermission[] = Array.from(
 
 export type HospitalCode = 'PGI' | 'RML' | 'KGMU';
 
+type AuthResetListener = () => void;
+const resetListeners: Set<AuthResetListener> = new Set();
+
+export const registerAuthResetListener = (listener: AuthResetListener) => {
+  resetListeners.add(listener);
+  return () => {
+    resetListeners.delete(listener);
+  };
+};
+
+export const notifyAuthReset = () => {
+  resetListeners.forEach((listener) => {
+    try {
+      listener();
+    } catch (e) {
+      console.error('Error in auth reset listener', e);
+    }
+  });
+};
+
 export const HOSPITAL_USERS: Record<HospitalCode, User> = {
   PGI: {
     id: 'usr_pgi',
@@ -118,6 +138,7 @@ interface AuthState {
   primaryRole: PrimaryUserRole;
   activeHospitalProfile: PermissionProfile;
   activeHospital: HospitalCode;
+  authSessionId: string;
   setUser: (user: User | null, token: string | null) => void;
   switchHospital: (code: HospitalCode) => void;
   switchRole: (role: UserRole) => void;
@@ -126,6 +147,9 @@ interface AuthState {
   logout: () => Promise<void>;
   initializeAuth: () => Promise<void>;
 }
+
+const generateSessionId = (prefix: string) =>
+  `auth_${prefix.toLowerCase()}_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: HOSPITAL_USERS.PGI,
@@ -136,8 +160,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   primaryRole: 'receiving_hospital',
   activeHospitalProfile: 'all',
   activeHospital: 'PGI',
+  authSessionId: generateSessionId('pgi'),
 
   setUser: (user, token) => {
+    // Notify all hospital stores to clear previous hospital data immediately
+    notifyAuthReset();
+
     if (user) {
       const hospitalCode: HospitalCode =
         user.facility === 'RML'
@@ -145,6 +173,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           : user.facility === 'KGMU'
           ? 'KGMU'
           : 'PGI';
+
+      const newSessionId = generateSessionId(hospitalCode);
 
       set({
         user,
@@ -154,6 +184,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         primaryRole: 'receiving_hospital',
         activeHospitalProfile: user.permissionProfile || 'all',
         activeHospital: hospitalCode,
+        authSessionId: newSessionId,
       });
 
       if (token) {
@@ -161,6 +192,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       AsyncStorage.setItem('@bilisure_user_facility', hospitalCode);
     } else {
+      const newSessionId = generateSessionId('logged_out');
       set({
         user: HOSPITAL_USERS.PGI,
         token: null,
@@ -168,19 +200,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         activeRole: 'receiving_hospital',
         primaryRole: 'receiving_hospital',
         activeHospital: 'PGI',
+        authSessionId: newSessionId,
       });
       AsyncStorage.removeItem('@bilisure_access_token');
+      AsyncStorage.removeItem('@bilisure_user_facility');
     }
   },
 
   switchHospital: (code: HospitalCode) => {
+    // Notify all hospital stores to clear previous hospital data immediately
+    notifyAuthReset();
+
     const newUser = HOSPITAL_USERS[code] || HOSPITAL_USERS.PGI;
+    const newSessionId = generateSessionId(code);
+
     set({
       user: newUser,
       activeRole: 'receiving_hospital',
       primaryRole: 'receiving_hospital',
       activeHospital: code,
       token: `mock_jwt_token_${code.toLowerCase()}`,
+      authSessionId: newSessionId,
     });
     AsyncStorage.setItem('@bilisure_user_facility', code);
     AsyncStorage.setItem('@bilisure_access_token', `mock_jwt_token_${code.toLowerCase()}`);
@@ -241,15 +281,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   logout: async () => {
+    // 1. Immediately notify all dependent stores to clear in-memory hospital patient data
+    notifyAuthReset();
+
+    // 2. Remove persisted session tokens and hospital facility identity
     await AsyncStorage.removeItem('@bilisure_access_token');
     await AsyncStorage.removeItem('@bilisure_refresh_token');
     await AsyncStorage.removeItem('@bilisure_user_role');
+    await AsyncStorage.removeItem('@bilisure_user_facility');
+
+    // 3. Reset auth state with a new invalidated session generation
     set({
       user: PRIMARY_PRESET_USERS.doctor_referring,
       token: null,
       isAuthenticated: false,
       activeRole: 'doctor_referring',
       primaryRole: 'doctor_referring',
+      activeHospital: 'PGI',
+      authSessionId: generateSessionId('logged_out'),
     });
   },
 

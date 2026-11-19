@@ -69,6 +69,8 @@ export const RootNavigator: React.FC = () => {
   const { logout } = useAuthStore();
 
   const handleLogout = async () => {
+    usePatientStore.getState().reset();
+    useNetworkStore.getState().reset();
     await logout();
     setCurrentRoute('login');
   };
@@ -76,6 +78,10 @@ export const RootNavigator: React.FC = () => {
   const handleSplashFinish = () => setCurrentRoute('onboarding');
   const handleOnboardingContinue = () => setCurrentRoute('login');
   const handleLoginSuccess = () => {
+    usePatientStore.getState().reset();
+    useNetworkStore.getState().reset();
+    usePatientStore.getState().loadBabies();
+    useNetworkStore.getState().loadNetworkData();
     setActiveTab('babies');
     setCurrentRoute('main');
   };

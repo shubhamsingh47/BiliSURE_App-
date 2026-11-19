@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Hospital, PTStation, Referral, Admission, TreatmentSession, InAppNotification, ReferralStatus, ReferralUrgency, Baby } from '../types';
 import { apiClient } from '../services/api.client';
 import { usePatientStore } from './usePatientStore';
+import { useAuthStore, registerAuthResetListener } from './useAuthStore';
 
 interface NetworkState {
   hospitals: Hospital[];
@@ -12,6 +13,9 @@ interface NetworkState {
   districtMetrics: any | null;
   isLoading: boolean;
   error: string | null;
+  loadedHospital: string | null;
+  activeSessionId: string | null;
+  reset: () => void;
 
   // Actions
   loadNetworkData: () => Promise<void>;
@@ -298,9 +302,56 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   districtMetrics: null,
   isLoading: false,
   error: null,
+  loadedHospital: null,
+  activeSessionId: null,
+
+  reset: () => {
+    set({
+      referrals: [],
+      admissions: [],
+      notifications: [],
+      districtMetrics: null,
+      isLoading: false,
+      error: null,
+      loadedHospital: null,
+      activeSessionId: null,
+    });
+  },
 
   loadNetworkData: async () => {
-    set({ isLoading: true, error: null });
+    const authState = useAuthStore.getState();
+    const currentHosp = (authState.user?.facility || authState.activeHospital || '').toUpperCase();
+    const requestSessionId = authState.authSessionId;
+
+    if (!authState.isAuthenticated || !currentHosp) {
+      set({
+        referrals: [],
+        admissions: [],
+        notifications: [],
+        districtMetrics: null,
+        isLoading: false,
+        error: null,
+        loadedHospital: null,
+        activeSessionId: null,
+      });
+      return;
+    }
+
+    // Immediately clear hospital-specific state if switching hospital or new session
+    if (get().loadedHospital !== currentHosp || get().activeSessionId !== requestSessionId) {
+      set({
+        referrals: [],
+        admissions: [],
+        notifications: [],
+        isLoading: true,
+        error: null,
+        loadedHospital: currentHosp,
+        activeSessionId: requestSessionId,
+      });
+    } else {
+      set({ isLoading: true, error: null });
+    }
+
     try {
       const [hospRes, refRes, admRes, notifRes, distRes] = await Promise.allSettled([
         apiClient.get('/hospitals'),
@@ -309,6 +360,18 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         apiClient.get('/notifications'),
         apiClient.get('/district/overview'),
       ]);
+
+      // Check if session changed while in-flight
+      const latestAuth = useAuthStore.getState();
+      const latestHosp = (latestAuth.user?.facility || latestAuth.activeHospital || '').toUpperCase();
+      if (
+        !latestAuth.isAuthenticated ||
+        latestAuth.authSessionId !== requestSessionId ||
+        latestHosp !== currentHosp
+      ) {
+        console.warn(`[useNetworkStore] Discarded stale network data for ${currentHosp} (active session: ${latestHosp})`);
+        return;
+      }
 
       if (hospRes.status === 'fulfilled' && hospRes.value.data.data) {
         set({ hospitals: hospRes.value.data.data });
@@ -325,10 +388,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       if (distRes.status === 'fulfilled' && distRes.value.data.data) {
         set({ districtMetrics: distRes.value.data.data });
       }
+      set({ loadedHospital: currentHosp, activeSessionId: requestSessionId });
     } catch (err: any) {
       set({ error: err?.message || 'Error loading network data' });
     } finally {
-      set({ isLoading: false });
+      if (useAuthStore.getState().authSessionId === requestSessionId) {
+        set({ isLoading: false });
+      }
     }
   },
 
@@ -920,3 +986,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     apiClient.patch(`/notifications/${id}/read`).catch(() => {});
   },
 }));
+
+// Automatically register to reset network store whenever auth logout or hospital change occurs
+registerAuthResetListener(() => {
+  useNetworkStore.getState().reset();
+});

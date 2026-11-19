@@ -228,29 +228,6 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                   <View style={styles.patientBannerInfo}>
                     <View style={styles.patientTagRow}>
                       <Text style={styles.patientBannerTag}>PATIENT TO SEND TO PHOTOTHERAPY</Text>
-                      {ptSelectedBaby.severityState && (
-                        <View
-                          style={[
-                            styles.severityMiniBadge,
-                            {
-                              backgroundColor:
-                                ptSelectedBaby.severityState === 'critical' ? '#FEE2E2' : '#FEF3C7',
-                            },
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.severityMiniText,
-                              {
-                                color:
-                                  ptSelectedBaby.severityState === 'critical' ? '#DC2626' : '#D97706',
-                              },
-                            ]}
-                          >
-                            {ptSelectedBaby.severityState.toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
                     </View>
                     <Text style={styles.patientBannerName} numberOfLines={1}>
                       {ptSelectedBaby.parentsName?.trim() || ptSelectedBaby.name}
@@ -405,29 +382,6 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
                     <View style={styles.patientItemInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={styles.patientItemName}>{displayName}</Text>
-                        {item.severityState && (
-                          <View
-                            style={[
-                              styles.severityPill,
-                              {
-                                backgroundColor:
-                                  item.severityState === 'critical' ? '#FEE2E2' : '#FEF3C7',
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.severityPillText,
-                                {
-                                  color:
-                                    item.severityState === 'critical' ? '#DC2626' : '#D97706',
-                                },
-                              ]}
-                            >
-                              {item.severityState.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
                       </View>
                       <Text style={styles.patientItemMeta}>
                         UHID: {item.uhid} • {item.gestationalAgeWeeks || 38}w • {item.weight || 3.1}kg

@@ -125,33 +125,6 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
               <View style={styles.patientBannerInfo}>
                 <View style={styles.patientTagRow}>
                   <Text style={styles.patientBannerTag}>REFERRING PATIENT</Text>
-                  {selectedPatient.severityState && (
-                    <View
-                      style={[
-                        styles.severityMiniBadge,
-                        {
-                          backgroundColor:
-                            selectedPatient.severityState === 'critical'
-                              ? '#FEE2E2'
-                              : '#FEF3C7',
-                        },
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.severityMiniText,
-                          {
-                            color:
-                              selectedPatient.severityState === 'critical'
-                                ? '#DC2626'
-                                : '#D97706',
-                          },
-                        ]}
-                      >
-                        {selectedPatient.severityState.toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
                 </View>
                 <Text style={styles.patientBannerName} numberOfLines={1}>
                   {selectedPatient.parentsName?.trim() || selectedPatient.name}
@@ -363,29 +336,6 @@ export const HospitalDirectoryScreen: React.FC<HospitalDirectoryScreenProps> = (
                     <View style={styles.patientItemInfo}>
                       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                         <Text style={styles.patientItemName}>{displayName}</Text>
-                        {item.severityState && (
-                          <View
-                            style={[
-                              styles.severityPill,
-                              {
-                                backgroundColor:
-                                  item.severityState === 'critical' ? '#FEE2E2' : '#FEF3C7',
-                              },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.severityPillText,
-                                {
-                                  color:
-                                    item.severityState === 'critical' ? '#DC2626' : '#D97706',
-                                },
-                              ]}
-                            >
-                              {item.severityState.toUpperCase()}
-                            </Text>
-                          </View>
-                        )}
                       </View>
                       <Text style={styles.patientItemUhid}>UHID: {item.uhid}</Text>
                       <Text style={styles.patientItemDetails}>

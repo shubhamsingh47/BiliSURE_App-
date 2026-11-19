@@ -15,6 +15,7 @@ import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
+import { SeverityState } from '../../../types';
 import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface NewRegistrationScreenProps {
@@ -87,10 +88,11 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const [motherName, setMotherName] = useState('');
   const [dob, setDob] = useState(formatCurrentDateTime());
   const [uhid, setUhid] = useState('');
-  const [gestationalAge, setGestationalAge] = useState('38');
-  const [birthWeight, setBirthWeight] = useState('3.1');
+  const [gestationalAge, setGestationalAge] = useState('');
+  const [birthWeight, setBirthWeight] = useState('');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
   const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
+  const severity: SeverityState = 'normal';
   const [repeatTransaction, setRepeatTransaction] = useState(false);
   const [hasAttachment, setHasAttachment] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -109,15 +111,24 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       return;
     }
 
-    const parsedGestAge = gestationalAge.trim() ? parseInt(gestationalAge.trim(), 10) : 38;
-    const parsedWeight = birthWeight.trim() ? parseFloat(birthWeight.trim()) : 3.1;
+    if (!gestationalAge.trim()) {
+      Alert.alert('Required Field', 'Please enter gestational age in weeks.');
+      return;
+    }
 
-    if (gestationalAge.trim() && (isNaN(parsedGestAge) || parsedGestAge < 20 || parsedGestAge > 46)) {
+    const parsedGestAge = parseInt(gestationalAge.trim(), 10);
+    if (isNaN(parsedGestAge) || parsedGestAge < 20 || parsedGestAge > 46) {
       Alert.alert('Invalid Gestational Age', 'Please enter a valid gestational age between 20 and 46 weeks.');
       return;
     }
 
-    if (birthWeight.trim() && (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 10)) {
+    if (!birthWeight.trim()) {
+      Alert.alert('Required Field', 'Please enter birth weight in kg.');
+      return;
+    }
+
+    const parsedWeight = parseFloat(birthWeight.trim());
+    if (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 10) {
       Alert.alert('Invalid Birth Weight', 'Please enter a valid birth weight in kg (e.g. 3.1).');
       return;
     }
@@ -183,7 +194,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           <View style={styles.colHalf}>
             <CustomInput
               label="Gestation (weeks)"
-              placeholder="38"
+              placeholder="e.g. 38"
               value={gestationalAge}
               onChangeText={setGestationalAge}
               keyboardType="numeric"
@@ -193,7 +204,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           <View style={styles.colHalfRight}>
             <CustomInput
               label="Birth weight (kg)"
-              placeholder="3.1"
+              placeholder="e.g. 3.1"
               value={birthWeight}
               onChangeText={setBirthWeight}
               keyboardType="decimal-pad"
