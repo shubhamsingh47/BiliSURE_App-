@@ -187,10 +187,18 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   // Manage all Flowsheet Records Modal state (Single Card Pencil)
   const [manageRecordsModalVisible, setManageRecordsModalVisible] = useState(false);
 
-  // Filter admitted neonates currently under phototherapy treatment
+  // Filter admitted neonates currently under phototherapy treatment in the active hospital
+  const currentHosp = (user?.facility || 'PGI').toUpperCase();
+  const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
   const treatedPatients = useMemo(
-    () => admissions.filter((a) => a.admissionStatus === 'under_treatment'),
-    [admissions]
+    () =>
+      admissions.filter(
+        (a) =>
+          a.admissionStatus === 'under_treatment' &&
+          (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
+      ),
+    [admissions, currentHospId, currentHosp]
   );
 
   // Keep detailedAdmission in sync with updated store state
