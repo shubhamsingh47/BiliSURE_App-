@@ -247,8 +247,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setHospitalPermissionProfile: (profile: PermissionProfile) => {
     const current = get().user;
     let permissions = ALL_HOSPITAL_PERMISSIONS;
-    let name = 'District Civil Hospital (NICU / Pediatrics)';
-    let department = 'NICU / Pediatrics';
+    let name = current?.name || `${current?.facility || 'PGI'} Hospital`;
+    let department = current?.department || 'NICU / Pediatrics';
 
     if (profile === 'nursing') {
       department = 'NICU Phototherapy Unit';
