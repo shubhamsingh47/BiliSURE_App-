@@ -8,6 +8,7 @@
     "start": "node dist/index.js",
     "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
     "seed": "ts-node src/scripts/seed.ts",
+    "seed:patients": "ts-node src/scripts/seed30PatientsAtlas.ts",
     "db:clean": "ts-node src/scripts/cleanDatabase.ts",
     "test": "node dist/tests/runTests.js"
   },
