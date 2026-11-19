@@ -124,7 +124,7 @@ export class ReferralsService {
         // The baby still belongs to referring facility, but gains pending referral status & sent timestamp
         await BabyModel.findOneAndUpdate(
           { uhid: data.babyUhid.toUpperCase().trim() },
-          { 
+          {
             $set: {
               referralStatus: 'pending',
               referredToHospitalName: receivingHospitalName,
@@ -154,7 +154,7 @@ export class ReferralsService {
       type: 'referral_created',
       relatedBabyUhid: data.babyUhid,
       relatedReferralId: referralId,
-    }).catch(() => {});
+    }).catch(() => { });
 
     return newRef;
   }
@@ -241,7 +241,7 @@ export class ReferralsService {
         const query = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { referralId: id };
         const found = await ReferralModel.findOne(query).lean();
         if (found) return found;
-      } catch {}
+      } catch { }
     }
 
     const found = memoryReferrals.find(
@@ -427,7 +427,7 @@ export class ReferralsService {
     if (isMongoConnected) {
       try {
         await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
-      } catch {}
+      } catch { }
     }
 
     await NotificationsService.createNotification({
@@ -453,7 +453,7 @@ export class ReferralsService {
       try {
         await ReferralModel.findOneAndUpdate({ referralId: ref.referralId }, ref);
         await BabyModel.findOneAndUpdate({ uhid: ref.babyUhid }, { referralStatus: 'none' });
-      } catch {}
+      } catch { }
     }
 
     await NotificationsService.createNotification({

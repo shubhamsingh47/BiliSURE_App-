@@ -49,9 +49,9 @@ const INITIAL_HOSPITALS: Hospital[] = [
     address: 'Raebareli Road, Lucknow',
     contactNumber: '+91-522-2668700',
     totalPTStations: 10,
-    operationalPTStations: 8,
-    occupiedPTStations: 4,
-    availablePTStations: 4,
+    operationalPTStations: 10,
+    occupiedPTStations: 0,
+    availablePTStations: 10,
     lastAvailabilityUpdated: new Date().toISOString(),
   },
   {
@@ -63,10 +63,10 @@ const INITIAL_HOSPITALS: Hospital[] = [
     district: 'Lucknow District',
     address: 'Vibhuti Khand, Gomti Nagar, Lucknow',
     contactNumber: '+91-522-6692000',
-    totalPTStations: 8,
-    operationalPTStations: 7,
-    occupiedPTStations: 2,
-    availablePTStations: 5,
+    totalPTStations: 10,
+    operationalPTStations: 10,
+    occupiedPTStations: 0,
+    availablePTStations: 10,
     lastAvailabilityUpdated: new Date().toISOString(),
   },
   {
@@ -78,190 +78,47 @@ const INITIAL_HOSPITALS: Hospital[] = [
     district: 'Lucknow District',
     address: 'Shah Mina Road, Chowk, Lucknow',
     contactNumber: '+91-522-2257450',
-    totalPTStations: 12,
-    operationalPTStations: 10,
-    occupiedPTStations: 5,
-    availablePTStations: 5,
+    totalPTStations: 7,
+    operationalPTStations: 7,
+    occupiedPTStations: 0,
+    availablePTStations: 7,
     lastAvailabilityUpdated: new Date().toISOString(),
   },
 ];
 
 const INITIAL_STATIONS: PTStation[] = [
-  {
-    id: 'st_pgi_01',
-    stationId: 'PT-PGI-01',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 1',
-    type: 'led_tunnel',
-    location: 'NICU Bed 1',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    currentBabyName: null,
-    currentBabyUhid: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 24).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_pgi_02',
-    stationId: 'PT-PGI-02',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 2',
-    type: 'double_surface',
-    location: 'NICU Bed 2',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    currentBabyName: null,
-    currentBabyUhid: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 18).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_pgi_03',
-    stationId: 'PT-PGI-03',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 3',
-    type: 'single_surface',
-    location: 'NICU Bed 3',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 4).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_pgi_04',
-    stationId: 'PT-PGI-04',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 4',
-    type: 'fiberoptic_blanket',
-    location: 'NICU Bed 4',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_pgi_05',
-    stationId: 'PT-PGI-05',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 5',
-    type: 'double_surface',
-    location: 'SNCU Bed 1',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 1).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_pgi_06',
-    stationId: 'PT-PGI-06',
-    hospitalId: 'hosp_pgi',
-    hospitalName: 'PGI',
-    name: 'BED 6',
-    type: 'single_surface',
-    location: 'SNCU Bed 2',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 48).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  // RML (hosp_rml) Stations
-  {
-    id: 'st_rml_01',
-    stationId: 'PT-RML-01',
-    hospitalId: 'hosp_rml',
-    hospitalName: 'RML',
-    name: 'BED 7',
-    type: 'double_surface',
-    location: 'NICU Pod 1',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 20).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_rml_02',
-    stationId: 'PT-RML-02',
-    hospitalId: 'hosp_rml',
-    hospitalName: 'RML',
-    name: 'BED 8',
-    type: 'led_tunnel',
-    location: 'NICU Pod 2',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 5).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_rml_03',
-    stationId: 'PT-RML-03',
-    hospitalId: 'hosp_rml',
-    hospitalName: 'RML',
-    name: 'BED 9',
-    type: 'single_surface',
-    location: 'NICU Pod 3',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 8).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_rml_04',
-    stationId: 'PT-RML-04',
-    hospitalId: 'hosp_rml',
-    hospitalName: 'RML',
-    name: 'BED 10',
-    type: 'fiberoptic_blanket',
-    location: 'NICU Pod 4',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 2).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  // KGMU (hosp_kgmu) Stations
-  {
-    id: 'st_kgmu_01',
-    stationId: 'PT-KGMU-01',
-    hospitalId: 'hosp_kgmu',
-    hospitalName: 'KGMU',
-    name: 'BED 11',
-    type: 'double_surface',
-    location: 'Care Unit 1',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 30).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_kgmu_02',
-    stationId: 'PT-KGMU-02',
-    hospitalId: 'hosp_kgmu',
-    hospitalName: 'KGMU',
-    name: 'BED 12',
-    type: 'single_surface',
-    location: 'Care Unit 2',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 12).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
-  {
-    id: 'st_kgmu_03',
-    stationId: 'PT-KGMU-03',
-    hospitalId: 'hosp_kgmu',
-    hospitalName: 'KGMU',
-    name: 'BED 13',
-    type: 'fiberoptic_blanket',
-    location: 'Care Unit 3',
-    operationalStatus: 'available',
-    currentBabyId: null,
-    lastCleanedAt: new Date(Date.now() - 3600000 * 60).toISOString(),
-    lastUpdated: new Date().toISOString(),
-  },
+  // PGI (10 stations: BED 10 to BED 100)
+  { id: 'st_pgi_10', stationId: 'PT-PGI-10', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 10', type: 'led_tunnel', location: 'NICU Bed 10', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_20', stationId: 'PT-PGI-20', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 20', type: 'double_surface', location: 'NICU Bed 20', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_30', stationId: 'PT-PGI-30', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 30', type: 'single_surface', location: 'NICU Bed 30', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_40', stationId: 'PT-PGI-40', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 40', type: 'fiberoptic_blanket', location: 'NICU Bed 40', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_50', stationId: 'PT-PGI-50', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 50', type: 'double_surface', location: 'NICU Bed 50', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_60', stationId: 'PT-PGI-60', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 60', type: 'single_surface', location: 'NICU Bed 60', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_70', stationId: 'PT-PGI-70', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 70', type: 'led_tunnel', location: 'SNCU Bed 70', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_80', stationId: 'PT-PGI-80', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 80', type: 'double_surface', location: 'SNCU Bed 80', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_90', stationId: 'PT-PGI-90', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 90', type: 'single_surface', location: 'SNCU Bed 90', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_pgi_100', stationId: 'PT-PGI-100', hospitalId: 'hosp_pgi', hospitalName: 'PGI', name: 'BED 100', type: 'fiberoptic_blanket', location: 'SNCU Bed 100', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+
+  // RML (10 stations: BED 10 to BED 100)
+  { id: 'st_rml_10', stationId: 'PT-RML-10', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 10', type: 'double_surface', location: 'NICU Pod 10', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_20', stationId: 'PT-RML-20', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 20', type: 'led_tunnel', location: 'NICU Pod 20', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_30', stationId: 'PT-RML-30', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 30', type: 'single_surface', location: 'NICU Pod 30', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_40', stationId: 'PT-RML-40', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 40', type: 'fiberoptic_blanket', location: 'NICU Pod 40', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_50', stationId: 'PT-RML-50', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 50', type: 'double_surface', location: 'NICU Pod 50', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_60', stationId: 'PT-RML-60', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 60', type: 'led_tunnel', location: 'NICU Pod 60', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_70', stationId: 'PT-RML-70', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 70', type: 'single_surface', location: 'SNCU Pod 70', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_80', stationId: 'PT-RML-80', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 80', type: 'fiberoptic_blanket', location: 'SNCU Pod 80', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_90', stationId: 'PT-RML-90', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 90', type: 'double_surface', location: 'SNCU Pod 90', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_rml_100', stationId: 'PT-RML-100', hospitalId: 'hosp_rml', hospitalName: 'RML', name: 'BED 100', type: 'led_tunnel', location: 'SNCU Pod 100', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+
+  // KGMU (7 stations: BED 10 to BED 70)
+  { id: 'st_kgmu_10', stationId: 'PT-KGMU-10', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 10', type: 'double_surface', location: 'Care Unit 10', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_20', stationId: 'PT-KGMU-20', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 20', type: 'single_surface', location: 'Care Unit 20', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_30', stationId: 'PT-KGMU-30', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 30', type: 'fiberoptic_blanket', location: 'Care Unit 30', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_40', stationId: 'PT-KGMU-40', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 40', type: 'single_surface', location: 'Care Unit 40', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_50', stationId: 'PT-KGMU-50', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 50', type: 'double_surface', location: 'Care Unit 50', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_60', stationId: 'PT-KGMU-60', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 60', type: 'led_tunnel', location: 'Care Unit 60', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
+  { id: 'st_kgmu_70', stationId: 'PT-KGMU-70', hospitalId: 'hosp_kgmu', hospitalName: 'KGMU', name: 'BED 70', type: 'fiberoptic_blanket', location: 'Care Unit 70', operationalStatus: 'available', currentBabyId: null, currentBabyName: null, currentBabyUhid: null, lastCleanedAt: new Date().toISOString(), lastUpdated: new Date().toISOString() },
 ];
 
 /**
@@ -352,13 +209,16 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       set({ isLoading: true, error: null });
     }
 
+    const currentHospId = authState.user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
     try {
-      const [hospRes, refRes, admRes, notifRes, distRes] = await Promise.allSettled([
+      const [hospRes, refRes, admRes, notifRes, distRes, stnRes] = await Promise.allSettled([
         apiClient.get('/hospitals'),
         apiClient.get('/referrals'),
         apiClient.get('/admissions'),
         apiClient.get('/notifications'),
         apiClient.get('/district/overview'),
+        apiClient.get(`/hospitals/${currentHospId}/stations`),
       ]);
 
       // Check if session changed while in-flight
@@ -387,6 +247,15 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }
       if (distRes.status === 'fulfilled' && distRes.value.data.data) {
         set({ districtMetrics: distRes.value.data.data });
+      }
+      if (stnRes.status === 'fulfilled' && Array.isArray(stnRes.value.data?.data) && stnRes.value.data.data.length > 0) {
+        const remoteStations = stnRes.value.data.data;
+        set((state) => {
+          const others = state.stations.filter(
+            (s) => s.hospitalId !== currentHospId && s.hospitalName?.toUpperCase() !== currentHosp
+          );
+          return { stations: [...others, ...remoteStations] };
+        });
       }
       set({ loadedHospital: currentHosp, activeSessionId: requestSessionId });
     } catch (err: any) {

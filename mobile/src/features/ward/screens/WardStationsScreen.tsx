@@ -76,9 +76,14 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
   const currentHospId = user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
 
   const hospitalStations = useMemo(() => {
-    return stations.filter(
+    const list = stations.filter(
       (s) => s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp
     );
+    return list.slice().sort((a, b) => {
+      const numA = parseInt(a.name?.replace(/\D/g, '') || '0', 10);
+      const numB = parseInt(b.name?.replace(/\D/g, '') || '0', 10);
+      return numA - numB;
+    });
   }, [stations, currentHospId, currentHosp]);
 
   const hospitalAdmissions = useMemo(() => {
