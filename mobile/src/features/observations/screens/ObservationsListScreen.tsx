@@ -37,6 +37,12 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
   const [isAddingNew, setIsAddingNew] = useState(false);
 
   const isDischarged = selectedBaby?.status === 'discharged';
+  const isReferred =
+    selectedBaby?.referralStatus === 'pending' ||
+    selectedBaby?.isTransferredOut ||
+    selectedBaby?.isHistoricalOnly ||
+    !!selectedBaby?.referredToHospitalName;
+  const isLocked = isDischarged || isReferred;
   const patientDisplayName = selectedBaby?.parentsName?.trim() || selectedBaby?.name || 'Patient';
 
   // Filter observations for the selected patient and sort newest first
@@ -114,10 +120,10 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
   return (
     <View style={styles.safeArea}>
       <CustomHeader
-        title={`Observations - ${patientDisplayName}`}
+        title={`Observations · ${patientDisplayName}`}
         onBack={onBack}
         rightAction={
-          !isDischarged ? (
+          !isLocked ? (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={handleOpenAdd}
@@ -135,6 +141,16 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
         <View style={styles.dischargedReadOnlyBanner}>
           <Text style={styles.dischargedReadOnlyText}>
             Patient is discharged. Observation records are read-only and locked.
+          </Text>
+        </View>
+      )}
+
+      {!isDischarged && isReferred && (
+        <View style={[styles.dischargedReadOnlyBanner, { backgroundColor: '#EDE9FE', borderColor: '#DDD6FE' }]}>
+          <Text style={[styles.dischargedReadOnlyText, { color: '#6D28D9' }]}>
+            {selectedBaby?.referredToHospitalName
+              ? `Patient referred to ${selectedBaby.referredToHospitalName}. Observation records are read-only.`
+              : 'Patient is referred to another facility. Observation records are read-only.'}
           </Text>
         </View>
       )}
@@ -163,7 +179,7 @@ export const ObservationsListScreen: React.FC<ObservationsListScreenProps> = ({ 
                 <Text style={styles.valueUnit}>mg/dL</Text>
               </View>
 
-              {!isDischarged && (
+              {!isLocked && (
                 <TouchableOpacity
                   activeOpacity={0.7}
                   onPress={() => handleOpenEdit(item)}
@@ -295,13 +311,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#7D3BFF',
-    paddingHorizontal: moderateScale(12),
-    paddingVertical: moderateScale(6),
-    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(13),
+    paddingVertical: moderateScale(7),
+    borderRadius: moderateScale(16),
     gap: 4,
+    shadowColor: '#7D3BFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   headerAddBtnText: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(12.5),
     fontWeight: '700',
     color: '#FFFFFF',
   },

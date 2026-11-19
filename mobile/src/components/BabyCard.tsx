@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Edit3, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
 import { Baby, BilirubinReading } from '../types';
-import { moderateScale, fontScale, SPACING } from '../theme/responsive';
+import { moderateScale, fontScale } from '../theme/responsive';
 import { formatCardDateTime } from '../services/dateTime.service';
 
 export interface PhototherapyInfo {
@@ -36,17 +36,6 @@ const formatDischargeDateTime = (baby: Baby): string => {
   const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', hour12: true });
   return `${dateStr}, ${timeStr}`;
 };
-const getSeverityInfo = (state?: string) => {
-  switch (state) {
-    case 'critical':
-      return { label: 'Critical', color: COLORS.critical };
-    case 'moderate':
-      return { label: 'Moderate', color: COLORS.moderate };
-    case 'normal':
-    default:
-      return { label: 'Normal', color: COLORS.normal };
-  }
-};
 
 const getDisplayName = (baby: Baby): string => {
   const pName = baby.parentsName?.trim();
@@ -68,7 +57,6 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   referredToHospital,
   referralSentAt,
 }) => {
-  const severity = getSeverityInfo(baby.severityState);
   const sample = latestSample !== undefined
     ? latestSample
     : latestReading
@@ -76,6 +64,7 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     : null;
 
   const displayName = getDisplayName(baby);
+
   // A baby card is greyed out and marked non-clickable if it is pending referral OR was referred/transferred to another hospital
   const targetHospital = referredToHospital || baby.referredToHospitalName || null;
   const isTransferred = baby.isTransferredOut || baby.isHistoricalOnly || false;
@@ -93,8 +82,16 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   const activeBabyTimestamp = baby.referralAcceptedAt || baby.acceptedAt || baby.createdAt || baby.registeredAt;
   const activeBabyDateTime = formatCardDateTime(activeBabyTimestamp);
 
+  // Reading date & time: if reading has timestamp, use that! Otherwise use baby registration/acceptance timestamp
+  const readingTimeStr = sample?.timestamp
+    ? formatCardDateTime(sample.timestamp)
+    : activeBabyDateTime;
+
   // Phototherapy & Discharge status
-  const isBabyInPt = phototherapyInfo?.status === 'in_treatment' || baby.status === 'under_treatment';
+  const activeStationName = phototherapyInfo?.stationName || baby.currentStationId || null;
+  const isBabyInPt =
+    (phototherapyInfo?.status === 'in_treatment' && !!activeStationName) ||
+    (baby.status === 'under_treatment' && !!activeStationName);
   const isBabyPtConcluded = phototherapyInfo?.status === 'concluded' || (!isBabyInPt && !!baby.dischargeValue);
   const isBabyDischarged = baby.status === 'discharged';
   const dischargeTimeStr = isBabyDischarged ? formatDischargeDateTime(baby) : '';
@@ -103,20 +100,26 @@ export const BabyCard: React.FC<BabyCardProps> = ({
     <TouchableOpacity
       activeOpacity={0.7}
       onPress={onPress}
-      disabled={isReferred}
       style={[styles.card, isReferred && styles.cardReferred]}
       accessibilityRole="button"
       accessibilityLabel={
         isReferred
           ? `${displayName}, ${badgeLabel}`
-          : `${displayName}, ${severity.label}`
+          : isBabyDischarged
+          ? `${displayName}, Discharged`
+          : isBabyInPt && activeStationName
+          ? `${displayName}, PT, ${activeStationName}`
+          : `${displayName}`
       }
     >
+      {/* UHID Pill */}
       <View style={[styles.uhidPill, isReferred ? styles.uhidPillReferred : { backgroundColor: pillColor }]}>
         <Text style={[styles.uhidText, isReferred && styles.uhidTextReferred]}>UHID</Text>
       </View>
 
+      {/* Middle Information Section */}
       <View style={styles.middleSection}>
+        {/* Row 1: Baby / Mother Name + Edit Pencil */}
         <View style={styles.nameRow}>
           <Text style={[styles.babyName, isReferred && styles.babyNameReferred]} numberOfLines={1}>
             {displayName}
@@ -133,6 +136,8 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             </TouchableOpacity>
           )}
         </View>
+
+        {/* Row 2: Status Indicator (Clean & Uncrowded) */}
         <View style={styles.statusRow}>
           {isBabyDischarged ? (
             <View style={styles.dischargedTagPill}>
@@ -140,33 +145,34 @@ export const BabyCard: React.FC<BabyCardProps> = ({
                 Discharged{dischargeTimeStr ? ` • ${dischargeTimeStr}` : ''}
               </Text>
             </View>
-          ) : (
-            <>
-              <Text style={[styles.statusText, { color: isReferred ? '#64748B' : severity.color }]}>
-                {severity.label}
+          ) : isBabyInPt && activeStationName ? (
+            <View style={styles.inPtBadge}>
+              <Text style={styles.inPtBadgeText}>
+                PT • {activeStationName}
               </Text>
-              {isBabyInPt && (
-                <View style={styles.inPtBadge}>
-                  <Text style={styles.inPtBadgeText}>
-                    ● IN PT{phototherapyInfo?.stationName ? ` (${phototherapyInfo.stationName})` : ''}
-                  </Text>
-                </View>
-              )}
-              {!isBabyInPt && isBabyPtConcluded && (
-                <View style={styles.concludedPtBadge}>
-                  <Text style={styles.concludedPtBadgeText}>
-                    ✓ PT DONE{phototherapyInfo?.hours ? ` (${phototherapyInfo.hours}h)` : ''}
-                  </Text>
-                </View>
-              )}
-            </>
+            </View>
+          ) : isBabyPtConcluded ? (
+            <View style={styles.concludedPtBadge}>
+              <Text style={styles.concludedPtBadgeText} numberOfLines={1}>
+                ✓ PT Completed{phototherapyInfo?.hours ? ` (${phototherapyInfo.hours}h)` : ''}
+              </Text>
+            </View>
+          ) : isReferred ? (
+            <Text style={styles.metaSubText} numberOfLines={1}>
+              {badgeLabel}
+            </Text>
+          ) : (
+            <Text style={styles.metaSubText} numberOfLines={1}>
+              {baby.uhid ? `UHID: ${baby.uhid}` : ''}{baby.gestationalAgeWeeks ? ` • ${baby.gestationalAgeWeeks}w` : ''}
+            </Text>
           )}
         </View>
       </View>
 
+      {/* Right Information Section */}
       <View style={[styles.rightSection, isReferred && styles.rightSectionReferred]}>
         {isReferred ? (
-          /* Referred / Transferred State: Replace bilirubin reading with badge and sent timestamp */
+          /* Referred / Transferred State: Badge and sent timestamp */
           <View style={styles.referredRightCol}>
             <View style={[styles.referredTagBadge, isTransferred && styles.transferredTagBadge]}>
               <Text style={[styles.referredTagText, isTransferred && styles.transferredTagText]} numberOfLines={1}>
@@ -178,19 +184,22 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             )}
           </View>
         ) : isBabyDischarged ? (
+          /* Discharged State: Clean Chevron indicator */
           <View style={styles.dischargedChevronCircle}>
             <ChevronRight size={16} color="#94A3B8" />
           </View>
         ) : (
-          /* Normal Active State: Bilirubin reading with acceptance/registration timestamp below */
+          /* Active / Under Treatment State: Latest Bilirubin Value & Timestamp */
           <View style={styles.normalRightCol}>
-            {sample?.value != null && (
-              <Text style={[styles.sampleValueText, { color: severity.color }]}>
-                {sample.value.toFixed(1)} mg/dL
+            {sample?.value != null ? (
+              <Text style={styles.sampleValueText}>
+                {sample.value.toFixed(1)} <Text style={styles.sampleValueUnit}>mg/dL</Text>
               </Text>
+            ) : (
+              <Text style={styles.sampleValueEmpty}>--</Text>
             )}
-            {!!activeBabyDateTime && (
-              <Text style={styles.readingTime}>{activeBabyDateTime}</Text>
+            {!!readingTimeStr && (
+              <Text style={styles.readingTime}>{readingTimeStr}</Text>
             )}
           </View>
         )}
@@ -202,11 +211,11 @@ export const BabyCard: React.FC<BabyCardProps> = ({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.white,
-    borderRadius: moderateScale(18),
+    borderRadius: moderateScale(16),
     paddingVertical: moderateScale(12),
     paddingHorizontal: moderateScale(14),
     marginBottom: moderateScale(10),
-    minHeight: moderateScale(68),
+    minHeight: moderateScale(70),
     flexDirection: 'row',
     alignItems: 'center',
     shadowColor: '#000',
@@ -218,8 +227,8 @@ const styles = StyleSheet.create({
     borderColor: '#F1F5F9',
   },
   uhidPill: {
-    width: moderateScale(62),
-    height: moderateScale(46),
+    width: moderateScale(60),
+    height: moderateScale(44),
     borderRadius: moderateScale(14),
     alignItems: 'center',
     justifyContent: 'center',
@@ -233,12 +242,15 @@ const styles = StyleSheet.create({
   middleSection: {
     flex: 1,
     marginLeft: moderateScale(12),
+    marginRight: moderateScale(8),
     minWidth: 0,
+    justifyContent: 'center',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 1,
+    marginBottom: moderateScale(3),
   },
   babyName: {
     fontSize: fontScale(15),
@@ -247,9 +259,9 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   editIconBtn: {
-    width: moderateScale(24),
-    height: moderateScale(24),
-    borderRadius: moderateScale(12),
+    width: moderateScale(22),
+    height: moderateScale(22),
+    borderRadius: moderateScale(11),
     backgroundColor: '#F3E8FF',
     alignItems: 'center',
     justifyContent: 'center',
@@ -258,32 +270,51 @@ const styles = StyleSheet.create({
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: moderateScale(6),
+    flexWrap: 'wrap',
     marginTop: moderateScale(2),
   },
-  statusText: {
-    fontSize: fontScale(12),
-    fontWeight: '600',
-  },
-  dischargedBadge: {
-    backgroundColor: '#F1F5F9',
-    paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
+  inPtBadge: {
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(3),
     borderRadius: moderateScale(6),
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#A7F3D0',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
-  dischargedBadgeText: {
-    fontSize: fontScale(9),
-    fontWeight: '800',
-    color: '#475569',
-    letterSpacing: 0.5,
+  inPtBadgeText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#065F46',
+    letterSpacing: 0.2,
+    lineHeight: fontScale(15),
+  },
+  concludedPtBadge: {
+    backgroundColor: '#F0FDF4',
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(2.5),
+    borderRadius: moderateScale(6),
+    borderWidth: 1,
+    borderColor: '#BBF7D0',
+    alignSelf: 'flex-start',
+  },
+  concludedPtBadgeText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#15803D',
+    letterSpacing: 0.2,
+  },
+  metaSubText: {
+    fontSize: fontScale(11.5),
+    color: '#64748B',
+    fontWeight: '500',
   },
   dischargedTagPill: {
     backgroundColor: '#F1F5F9',
     paddingHorizontal: moderateScale(8),
-    paddingVertical: moderateScale(3),
-    borderRadius: moderateScale(7),
+    paddingVertical: moderateScale(2.5),
+    borderRadius: moderateScale(6),
     borderWidth: 1,
     borderColor: '#CBD5E1',
     alignSelf: 'flex-start',
@@ -305,18 +336,33 @@ const styles = StyleSheet.create({
   rightSection: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingLeft: moderateScale(8),
-    minWidth: moderateScale(68),
+    minWidth: moderateScale(72),
+  },
+  normalRightCol: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   sampleValueText: {
-    fontSize: fontScale(13),
+    fontSize: fontScale(15),
     fontWeight: '800',
-    marginBottom: moderateScale(2),
+    color: '#0F172A',
+    letterSpacing: -0.2,
+  },
+  sampleValueUnit: {
+    fontSize: fontScale(11),
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  sampleValueEmpty: {
+    fontSize: fontScale(14),
+    fontWeight: '600',
+    color: '#94A3B8',
   },
   readingTime: {
-    fontSize: fontScale(11),
+    fontSize: fontScale(10.5),
     color: '#64748B',
-    fontWeight: '600',
+    fontWeight: '500',
+    marginTop: moderateScale(2),
   },
   cardReferred: {
     backgroundColor: '#F8FAFC',
@@ -349,34 +395,6 @@ const styles = StyleSheet.create({
     borderColor: '#CBD5E1',
     marginBottom: moderateScale(3),
   },
-  inPtBadge: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
-    borderRadius: moderateScale(6),
-    borderWidth: 1,
-    borderColor: '#86EFAC',
-  },
-  inPtBadgeText: {
-    fontSize: fontScale(9),
-    fontWeight: '800',
-    color: '#15803D',
-    letterSpacing: 0.3,
-  },
-  concludedPtBadge: {
-    backgroundColor: '#F0FDF4',
-    paddingHorizontal: moderateScale(6),
-    paddingVertical: moderateScale(2),
-    borderRadius: moderateScale(6),
-    borderWidth: 1,
-    borderColor: '#BBF7D0',
-  },
-  concludedPtBadgeText: {
-    fontSize: fontScale(9),
-    fontWeight: '800',
-    color: '#16A34A',
-    letterSpacing: 0.3,
-  },
   referredTagText: {
     fontSize: fontScale(10.5),
     fontWeight: '700',
@@ -395,9 +413,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#64748B',
     marginTop: 1,
-  },
-  normalRightCol: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
   },
 });

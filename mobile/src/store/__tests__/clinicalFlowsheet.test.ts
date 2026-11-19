@@ -170,4 +170,101 @@ describe('Clinical Flowsheet & Baseline TSB Store Operations', () => {
     expect(getLocalDateKey(sessionYesterday)).toBe(yesterdayStr);
     expect(getLocalDateKey(sessionYesterday)).not.toBe(todayStr);
   });
+
+  it('concludes phototherapy into in_observation and releases station WITHOUT discharging baby', async () => {
+    // Setup baby in usePatientStore
+    usePatientStore.setState({
+      babies: [
+        {
+          id: 'baby_pt_test',
+          uhid: 'UHID-PT-001',
+          name: 'Baby of Ananya',
+          parentsName: 'Ananya Sharma',
+          dateOfBirth: new Date().toISOString(),
+          status: 'under_treatment',
+          currentStationId: 'PT-01',
+          severityState: 'high',
+          updatedAt: new Date().toISOString(),
+        } as Baby,
+      ],
+    });
+
+    // Setup active admission & occupied station in useNetworkStore
+    useNetworkStore.setState({
+      admissions: [
+        {
+          id: 'adm_pt_test',
+          admissionId: 'ADM-PT-99',
+          babyId: 'baby_pt_test',
+          babyUhid: 'UHID-PT-001',
+          babyName: 'Baby of Ananya',
+          hospitalId: 'hosp_001',
+          admissionStatus: 'under_treatment',
+          admittedAt: new Date().toISOString(),
+          physicalArrivalConfirmed: true,
+          stationReleased: false,
+          ptStationId: 'stn_pt_1',
+          ptStationName: 'BED 1',
+          treatmentSessions: [
+            {
+              sessionId: 'sess_pt_1',
+              startTime: new Date().toISOString(),
+              durationMinutes: 240,
+              nurseName: 'Nurse Rita',
+            },
+          ],
+        },
+      ],
+      stations: [
+        {
+          id: 'stn_pt_1',
+          stationId: 'PT-01',
+          name: 'BED 1',
+          operationalStatus: 'occupied',
+          currentBabyId: 'baby_pt_test',
+          currentBabyName: 'Baby of Ananya',
+          currentBabyUhid: 'UHID-PT-001',
+          hospitalId: 'hosp_001',
+        },
+      ],
+      hospitals: [
+        {
+          id: 'hosp_001',
+          _id: 'hosp_001',
+          name: 'District Civil Hospital',
+          code: 'DCH-01',
+          type: 'receiving_hospital',
+          district: 'Lucknow',
+          totalPTStations: 1,
+          operationalPTStations: 1,
+          occupiedPTStations: 1,
+          availablePTStations: 0,
+        } as any,
+      ],
+    });
+
+    const { concludePhototherapy } = useNetworkStore.getState();
+    await concludePhototherapy('adm_pt_test');
+
+    const networkState = useNetworkStore.getState();
+    const updatedAdmission = networkState.admissions.find((a) => a.id === 'adm_pt_test');
+    const updatedStation = networkState.stations.find((s) => s.id === 'stn_pt_1');
+    const updatedBaby = usePatientStore.getState().babies.find((b) => b.id === 'baby_pt_test');
+
+    // 1. Admission moved to in_observation and stationReleased = true
+    expect(updatedAdmission?.admissionStatus).toBe('in_observation');
+    expect(updatedAdmission?.stationReleased).toBe(true);
+    expect(updatedAdmission?.ptStationId).toBeUndefined();
+
+    // 2. Station released to cleaning_prep pool
+    expect(updatedStation?.operationalStatus).toBe('cleaning_prep');
+    expect(updatedStation?.currentBabyId).toBeNull();
+    expect(updatedStation?.currentBabyUhid).toBeNull();
+
+    // 3. Baby is in_observation, NOT discharged!
+    expect(updatedBaby?.status).toBe('in_observation');
+    expect(updatedBaby?.currentStationId).toBeUndefined();
+    expect(updatedBaby?.dischargeValue).toBeUndefined();
+    expect(updatedBaby?.dischargedAt).toBeUndefined();
+  });
 });

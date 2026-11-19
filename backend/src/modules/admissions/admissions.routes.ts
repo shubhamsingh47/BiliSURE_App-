@@ -14,6 +14,7 @@ router.post('/:id/sessions/start', authenticate, AdmissionsController.startSessi
 router.post('/:id/sessions/log', authenticate, AdmissionsController.logSession);
 router.post('/:id/sessions/:sessionId/end', authenticate, AdmissionsController.endSession);
 router.patch('/:id/sessions/:sessionId', authenticate, AdmissionsController.updateSession);
+router.post('/:id/conclude-phototherapy', authenticate, AdmissionsController.concludePhototherapy);
 router.post('/:id/discharge', authenticate, AdmissionsController.completeDischarge);
 
 export { router as admissionRoutes };

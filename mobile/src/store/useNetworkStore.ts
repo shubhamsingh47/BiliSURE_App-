@@ -25,6 +25,7 @@ interface NetworkState {
   endTreatmentSession: (admissionId: string, sessionId: string, nurseName: string, notes?: string) => Promise<void>;
   logTreatmentSession: (admissionId: string, data: { startTime: string; endTime: string; durationMinutes: number; phototherapyType?: string; nurseName: string; notes?: string }) => Promise<void>;
   approveDischarge: (admissionId: string, data: { doctorName: string; dischargeBilirubinValue: number; dischargeNotes?: string; followUpPlan?: string }) => Promise<void>;
+  concludePhototherapy: (admissionId: string) => Promise<void>;
   updateAdmission: (admissionId: string, updates: Partial<Admission>) => Promise<void>;
   updateTreatmentSession: (admissionId: string, sessionId: string, updates: Partial<TreatmentSession>) => Promise<void>;
   updateStationStatus: (stationId: string, status: any, meta?: any) => Promise<void>;
@@ -524,7 +525,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
             hospitalId: targetStation.hospitalId,
             hospitalName: targetStation.hospitalName,
             ptStationId: stationId,
-            ptStationName: `${targetStation.name} (${targetStation.stationId})`,
+            ptStationName: targetStation.name || targetStation.stationId,
             admissionStatus: 'under_treatment' as const,
             stationReleased: false,
           }
@@ -536,6 +537,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admissions: updatedAdmissions,
       hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
     });
+
+    if (admission.babyId) {
+      usePatientStore.getState().updateBaby(admission.babyId, {
+        status: 'under_treatment',
+        currentStationId: targetStation.name || targetStation.stationId,
+      }).catch(() => {});
+    }
 
     apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => {});
   },
@@ -592,7 +600,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         assignedDoctor: 'Attending Pediatrician',
         primaryNurse: nurseName,
         ptStationId: stationId,
-        ptStationName: `${targetStation.name} (${targetStation.stationId})`,
+        ptStationName: targetStation.name || targetStation.stationId,
         initialAdmissionBilirubin: resolvedInitialBili,
         treatmentSessions: [],
       };
@@ -615,6 +623,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         stations: updatedStations,
         hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
       });
+
+      if (baby.id) {
+        usePatientStore.getState().updateBaby(baby.id, {
+          status: 'under_treatment',
+          currentStationId: targetStation.name || targetStation.stationId,
+        }).catch(() => {});
+      }
     }
   },
 
@@ -731,6 +746,64 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     }));
 
     apiClient.patch(`/admissions/${admissionId}/sessions/${sessionId}`, updates).catch(() => {});
+  },
+
+  concludePhototherapy: async (admissionId) => {
+    const state = get();
+    const admission = state.admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
+    const stationIdToRelease = admission?.ptStationId;
+
+    set((state) => {
+      const updatedAdmissions = state.admissions.map((a) =>
+        a.id === admissionId || a.admissionId === admissionId
+          ? {
+              ...a,
+              admissionStatus: 'in_observation' as const,
+              stationReleased: true,
+              ptStationId: undefined,
+              ptStationName: undefined,
+            }
+          : a
+      );
+
+      // Release station to cleaning_prep
+      const updatedStations = state.stations.map((s) =>
+        (stationIdToRelease && (s.id === stationIdToRelease || s.stationId === stationIdToRelease)) ||
+        (admission?.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
+        (admission?.babyId && s.currentBabyId === admission.babyId)
+          ? {
+              ...s,
+              operationalStatus: 'cleaning_prep' as const,
+              currentBabyId: null,
+              currentBabyName: null,
+              currentBabyUhid: null,
+              notes: `Freed upon phototherapy conclusion for ${admission?.babyName || 'patient'}. Ready for sanitization.`,
+            }
+          : s
+      );
+
+      return {
+        admissions: updatedAdmissions,
+        stations: updatedStations,
+        hospitals: recalculateHospitalCapacity(state.hospitals, updatedStations),
+      };
+    });
+
+    // Synchronize matching baby in usePatientStore (in_observation, NOT discharged)
+    const babyStore = usePatientStore.getState();
+    const matchingBaby = babyStore.babies.find(
+      (b) =>
+        (admission?.babyUhid && b.uhid === admission.babyUhid) ||
+        (admission?.babyId && (b.id === admission.babyId || b.uhid === admission.babyId))
+    );
+    if (matchingBaby) {
+      await babyStore.updateBaby(matchingBaby.id, {
+        status: 'in_observation',
+        currentStationId: undefined,
+      });
+    }
+
+    apiClient.post(`/admissions/${admissionId}/conclude-phototherapy`, {}).catch(() => {});
   },
 
   approveDischarge: async (admissionId, data) => {

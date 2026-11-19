@@ -17,7 +17,7 @@ import { BabyCard } from '../../../components/BabyCard';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { Baby, SeverityState } from '../../../types';
+import { Baby } from '../../../types';
 import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface DashboardScreenProps {
@@ -32,7 +32,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   onOpenNewRegistration,
 }) => {
   const { babies, selectedDepartment, setSelectedDepartment, loadBabies, updateBaby, observations, readings } = usePatientStore();
-  const { referrals, admissions } = useNetworkStore();
+  const { referrals, admissions, stations } = useNetworkStore();
   const { user } = useAuthStore();
   const currentHospital = (user?.facility || 'PGI').toUpperCase();
 
@@ -65,7 +65,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [activeDept, setActiveDept] = useState(selectedDepartment || 'Deppt');
   const [showDeptDropdown, setShowDeptDropdown] = useState(false);
   const [search, setSearch] = useState('');
-  const [severityFilter, setSeverityFilter] = useState<'all' | SeverityState>('all');
   const insets = useSafeAreaInsets();
   const { width: windowWidth } = useWindowDimensions();
 
@@ -75,12 +74,15 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const [editParentsName, setEditParentsName] = useState('');
   const [editGestationalAge, setEditGestationalAge] = useState('38');
   const [editWeight, setEditWeight] = useState('3.1');
-  const [editSeverity, setEditSeverity] = useState<any>('normal');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenEdit = (baby: Baby) => {
     if (baby.status === 'discharged') {
       Alert.alert('Record Locked', 'This patient has been discharged and their record is locked.');
+      return;
+    }
+    if (baby.referralStatus === 'pending' || baby.referredToHospitalName || baby.isTransferredOut || baby.isHistoricalOnly) {
+      Alert.alert('Record Locked', 'This patient has been referred to another facility and cannot be edited.');
       return;
     }
     setEditingBaby(baby);
@@ -89,7 +91,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
     setEditParentsName(mName);
     setEditGestationalAge(baby.gestationalAgeWeeks ? String(baby.gestationalAgeWeeks) : '38');
     setEditWeight(baby.weight ? String(baby.weight) : '3.1');
-    setEditSeverity(baby.severityState || 'normal');
   };
 
   const handleSaveEdit = async () => {
@@ -106,7 +107,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
-        severityState: editSeverity,
       });
       setEditingBaby(null);
       Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
@@ -143,7 +143,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-  // Filter by selected department, search keyword, and clinical severity
+  // Filter by selected department and search keyword
   const filteredBabies = babies.filter((b) => {
     const matchesDept = !activeDept || activeDept === 'Deppt' || b.department === activeDept;
     const s = search.trim().toLowerCase();
@@ -152,10 +152,8 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
       b.name.toLowerCase().includes(s) ||
       b.uhid.toLowerCase().includes(s) ||
       (b.parentsName && b.parentsName.toLowerCase().includes(s));
-    const matchesSeverity =
-      severityFilter === 'all' || b.severityState === severityFilter;
 
-    return matchesDept && matchesSearch && matchesSeverity;
+    return matchesDept && matchesSearch;
   });
 
   // Sort newest first by date and time
@@ -175,6 +173,16 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
   };
 
   const getPhototherapyInfo = (baby: Baby) => {
+    // 1. Direct match on active station occupied by this baby
+    const occupiedStation = stations.find(
+      (s) =>
+        s.operationalStatus === 'occupied' &&
+        ((baby.uhid && s.currentBabyUhid === baby.uhid) ||
+         (baby.id && s.currentBabyId === baby.id) ||
+         (baby.name && s.currentBabyName === (baby.parentsName?.trim() || baby.name)))
+    );
+
+    // 2. Admission match
     const adm = admissions.find(
       (a) =>
         (a.babyId && a.babyId === baby.id) ||
@@ -182,32 +190,56 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         (baby.uhid && a.admissionId === baby.uhid)
     );
 
-    if (adm) {
-      const isConcluded = adm.stationReleased || adm.admissionStatus === 'in_observation' || adm.admissionStatus === 'discharged';
-      const sessions = adm.treatmentSessions || [];
-      const totalMinutes = sessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
-      const totalHours = (totalMinutes / 60).toFixed(1);
+    const isConcluded =
+      adm?.stationReleased ||
+      adm?.admissionStatus === 'in_observation' ||
+      adm?.admissionStatus === 'discharged';
+    const sessions = adm?.treatmentSessions || [];
+    const totalMinutes = sessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
+    const totalHours = (totalMinutes / 60).toFixed(1);
 
-      if (!isConcluded && (adm.admissionStatus as string) === 'under_treatment') {
-        return {
-          status: 'in_treatment' as const,
-          stationName: adm.ptStationName || baby.currentStationId || 'Station',
-          hours: totalHours,
-        };
-      }
+    // Station referenced by admission
+    const admStation = adm?.ptStationId
+      ? stations.find((s) => s.id === adm.ptStationId || s.stationId === adm.ptStationId)
+      : null;
 
-      if (sessions.length > 0) {
-        return {
-          status: 'concluded' as const,
-          hours: totalHours,
-        };
-      }
-    }
+    // Station referenced by baby.currentStationId
+    const babyStation = baby.currentStationId
+      ? stations.find(
+          (s) =>
+            s.id === baby.currentStationId ||
+            s.stationId === baby.currentStationId ||
+            s.name === baby.currentStationId
+        )
+      : null;
 
-    if (baby.status === 'under_treatment') {
+    // Resolve the real human-readable station name (never a generic placeholder)
+    const resolvedStation =
+      occupiedStation?.name ||
+      admStation?.name ||
+      babyStation?.name ||
+      adm?.ptStationName ||
+      baby.currentStationId ||
+      occupiedStation?.stationId ||
+      adm?.ptStationId;
+
+    const isUnderTreatment =
+      (!isConcluded && adm?.admissionStatus === 'under_treatment') ||
+      !!occupiedStation ||
+      baby.status === 'under_treatment';
+
+    if (isUnderTreatment && resolvedStation) {
       return {
         status: 'in_treatment' as const,
-        stationName: baby.currentStationId || 'Station',
+        stationName: resolvedStation,
+        hours: totalHours,
+      };
+    }
+
+    if (sessions.length > 0 || isConcluded) {
+      return {
+        status: 'concluded' as const,
+        hours: totalHours,
       };
     }
 
@@ -362,38 +394,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Severity Filter Chips */}
-        <View style={styles.filterContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScroll}
-          >
-            {(['all', 'critical', 'moderate', 'normal'] as const).map((filter) => {
-              const isActive = severityFilter === filter;
-              return (
-                <TouchableOpacity
-                  key={filter}
-                  onPress={() => setSeverityFilter(filter)}
-                  style={[styles.filterPill, isActive && styles.filterPillActive]}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.filterPillText,
-                      isActive && styles.filterPillTextActive,
-                    ]}
-                  >
-                    {filter === 'all'
-                      ? 'All Patients'
-                      : filter.charAt(0).toUpperCase() + filter.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
-        </View>
-
         {/* "See Report >" Banner Card */}
         <TouchableOpacity
           activeOpacity={0.8}
@@ -409,7 +409,7 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
             <User size={36} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Patients Found</Text>
             <Text style={styles.emptySub}>
-              No patient records match "{search || severityFilter}".
+              {search ? `No patient records match "${search}".` : 'No patient records available.'}
             </Text>
           </View>
         ) : (
@@ -513,30 +513,6 @@ export const DashboardScreen: React.FC<DashboardScreenProps> = ({
                     placeholder="3.1"
                   />
                 </View>
-              </View>
-
-              <Text style={styles.inputLabel}>Clinical Risk Status</Text>
-              <View style={styles.severityOptionsRow}>
-                {(['normal', 'moderate', 'critical'] as const).map((st) => {
-                  const isSel = editSeverity === st;
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      onPress={() => setEditSeverity(st)}
-                      style={[styles.severityPill, isSel && styles.severityPillActive]}
-                    >
-                      <Text
-                        style={[
-                          styles.severityPillText,
-                          isSel && styles.severityPillTextActive,
-                        ]}
-                      >
-                        {st.charAt(0).toUpperCase() + st.slice(1)}
-                      </Text>
-                      {isSel && <Check size={14} color="#FFFFFF" />}
-                    </TouchableOpacity>
-                  );
-                })}
               </View>
 
               <View style={styles.modalBtnRow}>
@@ -669,38 +645,6 @@ const styles = StyleSheet.create({
     fontSize: fontScale(13),
     color: '#0F172A',
     paddingVertical: moderateScale(4),
-  },
-  filterContainer: {
-    marginBottom: moderateScale(8),
-  },
-  filterScroll: {
-    flexDirection: 'row',
-    gap: moderateScale(8),
-    paddingVertical: moderateScale(2),
-  },
-  filterPill: {
-    paddingHorizontal: moderateScale(14),
-    paddingVertical: moderateScale(8),
-    borderRadius: moderateScale(12),
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    minHeight: moderateScale(34),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  filterPillActive: {
-    backgroundColor: '#7D3BFF',
-    borderColor: '#7D3BFF',
-  },
-  filterPillText: {
-    fontSize: fontScale(12),
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterPillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
   emptyContainer: {
     paddingVertical: SPACING.xxl * 1.5,
@@ -879,33 +823,6 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
-  },
-  severityOptionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  severityPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 8,
-    borderRadius: 10,
-    gap: 4,
-  },
-  severityPillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  severityPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  severityPillTextActive: {
-    color: '#FFFFFF',
   },
   modalBtnRow: {
     flexDirection: 'row',

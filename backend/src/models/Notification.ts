@@ -6,6 +6,7 @@ export type NotificationType =
   | 'referral_rejected'
   | 'baby_arrived'
   | 'pt_allocated'
+  | 'pt_concluded'
   | 'critical_reading'
   | 'discharge_approved';
 
@@ -37,6 +38,7 @@ const NotificationSchema = new Schema<INotification>(
         'referral_rejected',
         'baby_arrived',
         'pt_allocated',
+        'pt_concluded',
         'critical_reading',
         'discharge_approved',
       ],

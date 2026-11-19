@@ -23,7 +23,7 @@ import {
   Activity,
 } from 'lucide-react-native';
 import { usePatientStore } from '../../../store/usePatientStore';
-import { Baby, SeverityState } from '../../../types';
+import { Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 
 interface PatientsScreenProps {
@@ -37,7 +37,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
 }) => {
   const { babies, updateBaby } = usePatientStore();
   const [search, setSearch] = useState('');
-  const [severityFilter, setSeverityFilter] = useState<'all' | SeverityState>('all');
 
   // Edit Modal State
   const [editingBaby, setEditingBaby] = useState<Baby | null>(null);
@@ -46,23 +45,28 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
   const [editGestationalAge, setEditGestationalAge] = useState('');
   const [editWeight, setEditWeight] = useState('');
   const [editHeight, setEditHeight] = useState('');
-  const [editSeverity, setEditSeverity] = useState<SeverityState>('normal');
   const [editDoctor, setEditDoctor] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const filteredBabies = babies.filter((b) => {
-    const matchesSearch =
-      b.name.toLowerCase().includes(search.toLowerCase()) ||
-      b.uhid.toLowerCase().includes(search.toLowerCase()) ||
-      (b.parentsName && b.parentsName.toLowerCase().includes(search.toLowerCase()));
-
-    const matchesSeverity =
-      severityFilter === 'all' || b.severityState === severityFilter;
-
-    return matchesSearch && matchesSeverity;
+    const s = search.trim().toLowerCase();
+    return (
+      !s ||
+      b.name.toLowerCase().includes(s) ||
+      b.uhid.toLowerCase().includes(s) ||
+      (b.parentsName && b.parentsName.toLowerCase().includes(s))
+    );
   });
 
   const handleOpenEdit = (baby: Baby) => {
+    if (baby.status === 'discharged') {
+      Alert.alert('Record Locked', 'This patient has been discharged and their record is locked.');
+      return;
+    }
+    if (baby.referralStatus === 'pending' || baby.referredToHospitalName || baby.isTransferredOut || baby.isHistoricalOnly) {
+      Alert.alert('Record Locked', 'This patient has been referred to another facility and cannot be edited.');
+      return;
+    }
     setEditingBaby(baby);
     const mName = baby.parentsName?.trim() || baby.name;
     setEditName(mName);
@@ -70,7 +74,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
     setEditGestationalAge(baby.gestationalAgeWeeks ? String(baby.gestationalAgeWeeks) : '38');
     setEditWeight(baby.weight ? String(baby.weight) : '3.1');
     setEditHeight(baby.height ? String(baby.height) : '48');
-    setEditSeverity(baby.severityState || 'normal');
     setEditDoctor(baby.assignedDoctor || 'Dr. Priya Sharma');
   };
 
@@ -89,7 +92,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
         height: parseFloat(editHeight) || 48.0,
-        severityState: editSeverity,
         assignedDoctor: editDoctor.trim(),
       });
       setEditingBaby(null);
@@ -98,17 +100,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
       Alert.alert('Error', 'Failed to update patient details');
     } finally {
       setIsSaving(false);
-    }
-  };
-
-  const getSeverityBadge = (state?: SeverityState) => {
-    switch (state) {
-      case 'critical':
-        return { label: 'CRITICAL RISK', bg: '#FFF1F2', text: '#E11D48' };
-      case 'moderate':
-        return { label: 'MODERATE RISK', bg: '#FFFBEB', text: '#D97706' };
-      default:
-        return { label: 'LOW RISK / NORMAL', bg: '#ECFDF5', text: '#059669' };
     }
   };
 
@@ -157,32 +148,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         )}
       </View>
 
-      {/* Severity Filter Pills */}
-      <View style={styles.filterRow}>
-        {(['all', 'critical', 'moderate', 'normal'] as const).map((filter) => {
-          const isActive = severityFilter === filter;
-          return (
-            <TouchableOpacity
-              key={filter}
-              onPress={() => setSeverityFilter(filter)}
-              style={[styles.filterPill, isActive && styles.filterPillActive]}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.filterPillText,
-                  isActive && styles.filterPillTextActive,
-                ]}
-              >
-                {filter === 'all'
-                  ? 'All Patients'
-                  : filter.charAt(0).toUpperCase() + filter.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
       {/* Patients List */}
       <FlatList
         data={filteredBabies}
@@ -194,12 +159,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
             <User size={40} color="#CBD5E1" />
             <Text style={styles.emptyTitle}>No Patients Found</Text>
             <Text style={styles.emptySub}>
-              No patient records match your search or filter criteria.
+              {search ? `No patient records match "${search}".` : 'No patient records available.'}
             </Text>
           </View>
         }
         renderItem={({ item }) => {
-          const badge = getSeverityBadge(item.severityState);
           const pName = item.parentsName?.trim();
           const bName = item.name?.trim();
           const isInvalid = (val?: string) => !val || ['baby 1', 'baby 2', 'baby', 'baby1', 'baby2'].includes(val.toLowerCase());
@@ -210,7 +174,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
               onPress={() => onSelectBaby(item)}
               style={styles.patientCard}
             >
-              {/* Card Header: Mother Name + UHID on left, Risk Badge + Pencil Edit on right */}
+              {/* Card Header: Mother Name + UHID on left, Pencil Edit on right */}
               <View style={styles.cardHeader}>
                 <View style={styles.nameBlock}>
                   <Text style={styles.babyName} numberOfLines={1}>
@@ -221,22 +185,15 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
                   </View>
                 </View>
 
-                <View style={styles.headerRightGroup}>
-                  <View style={[styles.riskBadge, { backgroundColor: badge.bg }]}>
-                    <Text style={[styles.riskBadgeText, { color: badge.text }]}>
-                      {badge.label}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.pencilEditBtn}
-                    onPress={() => handleOpenEdit(item)}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                    accessibilityLabel={`Edit ${motherName}`}
-                  >
-                    <Edit3 size={15} color="#7D3BFF" />
-                  </TouchableOpacity>
-                </View>
+                <TouchableOpacity
+                  style={styles.pencilEditBtn}
+                  onPress={() => handleOpenEdit(item)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel={`Edit ${motherName}`}
+                >
+                  <Edit3 size={15} color="#7D3BFF" />
+                </TouchableOpacity>
               </View>
 
               {/* Patient Meta Details */}
@@ -321,30 +278,6 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
                 onChangeText={setEditDoctor}
                 placeholder="Dr. Priya Sharma"
               />
-
-              <Text style={styles.inputLabel}>Clinical Risk Status</Text>
-              <View style={styles.severityOptionsRow}>
-                {(['normal', 'moderate', 'critical'] as SeverityState[]).map((st) => {
-                  const isSel = editSeverity === st;
-                  return (
-                    <TouchableOpacity
-                      key={st}
-                      onPress={() => setEditSeverity(st)}
-                      style={[styles.severityPill, isSel && styles.severityPillActive]}
-                    >
-                      <Text
-                        style={[
-                          styles.severityPillText,
-                          isSel && styles.severityPillTextActive,
-                        ]}
-                      >
-                        {st.charAt(0).toUpperCase() + st.slice(1)}
-                      </Text>
-                      {isSel && <Check size={14} color="#FFFFFF" />}
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
 
               <View style={styles.modalBtnRow}>
                 <TouchableOpacity
@@ -431,30 +364,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#0F172A',
   },
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 8,
-    marginBottom: 12,
-  },
-  filterPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: '#F1F5F9',
-  },
-  filterPillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  filterPillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  filterPillTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
   listContent: {
     paddingHorizontal: 16,
     paddingBottom: 80,
@@ -498,20 +407,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: '#7D3BFF',
-  },
-  riskBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
-  riskBadgeText: {
-    fontSize: 9,
-    fontWeight: '800',
-  },
-  headerRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
   },
   pencilEditBtn: {
     width: 28,
@@ -663,33 +558,6 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
-  },
-  severityOptionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  severityPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 8,
-    borderRadius: 10,
-    gap: 4,
-  },
-  severityPillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  severityPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  severityPillTextActive: {
-    color: '#FFFFFF',
   },
   modalBtnRow: {
     flexDirection: 'row',

@@ -90,7 +90,7 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
       
       await usePatientStore.getState().updateBaby(targetBaby.id, {
         status: 'under_treatment',
-        currentStationId: `${station.name} (${station.stationId})`,
+        currentStationId: station.name || station.stationId,
       });
 
       usePatientStore.getState().selectBaby(null);

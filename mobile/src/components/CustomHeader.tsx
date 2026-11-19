@@ -3,7 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, ViewStyle } from 'react-nativ
 import { ArrowLeft } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../theme/colors';
-import { getScreenTopPadding } from '../theme/responsive';
+import { fontScale, getScreenTopPadding, moderateScale } from '../theme/responsive';
 
 interface CustomHeaderProps {
   title: string;
@@ -32,50 +32,78 @@ export const CustomHeader: React.FC<CustomHeaderProps> = ({
         {
           backgroundColor,
           paddingTop: dynamicTopPadding,
-          height: 56 + dynamicTopPadding,
+          minHeight: 56 + dynamicTopPadding,
         },
         style,
       ]}
     >
-      <View style={styles.leftContainer}>
-        {onBack && (
-          <TouchableOpacity activeOpacity={0.7} onPress={onBack} style={styles.backButton}>
-            <ArrowLeft size={24} color={textColor} />
+      {/* Left Back Action */}
+      {onBack ? (
+        <View style={styles.leftContainer}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={onBack}
+            style={styles.backButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Go back"
+          >
+            <ArrowLeft size={20} color={textColor} />
           </TouchableOpacity>
-        )}
-      </View>
-      <Text style={[styles.title, { color: textColor }]} numberOfLines={1}>
+        </View>
+      ) : (
+        <View style={styles.spacer} />
+      )}
+
+      {/* Dynamic Title (no wasted whitespace, no overflow) */}
+      <Text
+        style={[styles.title, { color: textColor }]}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {title}
       </Text>
-      <View style={styles.rightContainer}>{rightAction}</View>
+
+      {/* Right Action Container (auto-sized to content, never clipped) */}
+      {rightAction ? (
+        <View style={styles.rightContainer}>{rightAction}</View>
+      ) : (
+        <View style={styles.spacer} />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    height: 56,
+    minHeight: 56,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: moderateScale(16),
+    gap: moderateScale(10),
   },
   leftContainer: {
-    width: 44,
     alignItems: 'flex-start',
+    justifyContent: 'center',
   },
   backButton: {
-    padding: 6,
-    marginLeft: -6,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
   },
   title: {
     flex: 1,
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '700',
+    fontSize: fontScale(17),
+    fontWeight: '800',
+    letterSpacing: -0.2,
   },
   rightContainer: {
-    width: 44,
     alignItems: 'flex-end',
+    justifyContent: 'center',
+  },
+  spacer: {
+    width: moderateScale(12),
   },
 });

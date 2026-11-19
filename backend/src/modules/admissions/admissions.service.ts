@@ -456,6 +456,80 @@ export class AdmissionsService {
   }
 
   /**
+   * Conclude Phototherapy Course & Release Station to Cleaning Pool
+   * Does NOT discharge the baby; moves patient to in_observation for continued clinical monitoring.
+   */
+  static async concludePhototherapy(
+    admissionId: string,
+    data?: {
+      nurseName?: string;
+      notes?: string;
+    }
+  ) {
+    const admission = await this.getById(admissionId);
+
+    // Conclude any in-progress treatment session
+    const runningSession = admission.treatmentSessions.find((s) => s.status === 'active');
+    if (runningSession) {
+      const now = new Date();
+      runningSession.endTime = now;
+      const durationMs = now.getTime() - new Date(runningSession.startTime).getTime();
+      runningSession.durationMinutes = Math.max(1, Math.round(durationMs / 60000));
+      runningSession.status = 'completed';
+      if (data?.notes) {
+        runningSession.notes = (runningSession.notes ? runningSession.notes + ' | ' : '') + data.notes;
+      }
+    }
+
+    admission.cumulativeTreatmentMinutes = admission.treatmentSessions.reduce(
+      (acc, s) => acc + (s.durationMinutes || 0),
+      0
+    );
+    admission.updatedAt = new Date();
+
+    const releasedStationId = admission.ptStationId;
+    admission.admissionStatus = 'in_observation';
+    admission.stationReleased = true;
+    admission.ptStationId = undefined;
+    admission.ptStationName = undefined;
+
+    // Release the PT station to 'cleaning_prep'
+    if (releasedStationId) {
+      await HospitalsService.updateStationStatus(releasedStationId, 'cleaning_prep', {
+        notes: `Station freed following phototherapy conclusion for ${admission.babyName}. Ready for sanitization & cleaning.`,
+      });
+    }
+
+    // Update Baby record: set to in_observation, clear station. CRITICAL: Baby is NOT discharged!
+    try {
+      if (isMongoConnected) {
+        await BabyModel.findOneAndUpdate(
+          { uhid: admission.babyUhid },
+          {
+            status: 'in_observation',
+            currentStationId: undefined,
+          }
+        );
+      }
+    } catch {}
+
+    // Notify attending care team
+    await NotificationsService.createNotification({
+      recipientRole: 'attending_doctor',
+      title: `Phototherapy Concluded: ${admission.babyName}`,
+      message: `Phototherapy course concluded for ${admission.babyName} (${admission.babyUhid}). Cumulative exposure: ${(admission.cumulativeTreatmentMinutes / 60).toFixed(1)} hrs. Patient moved to in-observation. Station released to cleaning pool.`,
+      type: 'pt_concluded',
+      relatedBabyUhid: admission.babyUhid,
+    });
+
+    if (isMongoConnected && typeof (admission as any).save === 'function') {
+      await (admission as any).save();
+    }
+
+    return admission;
+  }
+
+  /**
    * Step 23 & 24: Discharge Approval & Hospital Episode Completion
    */
   static async completeDischarge(

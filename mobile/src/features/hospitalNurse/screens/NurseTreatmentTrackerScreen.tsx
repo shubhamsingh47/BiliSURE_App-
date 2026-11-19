@@ -94,7 +94,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   highlightBabyIdOrUhid = null,
 }) => {
   const insets = useSafeAreaInsets();
-  const { admissions, logTreatmentSession, approveDischarge, updateAdmission, updateTreatmentSession, notifications } = useNetworkStore();
+  const { admissions, logTreatmentSession, approveDischarge, concludePhototherapy, updateAdmission, updateTreatmentSession, notifications } = useNetworkStore();
   const { user } = useAuthStore();
   const { babies, readings, addReading, updateReading, observations, updateBaby } = usePatientStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -661,7 +661,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
 
     Alert.alert(
       'Conclude Phototherapy Treatment',
-      `Complete treatment course for ${admission.babyName} (${admission.babyUhid})?\n\n• Cumulative Exposure: ${totalHours} hrs\n• Station: ${admission.ptStationName || 'Bed'}\n\nThis will release the station back to the sanitization pool.`,
+      `Complete treatment course for ${admission.babyName} (${admission.babyUhid})?\n\n• Cumulative Exposure: ${totalHours} hrs\n• Station: ${admission.ptStationName || 'Bed'}\n\nThis will release the station back to the sanitization pool. The patient will remain admitted in observation until discharged by the doctor.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -669,35 +669,13 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
           style: 'destructive',
           onPress: async () => {
             try {
-              const patientReadings = readings.filter(
-                (r) =>
-                  (r.babyUhid && r.babyUhid === admission.babyUhid) ||
-                  (r.babyId && r.babyId === admission.babyId)
-              );
-              const latestVal = patientReadings[0]?.value ?? getResolvedAdmissionTsb(admission) ?? 0;
-
-              await approveDischarge(admission.id || admission.admissionId, {
-                doctorName: user.name,
-                dischargeBilirubinValue: latestVal,
-                dischargeNotes: `Concluded phototherapy course. Total exposure: ${totalHours} hrs.`,
-              });
-
-              // Synchronize matching baby in usePatientStore so baby card updates immediately
-              const matchingBaby = babies.find(
-                (b) =>
-                  (admission.babyUhid && b.uhid === admission.babyUhid) ||
-                  (admission.babyId && (b.id === admission.babyId || b.uhid === admission.babyId))
-              );
-              if (matchingBaby) {
-                await updateBaby(matchingBaby.id, {
-                  dischargeValue: latestVal,
-                  status: 'in_observation',
-                  currentStationId: undefined,
-                });
-              }
+              await concludePhototherapy(admission.id || admission.admissionId);
 
               setDetailedAdmission(null);
-              Alert.alert('Treatment Concluded', `Phototherapy finished. Station released to cleaning pool.`);
+              Alert.alert(
+                'Treatment Concluded',
+                `Phototherapy finished. Station released to cleaning pool. Patient is now in observation.`
+              );
             } catch {
               Alert.alert('Error', 'Failed to conclude treatment');
             }
@@ -933,8 +911,8 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               )}
             </View>
 
-            {/* Conclude Phototherapy Action or Discharged Notice */}
-            {!detailedFlowsheetData.isAdmissionDischarged ? (
+            {/* Conclude Phototherapy Action or Status Notice */}
+            {detailedAdmission.admissionStatus === 'under_treatment' && !detailedAdmission.stationReleased ? (
               <TouchableOpacity
                 style={styles.concludeBtn}
                 onPress={() => handleConcludeTreatment(detailedAdmission)}
@@ -943,11 +921,18 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                 <Check size={16} color="#FFFFFF" strokeWidth={2.5} />
                 <Text style={styles.concludeBtnText}>Conclude Phototherapy & Free Station</Text>
               </TouchableOpacity>
-            ) : (
+            ) : detailedFlowsheetData.isAdmissionDischarged ? (
               <View style={styles.concludedDischargedCard}>
                 <Check size={16} color="#00A569" strokeWidth={2.5} style={{ marginRight: 6 }} />
                 <Text style={styles.concludedDischargedText}>
                   Phototherapy Concluded & Patient Discharged
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.concludedObservationCard}>
+                <Check size={16} color="#7D3BFF" strokeWidth={2.5} style={{ marginRight: 6 }} />
+                <Text style={styles.concludedObservationText}>
+                  Phototherapy Concluded • Patient In Observation
                 </Text>
               </View>
             )}
@@ -1038,6 +1023,9 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
               const isItemDischarged =
                 item.admissionStatus === 'discharged' ||
                 itemMatchingBaby?.status === 'discharged';
+              const isItemActivePt =
+                item.admissionStatus === 'under_treatment' &&
+                !item.stationReleased;
 
               const isHighlighted =
                 !!targetHighlight &&
@@ -1123,7 +1111,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
 
                   {/* Card Action Row: Quick Entry + Tap to View Detailed Table */}
                   <View style={styles.cardActionsRow}>
-                    {!isItemDischarged ? (
+                    {isItemActivePt ? (
                       <>
                         <TouchableOpacity
                           style={styles.quickLogBtn}
@@ -1137,6 +1125,25 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
                           <Clock size={15} color="#7D3BFF" />
                           <Text style={styles.quickLogText}>+ Log PT</Text>
                         </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.quickBiliBtn}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            handleOpenBiliModal(item);
+                          }}
+                          activeOpacity={0.75}
+                          hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                        >
+                          <Plus size={15} color="#00A569" />
+                          <Text style={styles.quickBiliText}>+ Bilirubin</Text>
+                        </TouchableOpacity>
+                      </>
+                    ) : !isItemDischarged ? (
+                      <>
+                        <View style={styles.observationItemBadge}>
+                          <Text style={styles.observationItemBadgeText}>IN OBSERVATION</Text>
+                        </View>
 
                         <TouchableOpacity
                           style={styles.quickBiliBtn}
@@ -2586,6 +2593,38 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#16A34A',
     marginLeft: 6,
+  },
+  concludedObservationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F3FF',
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+    borderRadius: 14,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginVertical: 10,
+  },
+  concludedObservationText: {
+    fontSize: fontScale(12),
+    fontWeight: '800',
+    color: '#7D3BFF',
+    marginLeft: 6,
+  },
+  observationItemBadge: {
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#DDD6FE',
+  },
+  observationItemBadgeText: {
+    fontSize: fontScale(10),
+    fontWeight: '800',
+    color: '#7D3BFF',
+    letterSpacing: 0.3,
   },
   dischargedItemBadge: {
     backgroundColor: '#F1F5F9',

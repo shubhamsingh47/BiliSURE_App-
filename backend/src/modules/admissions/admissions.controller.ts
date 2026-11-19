@@ -125,6 +125,19 @@ export class AdmissionsController {
     }
   }
 
+  static async concludePhototherapy(req: Request, res: Response, next: NextFunction) {
+    try {
+      const nurseName = (req as any).user?.name || req.body.nurseName || 'Nurse Staff';
+      const result = await AdmissionsService.concludePhototherapy(String(req.params.id), {
+        nurseName,
+        notes: req.body.notes,
+      });
+      return sendSuccess(res, result, 200, 'Phototherapy concluded and station released to cleaning pool');
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async completeDischarge(req: Request, res: Response, next: NextFunction) {
     try {
       const doctorName = (req as any).user?.name || req.body.doctorName || 'Dr. Hospital Paediatrician';

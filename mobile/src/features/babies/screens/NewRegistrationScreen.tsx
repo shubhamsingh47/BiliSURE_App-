@@ -8,14 +8,13 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { ArrowLeft, Paperclip, ChevronDown, Check } from 'lucide-react-native';
+import { ArrowLeft, Paperclip, ChevronDown } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
-import { SeverityState } from '../../../types';
 import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
 
 interface NewRegistrationScreenProps {
@@ -92,7 +91,6 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
   const [birthWeight, setBirthWeight] = useState('3.1');
   const [facility, setFacility] = useState(user?.facility || 'North Community Health Centre (CHC)');
   const [doctor, setDoctor] = useState(user?.name || 'Dr. Priya Sharma');
-  const [severity, setSeverity] = useState<SeverityState>('normal');
   const [repeatTransaction, setRepeatTransaction] = useState(false);
   const [hasAttachment, setHasAttachment] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -135,7 +133,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
         uhid: finalUhid,
         assignedDoctor: doctor,
         facility,
-        severityState: severity,
+        severityState: 'normal',
         gestationalAgeWeeks: parsedGestAge,
         weight: parsedWeight,
         dateOfBirth: parsedBirth.isoDate,
@@ -221,46 +219,6 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
           >
             <Text style={styles.genBtnText}>Auto</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Severity / Risk Level Selector */}
-        <View style={styles.severitySection}>
-          <Text style={styles.severityLabel}>Clinical Risk Status</Text>
-          <View style={styles.severityRow}>
-            {(['normal', 'moderate', 'critical'] as const).map((level) => {
-              const isSelected = severity === level;
-              const colorMap = {
-                normal: COLORS.normal,
-                moderate: COLORS.moderate,
-                critical: COLORS.critical,
-              };
-              const activeColor = colorMap[level];
-              return (
-                <TouchableOpacity
-                  key={level}
-                  activeOpacity={0.75}
-                  onPress={() => setSeverity(level)}
-                  style={[
-                    styles.severityBtn,
-                    isSelected && {
-                      backgroundColor: activeColor,
-                      borderColor: activeColor,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.severityBtnText,
-                      isSelected && styles.severityBtnTextActive,
-                    ]}
-                  >
-                    {level.charAt(0).toUpperCase() + level.slice(1)}
-                  </Text>
-                  {isSelected && <Check size={14} color="#FFFFFF" style={{ marginLeft: 4 }} />}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
         </View>
 
         {/* Dropdowns */}
@@ -446,42 +404,5 @@ const styles = StyleSheet.create({
   continueBtn: {
     marginTop: SPACING.sm,
     backgroundColor: '#7C3AED',
-  },
-  severitySection: {
-    marginBottom: SPACING.md,
-    marginTop: 4,
-  },
-  severityLabel: {
-    fontSize: fontScale(12),
-    fontWeight: '700',
-    color: '#475569',
-    marginBottom: SPACING.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  severityRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: moderateScale(8),
-  },
-  severityBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: moderateScale(10),
-    borderRadius: moderateScale(12),
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-  },
-  severityBtnText: {
-    fontSize: fontScale(12),
-    fontWeight: '600',
-    color: '#64748B',
-  },
-  severityBtnTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
   },
 });

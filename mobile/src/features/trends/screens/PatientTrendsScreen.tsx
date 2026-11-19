@@ -46,7 +46,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const insets = useSafeAreaInsets();
   const { babies, selectedBaby, selectBaby, updateBaby, observations, readings, addObservation, updateObservation } = usePatientStore();
   const { user } = useAuthStore();
-  const { referrals, admissions, approveDischarge } = useNetworkStore();
+  const { referrals, admissions, stations, approveDischarge } = useNetworkStore();
   const activeBaby: Baby = selectedBaby || babies[0];
 
   const activeReferral = referrals.find(
@@ -63,11 +63,27 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       (a.babyId && (a.babyId === activeBaby?.id || a.babyId === activeBaby?.uhid))
   );
 
+  const occupiedStation = stations.find(
+    (s) =>
+      s.operationalStatus === 'occupied' &&
+      ((activeBaby?.uhid && s.currentBabyUhid === activeBaby.uhid) ||
+       (activeBaby?.id && s.currentBabyId === activeBaby.id))
+  );
+  const admStation = babyAdmission?.ptStationId
+    ? stations.find((s) => s.id === babyAdmission.ptStationId || s.stationId === babyAdmission.ptStationId)
+    : null;
+  const currentStationDisplayName =
+    occupiedStation?.name ||
+    admStation?.name ||
+    babyAdmission?.ptStationName ||
+    activeBaby?.currentStationId;
+
   const ptSessions = babyAdmission?.treatmentSessions || [];
   const totalPtMinutes = ptSessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
   const totalPtHours = (totalPtMinutes / 60).toFixed(1);
   const isPhototherapyActive =
     (babyAdmission?.admissionStatus === 'under_treatment' && !babyAdmission?.stationReleased) ||
+    !!occupiedStation ||
     activeBaby.status === 'under_treatment';
   const isPhototherapyConcluded = ptSessions.length > 0 && !isPhototherapyActive;
   const activeAdmission = babyAdmission;
@@ -90,10 +106,18 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const [editWeight, setEditWeight] = useState(
     activeBaby.weight ? String(activeBaby.weight) : '3.1'
   );
-  const [editSeverity, setEditSeverity] = useState(activeBaby.severityState || 'normal');
   const [isSaving, setIsSaving] = useState(false);
 
   const handleOpenEdit = () => {
+    if (isLocked) {
+      Alert.alert(
+        'Record Locked',
+        isReferred
+          ? 'This patient has been referred to another facility and cannot be edited.'
+          : 'This patient has been discharged and their record is locked.'
+      );
+      return;
+    }
     const mName = activeBaby.parentsName?.trim() || activeBaby.name;
     setEditName(mName);
     setEditParentsName(mName);
@@ -101,7 +125,6 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       activeBaby.gestationalAgeWeeks ? String(activeBaby.gestationalAgeWeeks) : '38'
     );
     setEditWeight(activeBaby.weight ? String(activeBaby.weight) : '3.1');
-    setEditSeverity(activeBaby.severityState || 'normal');
     setShowEditModal(true);
   };
 
@@ -118,7 +141,6 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         parentsName: editName.trim(),
         gestationalAgeWeeks: parseInt(editGestationalAge, 10) || 38,
         weight: parseFloat(editWeight) || 3.1,
-        severityState: editSeverity,
       });
       setShowEditModal(false);
       Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
@@ -173,6 +195,11 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
       ? babyObservations[babyObservations.length - 1].bilirubinValue
       : null;
   const isDischarged = activeBaby.status === 'discharged';
+  const targetHospital = activeBaby.referredToHospitalName || activeReferral?.receivingHospitalName || null;
+  const isTransferred = activeBaby.isTransferredOut || activeBaby.isHistoricalOnly || false;
+  const isPendingReferral = activeBaby.referralStatus === 'pending' && !!targetHospital;
+  const isReferred = isPendingReferral || isTransferred || !!activeBaby.referredToHospitalName;
+  const isLocked = isDischarged || isReferred;
   const dischargeVal: number | null = isDischarged && activeBaby.dischargeValue ? activeBaby.dischargeValue : null;
 
   const handleDischarge = async () => {
@@ -332,6 +359,15 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   }, [readings, babyObservations, activeBaby]);
 
   const handleOpenAddObs = () => {
+    if (isLocked) {
+      Alert.alert(
+        'Record Locked',
+        isReferred
+          ? 'This patient has been referred to another facility. New observations cannot be added.'
+          : 'This patient has been discharged and their record is locked.'
+      );
+      return;
+    }
     setEditingObs(null);
     setObsValue('');
     setObsSite(OBS_SITES[0]);
@@ -340,6 +376,15 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   };
 
   const handleOpenEditObs = (obs: ClinicalObservation) => {
+    if (isLocked) {
+      Alert.alert(
+        'Record Locked',
+        isReferred
+          ? 'This patient has been referred to another facility and cannot be edited.'
+          : 'This patient has been discharged and their record is locked.'
+      );
+      return;
+    }
     setEditingObs(obs);
     setObsValue(String(obs.bilirubinValue));
     setObsSite(obs.site);
@@ -417,7 +462,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </Text>
           </TouchableOpacity>
 
-          {!isDischarged && (
+          {!isLocked && (
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={handleOpenEdit}
@@ -436,6 +481,19 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </View>
             <Text style={styles.dischargedNoticeText}>
               Patient is discharged. Clinical observations and phototherapy history are read-only.
+            </Text>
+          </View>
+        )}
+
+        {!isDischarged && isReferred && (
+          <View style={styles.dischargedNoticeBanner}>
+            <View style={[styles.dischargedNoticePill, { backgroundColor: '#EDE9FE' }]}>
+              <Text style={[styles.dischargedNoticePillText, { color: '#6D28D9' }]}>REFERRED PATIENT • READ-ONLY</Text>
+            </View>
+            <Text style={styles.dischargedNoticeText}>
+              {targetHospital
+                ? `This patient has been referred to ${targetHospital}. Clinical records are locked and managed by the receiving hospital.`
+                : 'This patient has been referred to another facility. All clinical records are read-only.'}
             </Text>
           </View>
         )}
@@ -535,30 +593,6 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                   </View>
                 </View>
 
-                <Text style={styles.inputLabel}>Clinical Risk Status</Text>
-                <View style={styles.severityOptionsRow}>
-                  {(['normal', 'moderate', 'critical'] as const).map((st) => {
-                    const isSel = editSeverity === st;
-                    return (
-                      <TouchableOpacity
-                        key={st}
-                        onPress={() => setEditSeverity(st)}
-                        style={[styles.severityPill, isSel && styles.severityPillActive]}
-                      >
-                        <Text
-                          style={[
-                            styles.severityPillText,
-                            isSel && styles.severityPillTextActive,
-                          ]}
-                        >
-                          {st.charAt(0).toUpperCase() + st.slice(1)}
-                        </Text>
-                        {isSel && <Check size={14} color="#FFFFFF" />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
                 <View style={styles.modalBtnRow}>
                   <TouchableOpacity
                     style={styles.cancelBtn}
@@ -581,14 +615,6 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </View>
           </View>
         </Modal>
-
-        {/* Present State */}
-        <View style={styles.presentStateContainer}>
-          <Text style={styles.presentStateLabel}>Present State</Text>
-          <Text style={styles.presentStateVal}>
-            {activeBaby.severityState ? activeBaby.severityState.charAt(0).toUpperCase() + activeBaby.severityState.slice(1) : 'Moderate'}
-          </Text>
-        </View>
 
         {/* Two Big Stat Cards from Frame 27 */}
         <View style={styles.statCardsRow}>
@@ -617,7 +643,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         <View style={styles.obsHeaderRow}>
           <Text style={styles.obsSectionTitle}>Recent Observations</Text>
           <View style={styles.obsHeaderActions}>
-            {!isDischarged && (
+            {!isLocked && (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={handleOpenAddObs}
@@ -643,7 +669,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             <Text style={[styles.obsHeadText, { flex: 1.2 }]}>Site</Text>
             <Text style={[styles.obsHeadText, { flex: 1 }]}>Value</Text>
             <Text style={[styles.obsHeadText, { flex: 1.6 }]}>Date & Time</Text>
-            <View style={{ width: isDischarged ? 0 : 28 }} />
+            <View style={{ width: isLocked ? 0 : 28 }} />
           </View>
           {recentObservations.length === 0 ? (
             <Text style={styles.obsEmptyText}>No observations recorded</Text>
@@ -666,7 +692,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                   {', '}
                   {new Date(o.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
-                {!isDischarged && (
+                {!isLocked && (
                   <TouchableOpacity
                     onPress={() => handleOpenEditObs(o)}
                     style={styles.obsEditBtn}
@@ -714,8 +740,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
               </Text>
             </View>
             <Text style={styles.referralActiveSub}>
-              {babyAdmission?.ptStationName
-                ? `Station: ${babyAdmission.ptStationName} (${babyAdmission.hospitalName || 'Ward Station'})`
+              {currentStationDisplayName
+                ? `Station: ${currentStationDisplayName} (${babyAdmission?.hospitalName || occupiedStation?.hospitalName || 'Ward Station'})`
                 : 'Active under phototherapy continuous monitoring.'}
             </Text>
             <Text style={styles.referralActiveHint}>
@@ -803,7 +829,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
             {/* Doctor Decision & Actions */}
             <View style={styles.ptActionRow}>
-              {!isDischarged ? (
+              {!isLocked ? (
                 <>
                   <TouchableOpacity
                     style={styles.ptDischargeBtn}
@@ -823,6 +849,12 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
                     <Text style={styles.ptResumeBtnText}>Resume PT</Text>
                   </TouchableOpacity>
                 </>
+              ) : isReferred ? (
+                <View style={[styles.dischargedPillRow, { backgroundColor: '#EDE9FE', borderColor: '#DDD6FE' }]}>
+                  <Text style={[styles.dischargedCompletedText, { color: '#6D28D9' }]}>
+                    {targetHospital ? `Referred to ${targetHospital} (Read-Only)` : 'Referred Patient (Read-Only)'}
+                  </Text>
+                </View>
               ) : (
                 <View style={styles.dischargedPillRow}>
                   <Check size={16} color="#00A569" strokeWidth={2.5} style={{ marginRight: 6 }} />
@@ -834,7 +866,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
             </View>
           </View>
         ) : (onSendToPhototherapy || onOpenReferral) ? (
-          !isDischarged ? (
+          !isLocked ? (
             <TouchableOpacity
               onPress={() => (onSendToPhototherapy ? onSendToPhototherapy(activeBaby) : onOpenReferral?.())}
               style={[styles.referralCalloutBtn, { marginTop: 16 }]}
@@ -922,7 +954,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         </Modal>
 
         {/* Discharge Button */}
-        {!isDischarged ? (
+        {!isLocked ? (
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleDischarge}
@@ -931,6 +963,12 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
           >
             <Text style={styles.dischargeBtnText}>Discharge</Text>
           </TouchableOpacity>
+        ) : isReferred ? (
+          <View style={[styles.dischargeBtn, { backgroundColor: '#EDE9FE', borderColor: '#DDD6FE', borderWidth: 1 }]}>
+            <Text style={[styles.dischargeBtnText, { color: '#6D28D9' }]}>
+              {targetHospital ? `Referred to ${targetHospital} (Read-Only)` : 'Referred Patient (Read-Only)'}
+            </Text>
+          </View>
         ) : (
           <View style={[styles.dischargeBtn, { backgroundColor: '#E2E8F0' }]}>
             <Text style={[styles.dischargeBtnText, { color: '#64748B' }]}>Patient Discharged</Text>
@@ -984,24 +1022,6 @@ const styles = StyleSheet.create({
     color: '#181829',
     marginLeft: moderateScale(4),
     flexShrink: 1,
-  },
-  presentStateContainer: {
-    backgroundColor: '#FDF4E5',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderRadius: moderateScale(16),
-    marginBottom: SPACING.md,
-  },
-  presentStateLabel: {
-    fontSize: fontScale(12),
-    color: '#D97706',
-    fontWeight: '600',
-  },
-  presentStateVal: {
-    fontSize: fontScale(26),
-    fontWeight: '800',
-    color: '#B45309',
-    marginTop: 2,
   },
   statCardsRow: {
     flexDirection: 'row',
@@ -1537,33 +1557,6 @@ const styles = StyleSheet.create({
   },
   halfInput: {
     flex: 1,
-  },
-  severityOptionsRow: {
-    flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
-    marginBottom: 12,
-  },
-  severityPill: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F1F5F9',
-    paddingVertical: 8,
-    borderRadius: 10,
-    gap: 4,
-  },
-  severityPillActive: {
-    backgroundColor: '#7D3BFF',
-  },
-  severityPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
-  },
-  severityPillTextActive: {
-    color: '#FFFFFF',
   },
   modalBtnRow: {
     flexDirection: 'row',
