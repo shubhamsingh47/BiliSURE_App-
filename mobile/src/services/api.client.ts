@@ -33,8 +33,8 @@ const getBackendBaseUrl = (): string => {
     }
   } catch { }
 
-  // 4. Fallback to PC Wi-Fi IP so physical Android/iOS devices connect reliably on the local network
-  return `http://${DEV_LAN_IP}:5000/api/v1`;
+  // 4. Default fallback to production cloud backend
+  return 'https://bilisure.medblue.cloud/api/v1';
 };
 
 export const API_BASE_URL = getBackendBaseUrl();

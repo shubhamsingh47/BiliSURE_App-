@@ -17,6 +17,7 @@
       }
     },
     "extra": {
+      "apiUrl": "https://bilisure.medblue.cloud/api/v1",
       "eas": {
         "projectId": "6e0bd715-4cb4-4549-b967-467e66576008"
       }
