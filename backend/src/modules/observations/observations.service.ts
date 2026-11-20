@@ -3,9 +3,30 @@ import { ObservationModel } from '../../models/Observation';
 import { BabyModel } from '../../models/Baby';
 
 export class ObservationsService {
-  static async listForBaby(babyId?: string) {
+  static async listForBaby(babyId?: string, userFacility?: string) {
     if (!babyId) {
-      const obs = await ObservationModel.find({}).sort({ timestamp: -1 }).lean();
+      const query: any = {};
+      const facilityUpper = (userFacility || '').trim().toUpperCase();
+      const isDistrict =
+        !userFacility ||
+        facilityUpper.includes('DISTRICT') ||
+        facilityUpper.includes('ADMIN') ||
+        facilityUpper === 'ALL';
+
+      if (!isDistrict) {
+        const facilityBabies = await BabyModel.find({
+          $or: [
+            { currentHospital: new RegExp(`^${userFacility}$`, 'i') },
+            { facility: new RegExp(`^${userFacility}$`, 'i') },
+          ],
+        })
+          .select('_id uhid name')
+          .lean();
+        const babyIds = facilityBabies.map((b: any) => b._id);
+        query.babyId = { $in: babyIds };
+      }
+
+      const obs = await ObservationModel.find(query).sort({ timestamp: -1 }).limit(100).lean();
       return obs || [];
     }
 

@@ -171,7 +171,7 @@ export class HospitalsService {
       try {
         const list = await PTStationModel.find({ hospitalId }).lean();
         if (list.length > 0) return naturalSort(list as any);
-      } catch {}
+      } catch { }
     }
     const mem = memoryStations.filter((s) => String(s.hospitalId) === String(hospitalId));
     return naturalSort(mem as any);

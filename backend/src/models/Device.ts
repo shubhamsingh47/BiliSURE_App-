@@ -7,6 +7,7 @@ export interface IDevice {
   macAddress: string;
   facility: string;
   department: string;
+  assignedWard?: string;
   autoCalibrateEnabled: boolean;
   accuracyTestPassed: boolean;
   recordCalibrationLog: boolean;
@@ -15,6 +16,10 @@ export interface IDevice {
   isCalibrated: boolean;
   status: 'active' | 'calibrated' | 'alert_broken' | 'maintenance';
   lastCalibratedAt?: Date;
+  nextCalibrationDue?: Date;
+  lastDiagnosticStatus?: 'healthy' | 'issue_detected' | 'calibration_required';
+  firmwareVersion?: string;
+  isSynthetic?: boolean;
   createdAt?: Date;
   updatedAt?: Date;
 }
@@ -26,6 +31,7 @@ const DeviceSchema = new Schema<IDevice>(
     macAddress: { type: String, default: '00:1B:44:11:3A:B7' },
     facility: { type: String, default: 'Central Children Hospital' },
     department: { type: String, default: 'NICU' },
+    assignedWard: { type: String, default: 'NICU' },
     autoCalibrateEnabled: { type: Boolean, default: true },
     accuracyTestPassed: { type: Boolean, default: true },
     recordCalibrationLog: { type: Boolean, default: false },
@@ -38,6 +44,14 @@ const DeviceSchema = new Schema<IDevice>(
       default: 'calibrated',
     },
     lastCalibratedAt: { type: Date, default: Date.now },
+    nextCalibrationDue: { type: Date },
+    lastDiagnosticStatus: {
+      type: String,
+      enum: ['healthy', 'issue_detected', 'calibration_required'],
+      default: 'healthy',
+    },
+    firmwareVersion: { type: String, default: 'v2.4.1' },
+    isSynthetic: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

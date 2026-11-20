@@ -8,9 +8,6 @@ export async function seedDefaultUsers() {
     return;
   }
   try {
-    const existing = await UserModel.findOne({ email: 'pgi@hospital.org' });
-    if (existing) return;
-
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash('Password123!', salt);
 
@@ -56,6 +53,20 @@ export async function seedDefaultUsers() {
         department: 'Pediatric Care & NICU',
         facility: 'KGMU',
         facilityId: 'hosp_kgmu',
+        districtId: 'dist_lucknow',
+        isActive: true,
+        isActivated: true,
+      },
+      {
+        email: 'admin@bilisure.org',
+        passwordHash,
+        name: 'Super Administrator',
+        role: 'district_admin',
+        primaryRole: 'district_admin',
+        permissionProfile: 'all',
+        permissions: resolvePermissions('district_admin', 'all'),
+        department: 'Central Neonatal Command',
+        facility: 'District Command',
         districtId: 'dist_lucknow',
         isActive: true,
         isActivated: true,

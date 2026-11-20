@@ -6,7 +6,8 @@ export class ObservationsController {
   static async list(req: Request, res: Response, next: NextFunction) {
     try {
       const babyId = req.query.babyId as string;
-      const obs = await ObservationsService.listForBaby(babyId);
+      const userFacility = req.user?.facility || (req.query.facility as string);
+      const obs = await ObservationsService.listForBaby(babyId, userFacility);
       sendSuccess(res, obs, 200, 'Observations retrieved successfully');
     } catch (err) {
       next(err);

@@ -8,6 +8,92 @@ import { isMongoConnected } from '../../config/database';
 const memoryReadings: any[] = [];
 
 export class ReadingsService {
+  static async listReadings(filters: {
+    search?: string;
+    facility?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    const query: any = {};
+    const facilityUpper = (filters.facility || '').trim().toUpperCase();
+    const isDistrict =
+      !filters.facility ||
+      facilityUpper.includes('DISTRICT') ||
+      facilityUpper.includes('ADMIN') ||
+      facilityUpper === 'ALL';
+
+    if (!isDistrict) {
+      const facilityBabies = await BabyModel.find({
+        $or: [
+          { currentHospital: new RegExp(`^${filters.facility}$`, 'i') },
+          { facility: new RegExp(`^${filters.facility}$`, 'i') },
+        ],
+      })
+        .select('uhid')
+        .lean();
+      const uhids = facilityBabies.map((b: any) => b.uhid);
+      query.babyUhid = { $in: uhids };
+    }
+
+    if (filters.search) {
+      const babyMatches = await BabyModel.find({
+        name: { $regex: filters.search, $options: 'i' },
+      })
+        .select('uhid')
+        .lean();
+      const matchedUhids = babyMatches.map((b: any) => b.uhid);
+
+      query.$or = [
+        { babyUhid: { $regex: filters.search, $options: 'i' } },
+        { babyUhid: { $in: matchedUhids } },
+        { operatorName: { $regex: filters.search, $options: 'i' } },
+      ];
+    }
+
+    if (filters.startDate || filters.endDate) {
+      query.timestamp = {};
+      if (filters.startDate) query.timestamp.$gte = new Date(filters.startDate);
+      if (filters.endDate) query.timestamp.$lte = new Date(filters.endDate);
+    }
+
+    const total = await BilirubinReadingModel.countDocuments(query);
+    const items = await BilirubinReadingModel.find(query)
+      .sort({ timestamp: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+
+    // Enrich with baby details (name, gestational age, department)
+    const babyUhids = Array.from(new Set(items.map((r: any) => r.babyUhid).filter(Boolean)));
+    const babies = await BabyModel.find({ uhid: { $in: babyUhids } })
+      .select('uhid name dateOfBirth gestationalAgeWeeks department severityState facility')
+      .lean();
+    const babyMap = new Map<string, any>();
+    babies.forEach((b: any) => babyMap.set(b.uhid, b));
+
+    const enrichedItems = items.map((r: any) => {
+      const baby = babyMap.get(r.babyUhid);
+      return {
+        ...r,
+        babyName: baby?.name || r.babyUhid,
+        department: baby?.department || 'NICU',
+        gestationalAgeWeeks: baby?.gestationalAgeWeeks || 38,
+        babyFacility: baby?.facility || 'Hospital',
+      };
+    });
+
+    return {
+      items: enrichedItems,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) || 1 },
+    };
+  }
+
   static async getReadingsForBaby(babyId: string, timeRange?: string) {
     if (isMongoConnected) {
       try {

@@ -18,6 +18,9 @@ import { admissionRoutes } from './modules/admissions/admissions.routes';
 import { notificationRoutes } from './modules/notifications/notifications.routes';
 import { districtRoutes } from './modules/district/district.routes';
 import { reservationRoutes } from './modules/reservations/reservations.routes';
+import { chatRoutes } from './modules/chats/chats.routes';
+import { deviceTestingRoutes } from './modules/deviceTesting/deviceTesting.routes';
+import { billingRoutes } from './modules/billing/billing.routes';
 
 export function createApp(): express.Application {
   const app = express();
@@ -53,6 +56,9 @@ export function createApp(): express.Application {
   apiV1.use('/notifications', notificationRoutes);
   apiV1.use('/district', districtRoutes);
   apiV1.use('/reservations', reservationRoutes);
+  apiV1.use('/chats', chatRoutes);
+  apiV1.use('/device-testing', deviceTestingRoutes);
+  apiV1.use('/billing', billingRoutes);
 
   app.use('/api/v1', apiV1);
 
