@@ -5,7 +5,6 @@ import { Login } from './pages/Login';
 import { HospitalLayout } from './components/layout/HospitalLayout';
 import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
 import { OverviewPage } from './pages/hospital/OverviewPage';
-import { NomogramPage } from './pages/hospital/NomogramPage';
 import { PatientPage } from './pages/hospital/PatientPage';
 import { PhototherapyPage } from './pages/hospital/PhototherapyPage';
 import { ReferralsPage } from './pages/hospital/ReferralsPage';
@@ -62,7 +61,7 @@ export const App: React.FC = () => {
           >
             <Route index element={<Navigate to="/hospital/overview" replace />} />
             <Route path="overview" element={<OverviewPage />} />
-            <Route path="nomogram" element={<NomogramPage />} />
+            <Route path="nomogram" element={<Navigate to="/hospital/patient" replace />} />
             <Route path="patient" element={<PatientPage />} />
             <Route path="phototherapy" element={<PhototherapyPage />} />
             <Route path="device-testing" element={<DeviceTestingPage />} />
@@ -71,7 +70,7 @@ export const App: React.FC = () => {
 
             {/* Backwards-compatible redirects */}
             <Route path="patients" element={<Navigate to="/hospital/patient" replace />} />
-            <Route path="readings" element={<Navigate to="/hospital/nomogram" replace />} />
+            <Route path="readings" element={<Navigate to="/hospital/patient" replace />} />
             <Route path="chat" element={<Navigate to="/hospital/referrals" replace />} />
           </Route>
 

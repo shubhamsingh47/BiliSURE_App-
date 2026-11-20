@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  Activity,
   BedDouble,
   Cpu,
   ArrowRightLeft,
@@ -19,7 +18,6 @@ export const HospitalSidebar: React.FC = () => {
   const clinicalItems = [
     { label: 'Overview', to: '/hospital/overview', icon: LayoutDashboard },
     { label: 'Patients', to: '/hospital/patient', icon: Users },
-    { label: 'Nomogram & Triage', to: '/hospital/nomogram', icon: Activity },
     { label: 'PT Stations', to: '/hospital/phototherapy', icon: BedDouble },
     { label: 'Device Testing', to: '/hospital/device-testing', icon: Cpu },
   ];
