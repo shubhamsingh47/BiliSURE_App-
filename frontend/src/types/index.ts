@@ -380,6 +380,7 @@ export interface SuperAdminBillingSummary {
     totalRemaining: number;
     overallUsagePercent: number;
     totalActiveSubscriptions: number;
+    expiringOrExhaustedCount?: number;
   };
   hospitalStats: {
     facility: string;
@@ -392,7 +393,13 @@ export interface SuperAdminBillingSummary {
     usagePercent: number;
     totalBilledCostINR: number;
     uniquePatientsCount: number;
+    startDate?: string;
     expiryDate: string;
+    billingCycle?: string;
+    planAmountINR?: number;
+    pricePerTestINR?: number;
+    payPerTestRateINR?: number;
   }[];
   plans: SubscriptionPlanItem[];
+  facilityFilter?: string;
 }

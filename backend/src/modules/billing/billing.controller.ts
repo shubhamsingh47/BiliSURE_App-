@@ -3,6 +3,25 @@ import { BillingService } from './billing.service';
 import { BadRequestError } from '../../common/errors';
 
 export class BillingController {
+  static async getBalance(req: Request, res: Response, next: NextFunction) {
+    try {
+      const facility = req.user?.facility || 'PGI';
+      const data = await BillingService.getBalance(facility);
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async getDistrictBalances(req: Request, res: Response, next: NextFunction) {
+    try {
+      const data = await BillingService.getDistrictBalances();
+      res.status(200).json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   static async getPlans(req: Request, res: Response, next: NextFunction) {
     try {
       const plans = await BillingService.getPlans();
@@ -58,7 +77,8 @@ export class BillingController {
 
   static async getSuperAdminSummary(req: Request, res: Response, next: NextFunction) {
     try {
-      const data = await BillingService.getSuperAdminSummary();
+      const facility = req.query.facility as string | undefined;
+      const data = await BillingService.getSuperAdminSummary(facility);
       res.status(200).json({ success: true, data });
     } catch (err) {
       next(err);

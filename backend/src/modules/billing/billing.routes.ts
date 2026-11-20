@@ -6,6 +6,8 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/balance', BillingController.getBalance);
+router.get('/district-balances', authorizeRoles('district_admin'), BillingController.getDistrictBalances);
 router.get('/plans', BillingController.getPlans);
 router.get('/subscription', BillingController.getHospitalSubscription);
 router.get('/usage-history', BillingController.getUsageHistory);

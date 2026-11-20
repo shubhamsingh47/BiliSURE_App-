@@ -12,9 +12,8 @@ import { ReferralsPage } from './pages/hospital/ReferralsPage';
 import { ReportsPage } from './pages/hospital/ReportsPage';
 import { ChatPage } from './pages/hospital/ChatPage';
 import { DeviceTestingPage } from './pages/hospital/DeviceTestingPage';
-import { UsagePage } from './pages/hospital/UsagePage';
-import { BillingPage } from './pages/hospital/BillingPage';
 import { SuperAdminDashboard } from './pages/admin/SuperAdminDashboard';
+import { SuperAdminDeviceTestingPage } from './pages/admin/SuperAdminDeviceTestingPage';
 
 const ProtectedHospitalRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isSuperAdmin } = useAuth();
@@ -68,8 +67,6 @@ export const App: React.FC = () => {
             <Route path="readings" element={<ReadingsPage />} />
             <Route path="phototherapy" element={<PhototherapyPage />} />
             <Route path="device-testing" element={<DeviceTestingPage />} />
-            <Route path="usage" element={<UsagePage />} />
-            <Route path="billing" element={<BillingPage />} />
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="reports" element={<ReportsPage />} />
             <Route path="chat" element={<ChatPage />} />
@@ -86,6 +83,7 @@ export const App: React.FC = () => {
           >
             <Route index element={<Navigate to="/admin/overview" replace />} />
             <Route path="overview" element={<SuperAdminDashboard />} />
+            <Route path="device-testing" element={<SuperAdminDeviceTestingPage />} />
           </Route>
 
           {/* Catch-all */}

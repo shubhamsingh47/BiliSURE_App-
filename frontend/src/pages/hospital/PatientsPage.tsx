@@ -199,9 +199,28 @@ export const PatientsPage: React.FC = () => {
                     const isHigh = baby.severityState === 'critical' || measurement >= 14;
 
                     return (
-                      <tr key={baby._id} className="hover:bg-slate-50/80 transition">
+                      <tr
+                        key={baby._id}
+                        onClick={() =>
+                          setSelectedPatient({
+                            ...baby,
+                            patientName: baby.name,
+                            uhid: baby.uhid,
+                            ward: baby.department,
+                            ageHours: 48,
+                            measurementValue: measurement,
+                            unit: 'mg/dL',
+                            timestamp: baby.createdAt,
+                            gestationalAgeWeeks: baby.gestationalAgeWeeks,
+                            reviewStatus: isHigh ? 'Pending review' : 'Reviewed',
+                            operatorName: 'Dr. Ward In-Charge',
+                          })
+                        }
+                        className="hover:bg-blue-50/60 transition cursor-pointer group"
+                        title="Click to inspect patient details, Bhutani nomogram & sample history"
+                      >
                         <td className="py-3.5 px-5">
-                          <p className="font-bold text-slate-900">{baby.name}</p>
+                          <p className="font-bold text-slate-900 group-hover:text-blue-700 transition">{baby.name}</p>
                           <p className="text-[11px] text-slate-400 font-mono mt-0.5">{baby.uhid}</p>
                         </td>
                         <td className="py-3.5 px-5 text-slate-600">{baby.department || 'NICU'}</td>
@@ -221,27 +240,10 @@ export const PatientsPage: React.FC = () => {
                           </Badge>
                         </td>
                         <td className="py-3.5 px-5 text-right">
-                          <button
-                            onClick={() =>
-                              setSelectedPatient({
-                                ...baby,
-                                patientName: baby.name,
-                                uhid: baby.uhid,
-                                ward: baby.department,
-                                ageHours: 48,
-                                measurementValue: measurement,
-                                unit: 'mg/dL',
-                                timestamp: baby.createdAt,
-                                gestationalAgeWeeks: baby.gestationalAgeWeeks,
-                                reviewStatus: isHigh ? 'Pending review' : 'Reviewed',
-                                operatorName: 'Dr. Ward In-Charge',
-                              })
-                            }
-                            className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 text-xs font-semibold text-slate-700 transition inline-flex items-center gap-1"
-                          >
+                          <span className="px-2.5 py-1 rounded-lg border border-slate-200 group-hover:border-blue-400 group-hover:bg-blue-50 group-hover:text-blue-700 text-xs font-semibold text-slate-600 transition inline-flex items-center gap-1">
                             <span>Open</span>
                             <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
+                          </span>
                         </td>
                       </tr>
                     );

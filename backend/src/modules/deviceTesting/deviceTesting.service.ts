@@ -4,14 +4,16 @@ import { NotFoundError, BadRequestError } from '../../common/errors';
 
 export class DeviceTestingService {
   /**
-   * Get all registered devices for a facility
+   * Get all registered devices for a facility or all hospitals
    */
   static async getDevices(facility?: string, isSuperAdmin = false) {
     const filter: any = {};
-    if (!isSuperAdmin && facility) {
+    if (facility && facility !== 'All') {
       filter.facility = facility;
+    } else {
+      filter.facility = { $in: ['PGI', 'RML', 'KGMU'] };
     }
-    const devices = await DeviceModel.find(filter).sort({ serialNumber: 1 });
+    const devices = await DeviceModel.find(filter).sort({ facility: 1, serialNumber: 1 });
     return devices;
   }
 
@@ -268,9 +270,12 @@ export class DeviceTestingService {
     const { facility, deviceSerial, isSuperAdmin = false, limit = 20, page = 1 } = params;
     const filter: any = {};
 
-    if (!isSuperAdmin && facility) {
+    if (facility && facility !== 'All') {
       filter.facility = facility;
+    } else {
+      filter.facility = { $in: ['PGI', 'RML', 'KGMU'] };
     }
+
     if (deviceSerial) {
       filter.deviceSerial = deviceSerial;
     }
@@ -294,8 +299,10 @@ export class DeviceTestingService {
    */
   static async getSummary(facility?: string, isSuperAdmin = false) {
     const filter: any = {};
-    if (!isSuperAdmin && facility) {
+    if (facility && facility !== 'All') {
       filter.facility = facility;
+    } else {
+      filter.facility = { $in: ['PGI', 'RML', 'KGMU'] };
     }
 
     const devices = await DeviceModel.find(filter);
@@ -312,15 +319,19 @@ export class DeviceTestingService {
       else calibrationRequired++;
     });
 
-    const latestScan = await DeviceDiagnosticModel.findOne(filter).sort({ createdAt: -1 });
+    const [latestScan, scannedDeviceSerials] = await Promise.all([
+      DeviceDiagnosticModel.findOne(filter).sort({ createdAt: -1 }),
+      DeviceDiagnosticModel.distinct('deviceSerial', filter),
+    ]);
 
     return {
       totalDevices,
+      totalScanned: scannedDeviceSerials.length,
       healthy,
       issues,
       calibrationRequired,
       latestScanAt: latestScan ? latestScan.createdAt : null,
-      facility: facility || 'All Facilities',
+      facility: facility && facility !== 'All' ? facility : 'All Hospitals',
     };
   }
 }

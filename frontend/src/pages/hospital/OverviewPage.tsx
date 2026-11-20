@@ -242,9 +242,14 @@ export const OverviewPage: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
               {recentResults.map((result) => (
-                <tr key={result.id} className="hover:bg-slate-50/80 transition">
+                <tr
+                  key={result.id}
+                  onClick={() => setSelectedResult(result)}
+                  className="hover:bg-blue-50/60 cursor-pointer transition group"
+                  title="Click to inspect Bhutani nomogram and sample history"
+                >
                   <td className="py-3.5 px-5">
-                    <p className="font-bold text-slate-900">{result.patientName}</p>
+                    <p className="font-bold text-slate-900 group-hover:text-blue-700 transition">{result.patientName}</p>
                     <p className="text-[11px] text-slate-400 font-mono mt-0.5">{result.uhid}</p>
                   </td>
                   <td className="py-3.5 px-5 text-slate-600">{result.ward}</td>
@@ -267,13 +272,10 @@ export const OverviewPage: React.FC = () => {
                     </Badge>
                   </td>
                   <td className="py-3.5 px-5 text-right">
-                    <button
-                      onClick={() => setSelectedResult(result)}
-                      className="px-3 py-1.5 rounded-lg border border-slate-300 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-600 text-xs font-semibold text-slate-700 transition inline-flex items-center gap-1"
-                    >
+                    <span className="px-2.5 py-1 rounded-lg border border-slate-200 group-hover:border-blue-400 group-hover:bg-blue-50 group-hover:text-blue-700 text-xs font-semibold text-slate-600 transition inline-flex items-center gap-1">
                       <span>Open</span>
                       <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
+                    </span>
                   </td>
                 </tr>
               ))}

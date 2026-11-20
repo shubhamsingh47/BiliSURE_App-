@@ -5,6 +5,95 @@ import { NotFoundError, BadRequestError } from '../../common/errors';
 
 export class BillingService {
   /**
+   * Get simplified test balance for hospital
+   */
+  static async getBalance(facility: string) {
+    if (!['PGI', 'RML', 'KGMU'].includes(facility)) {
+      throw new BadRequestError('Test balance accounts exist only for PGI, RML, and KGMU hospitals.');
+    }
+    const sub = await HospitalSubscriptionModel.findOne({ facility });
+    if (!sub) {
+      return {
+        facility,
+        configured: false,
+        totalAllocated: 0,
+        usedTests: 0,
+        remainingTests: 0,
+        usagePercent: 0,
+      };
+    }
+    const remaining = Math.max(0, sub.totalAllocatedTests - sub.usedTests);
+    const usagePercent = sub.totalAllocatedTests > 0
+      ? Math.round((sub.usedTests / sub.totalAllocatedTests) * 100)
+      : 0;
+    return {
+      facility,
+      configured: true,
+      planName: sub.planName,
+      totalAllocated: sub.totalAllocatedTests,
+      usedTests: sub.usedTests,
+      remainingTests: remaining,
+      usagePercent,
+      isLowCredit: remaining < sub.totalAllocatedTests * 0.15,
+      expiryDate: sub.expiryDate,
+    };
+  }
+
+  /**
+   * Get district-wide test balances for Super Admin (PGI, RML, KGMU separately + combined)
+   */
+  static async getDistrictBalances() {
+    const facilities = ['PGI', 'RML', 'KGMU'];
+    const subs = await HospitalSubscriptionModel.find({ facility: { $in: facilities } });
+
+    const hospitals = facilities.map((fac) => {
+      const sub = subs.find((s) => s.facility === fac);
+      if (!sub) {
+        return {
+          facility: fac,
+          configured: false,
+          totalAllocated: 0,
+          usedTests: 0,
+          remainingTests: 0,
+          usagePercent: 0,
+        };
+      }
+      const remaining = Math.max(0, sub.totalAllocatedTests - sub.usedTests);
+      const usagePercent = sub.totalAllocatedTests > 0
+        ? Math.round((sub.usedTests / sub.totalAllocatedTests) * 100)
+        : 0;
+      return {
+        facility: fac,
+        configured: true,
+        planName: sub.planName,
+        totalAllocated: sub.totalAllocatedTests,
+        usedTests: sub.usedTests,
+        remainingTests: remaining,
+        usagePercent,
+        isLowCredit: remaining < sub.totalAllocatedTests * 0.15,
+        expiryDate: sub.expiryDate,
+      };
+    });
+
+    const combinedAllocated = hospitals.reduce((sum, h) => sum + h.totalAllocated, 0);
+    const combinedUsed = hospitals.reduce((sum, h) => sum + h.usedTests, 0);
+    const combinedRemaining = Math.max(0, combinedAllocated - combinedUsed);
+    const combinedUsagePercent = combinedAllocated > 0
+      ? Math.round((combinedUsed / combinedAllocated) * 100)
+      : 0;
+
+    return {
+      hospitals,
+      combined: {
+        totalAllocated: combinedAllocated,
+        usedTests: combinedUsed,
+        remainingTests: combinedRemaining,
+        usagePercent: combinedUsagePercent,
+      },
+    };
+  }
+
+  /**
    * Get all active subscription plans
    */
   static async getPlans() {
@@ -16,6 +105,10 @@ export class BillingService {
    * Get hospital active subscription and key metrics
    */
   static async getHospitalSubscription(facility: string) {
+    if (!['PGI', 'RML', 'KGMU'].includes(facility)) {
+      throw new BadRequestError('Subscription accounts only exist for hospital facilities (PGI, RML, KGMU). Super Admin is a monitoring entity.');
+    }
+
     let sub = await HospitalSubscriptionModel.findOne({ facility });
     
     // Fallback if not yet created in DB
@@ -72,8 +165,10 @@ export class BillingService {
     const { facility, isSuperAdmin = false, page = 1, limit = 20 } = params;
     const filter: any = {};
 
-    if (!isSuperAdmin && facility) {
+    if (facility && facility !== 'All') {
       filter.facility = facility;
+    } else {
+      filter.facility = { $in: ['PGI', 'RML', 'KGMU'] };
     }
 
     const skip = (page - 1) * limit;
@@ -159,11 +254,26 @@ export class BillingService {
   /**
    * Super Admin Cross-Hospital Billing Aggregates
    */
-  static async getSuperAdminSummary() {
+  static async getSuperAdminSummary(facility?: string) {
+    const subFilter: any = {};
+    if (facility && facility !== 'All') {
+      subFilter.facility = facility;
+    } else {
+      subFilter.facility = { $in: ['PGI', 'RML', 'KGMU'] };
+    }
+
+    const usageMatch: any = {};
+    if (facility && facility !== 'All') {
+      usageMatch.facility = facility;
+    } else {
+      usageMatch.facility = { $in: ['PGI', 'RML', 'KGMU'] };
+    }
+
     const [subscriptions, plans, totalTestsUsage] = await Promise.all([
-      HospitalSubscriptionModel.find(),
-      SubscriptionPlanModel.find({ isActive: true }),
+      HospitalSubscriptionModel.find(subFilter).sort({ facility: 1 }),
+      SubscriptionPlanModel.find({ isActive: true }).sort({ priceINR: 1 }),
       TestUsageRecordModel.aggregate([
+        { $match: usageMatch },
         {
           $group: {
             _id: '$facility',
@@ -178,6 +288,9 @@ export class BillingService {
     const totalAllocated = subscriptions.reduce((acc, s) => acc + s.totalAllocatedTests, 0);
     const totalConsumed = subscriptions.reduce((acc, s) => acc + s.usedTests, 0);
     const totalRemaining = subscriptions.reduce((acc, s) => acc + s.remainingTests, 0);
+    const expiringOrExhaustedCount = subscriptions.filter(
+      (s) => s.status === 'expiring_soon' || s.status === 'exhausted' || s.remainingTests < s.totalAllocatedTests * 0.15
+    ).length;
 
     const hospitalStats = subscriptions.map((sub) => {
       const usageAgg = totalTestsUsage.find((u) => u._id === sub.facility);
@@ -192,7 +305,12 @@ export class BillingService {
         usagePercent: sub.totalAllocatedTests > 0 ? Math.round((sub.usedTests / sub.totalAllocatedTests) * 100) : 0,
         totalBilledCostINR: usageAgg?.totalBilledCostINR || 0,
         uniquePatientsCount: usageAgg?.uniquePatientsScreened?.length || 0,
+        startDate: sub.startDate,
         expiryDate: sub.expiryDate,
+        billingCycle: sub.billingCycle || 'monthly',
+        planAmountINR: sub.planAmountINR || 19999,
+        pricePerTestINR: sub.pricePerTestINR || 39.99,
+        payPerTestRateINR: 65.0,
       };
     });
 
@@ -203,9 +321,11 @@ export class BillingService {
         totalRemaining,
         overallUsagePercent: totalAllocated > 0 ? Math.round((totalConsumed / totalAllocated) * 100) : 0,
         totalActiveSubscriptions: subscriptions.filter((s) => s.status === 'active').length,
+        expiringOrExhaustedCount,
       },
       hospitalStats,
       plans,
+      facilityFilter: facility && facility !== 'All' ? facility : 'All Hospitals',
     };
   }
 }
