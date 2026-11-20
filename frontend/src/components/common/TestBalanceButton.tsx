@@ -130,51 +130,51 @@ export const TestBalanceButton: React.FC = () => {
 
       {/* Popover Dropdown Panel */}
       {isOpen && (
-        <div className="absolute right-0 mt-2.5 w-80 bg-white rounded-2xl shadow-xl border border-slate-200/90 p-5 z-50 animate-fade-in text-slate-800">
+        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 p-4 z-50 text-slate-800">
           {/* Header */}
           <div className="flex items-center justify-between pb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-                <Layers className="w-4 h-4" />
+              <div className="w-7 h-7 rounded-md bg-slate-100 text-slate-700 flex items-center justify-center">
+                <Layers className="w-4 h-4 text-slate-600" />
               </div>
               <div>
-                <h4 className="text-xs font-bold text-slate-900">
+                <h4 className="text-xs font-semibold text-slate-900">
                   {isSuperAdmin ? 'District Test Quotas' : `${hospitalBalance?.facility || hospitalFacility} Balance`}
                 </h4>
-                <p className="text-[10px] text-slate-500">
-                  {isSuperAdmin ? 'PGI, RML & KGMU Combined' : 'Authenticated Hospital Allocation'}
+                <p className="text-[11px] text-slate-500">
+                  {isSuperAdmin ? 'PGI, RML & KGMU Combined' : 'Approved Hospital Allocation'}
                 </p>
               </div>
             </div>
             <button
               onClick={() => setIsOpen(false)}
-              className="text-slate-400 hover:text-slate-600 p-1 rounded-lg hover:bg-slate-100"
+              className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-100 transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
           {/* Body Content */}
-          <div className="mt-3.5 space-y-3.5">
+          <div className="mt-3 space-y-3">
             {!isSuperAdmin && hospitalBalance && (
               <>
                 {/* 3 Metric Summary Boxes */}
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase block">Total</span>
-                    <span className="text-sm font-extrabold text-slate-900 mt-0.5 block">
+                  <div className="p-2 bg-slate-50 rounded-md border border-slate-100">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase block">Total</span>
+                    <span className="text-xs font-semibold text-slate-900 mt-0.5 block">
                       {hospitalBalance.totalAllocated.toLocaleString()}
                     </span>
                   </div>
-                  <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase block">Used</span>
-                    <span className="text-sm font-extrabold text-slate-600 mt-0.5 block">
+                  <div className="p-2 bg-slate-50 rounded-md border border-slate-100">
+                    <span className="text-[10px] font-medium text-slate-400 uppercase block">Used</span>
+                    <span className="text-xs font-semibold text-slate-600 mt-0.5 block">
                       {hospitalBalance.usedTests.toLocaleString()}
                     </span>
                   </div>
-                  <div className="p-2.5 bg-blue-50/60 rounded-xl border border-blue-100">
-                    <span className="text-[10px] font-semibold text-blue-600 uppercase block">Remaining</span>
-                    <span className="text-sm font-extrabold text-blue-700 mt-0.5 block">
+                  <div className="p-2 bg-blue-50/50 rounded-md border border-blue-100">
+                    <span className="text-[10px] font-medium text-blue-600 uppercase block">Left</span>
+                    <span className="text-xs font-semibold text-blue-700 mt-0.5 block">
                       {hospitalBalance.remainingTests.toLocaleString()}
                     </span>
                   </div>
@@ -184,13 +184,13 @@ export const TestBalanceButton: React.FC = () => {
                 <div>
                   <div className="flex justify-between text-[11px] mb-1 font-medium">
                     <span className="text-slate-500">Consumption Rate</span>
-                    <span className="font-bold text-slate-800">{hospitalBalance.usagePercent}% Used</span>
+                    <span className="text-slate-800">{hospitalBalance.usagePercent}%</span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-slate-100 overflow-hidden">
                     <div
                       className={clsx(
-                        'h-full rounded-full transition-all duration-500',
-                        hospitalBalance.usagePercent > 85 ? 'bg-amber-500' : 'bg-blue-600'
+                        'h-full rounded-full transition-all duration-300',
+                        hospitalBalance.usagePercent > 85 ? 'bg-amber-500' : 'bg-slate-900'
                       )}
                       style={{ width: `${Math.min(hospitalBalance.usagePercent, 100)}%` }}
                     />
@@ -199,9 +199,9 @@ export const TestBalanceButton: React.FC = () => {
 
                 {/* Low credit alert if applicable */}
                 {hospitalBalance.isLowCredit && (
-                  <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200/80 flex items-start gap-2 text-[11px] text-amber-800">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                    <span>Quota below 15%. Notify biomedical team for hospital top-up.</span>
+                  <div className="p-2.5 bg-amber-50 rounded-md border border-amber-200/80 flex items-start gap-2 text-[11px] text-amber-800">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                    <span>Quota below 15%. Notify biomedical engineering for top-up.</span>
                   </div>
                 )}
               </>
@@ -211,16 +211,16 @@ export const TestBalanceButton: React.FC = () => {
             {isSuperAdmin && districtBalances && (
               <>
                 {/* District Combined Bar */}
-                <div className="p-3 bg-slate-50 rounded-xl border border-slate-100">
-                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 mb-1.5">
-                    <span>Lucknow Division Total</span>
-                    <span className="text-blue-700 font-extrabold">
-                      {districtBalances.combined.remainingTests.toLocaleString()} / {districtBalances.combined.totalAllocated.toLocaleString()} Available
+                <div className="p-2.5 bg-slate-50 rounded-md border border-slate-100">
+                  <div className="flex items-center justify-between text-xs font-medium text-slate-700 mb-1">
+                    <span>Network Total Balance</span>
+                    <span className="text-slate-900 font-semibold">
+                      {districtBalances.combined.remainingTests.toLocaleString()} / {districtBalances.combined.totalAllocated.toLocaleString()}
                     </span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className="h-full bg-blue-600 rounded-full"
+                      className="h-full bg-slate-900 rounded-full"
                       style={{ width: `${Math.min(districtBalances.combined.usagePercent, 100)}%` }}
                     />
                   </div>
@@ -231,26 +231,26 @@ export const TestBalanceButton: React.FC = () => {
                 </div>
 
                 {/* Individual Hospital Balances: PGI, RML, KGMU */}
-                <div className="space-y-2 pt-1">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider block">
                     Hospital Allocation Breakdown
                   </span>
                   {districtBalances.hospitals.map((h) => (
                     <div
                       key={h.facility}
-                      className="p-2.5 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                      className="p-2 bg-white rounded-md border border-slate-200 flex items-center justify-between text-xs"
                     >
                       <div>
-                        <div className="font-bold text-slate-900">{h.facility} Hospital</div>
-                        <div className="text-[10px] text-slate-500 font-medium">
-                          Total: <strong className="text-slate-700">{h.totalAllocated.toLocaleString()}</strong> · Used: <strong className="text-slate-700">{h.usedTests.toLocaleString()}</strong>
+                        <div className="font-medium text-slate-900">{h.facility} Hospital</div>
+                        <div className="text-[10px] text-slate-500">
+                          {h.usedTests.toLocaleString()} / {h.totalAllocated.toLocaleString()} used
                         </div>
                       </div>
                       <div className="text-right">
-                        <span className="text-xs font-extrabold text-blue-700">
+                        <span className="text-xs font-semibold text-slate-800">
                           {h.remainingTests.toLocaleString()} left
                         </span>
-                        <div className="text-[10px] text-slate-400 font-mono">
+                        <div className="text-[10px] text-slate-400">
                           {h.usagePercent}%
                         </div>
                       </div>

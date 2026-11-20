@@ -1,37 +1,98 @@
+# ==========================================
 # Dependencies
+# ==========================================
 node_modules/
+*/node_modules/
 .pnp
 .pnp.js
 
-# Environment variables
+# ==========================================
+# Environment Variables & Secrets (CRITICAL)
+# ==========================================
 .env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+.env.*
 *.env
-backend/.env
-mobile/.env
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.template
 
-# Build outputs
+# Keystores, signing keys & certificates
+*.pem
+*.key
+*.cert
+*.crt
+*.pfx
+*.p12
+*.jks
+*.keystore
+*.mobileprovision
+
+# ==========================================
+# Build & Compilation Outputs
+# ==========================================
 dist/
 build/
+out/
+*/dist/
+*/build/
 backend/dist/
-backend/build/
+frontend/dist/
+.vite/
+*/.vite/
+*.tsbuildinfo
 
-# Expo & Mobile builds
+# ==========================================
+# Expo & React Native Build Artifacts
+# ==========================================
 .expo/
+*/.expo/
+.eas/
+*/.eas/
+web-build/
+*.apk
+*.aab
+*.ipa
+
+# Native Android / iOS build outputs
+mobile/android/.gradle/
+mobile/android/app/build/
+mobile/android/build/
+mobile/ios/build/
+mobile/ios/Pods/
 *.orig.*
 [.-]tmp/
 
-# Logs & test outputs
+# ==========================================
+# Logs & Diagnostic Dumps
+# ==========================================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 *.log
 coverage/
+.nyc_output/
+*.tar.gz
+*.zip
+*.bak
+dump/
+backups/
 
 # Database dumps
 *dump.json
+
+# ==========================================
+# IDEs & System Files
+# ==========================================
 .DS_Store
 Thumbs.db
+ehthumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
