@@ -1,35 +1,39 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
-  Users,
-  FileText,
-  BedDouble,
   Activity,
-  MessageSquare,
-  ArrowRightLeft,
-  ShieldCheck,
+  Users,
+  BedDouble,
   Cpu,
+  ArrowRightLeft,
+  FileText,
+  LogOut,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useAuth } from '../../context/AuthContext';
 
 export const HospitalSidebar: React.FC = () => {
-  const { hospitalFacility } = useAuth();
+  const { hospitalFacility, logout } = useAuth();
+  const navigate = useNavigate();
 
-  const workspaceItems = [
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
+  const navigationItems = [
     { label: 'Overview', to: '/hospital/overview', icon: LayoutDashboard },
-    { label: 'Patients & Results', to: '/hospital/patients', icon: Users },
-    { label: 'Readings & Nomogram', to: '/hospital/readings', icon: Activity },
-    { label: 'Device Fleet & PT Stations', to: '/hospital/phototherapy', icon: BedDouble },
+    { label: 'Patient', to: '/hospital/patient', icon: Users },
+    { label: 'PT Stations', to: '/hospital/phototherapy', icon: BedDouble },
     { label: 'Device Testing', to: '/hospital/device-testing', icon: Cpu },
-  ];
-
-  const integrationItems = [
     { label: 'EHR & Referrals', to: '/hospital/referrals', icon: ArrowRightLeft },
-    { label: 'Hospital Comms', to: '/hospital/chat', icon: MessageSquare },
     { label: 'Reports & Export', to: '/hospital/reports', icon: FileText },
   ];
+
+  const hospitalDisplayName = hospitalFacility
+    ? `${hospitalFacility} Hospital`
+    : 'Hospital';
 
   return (
     <aside className="w-64 bg-white text-slate-700 flex flex-col shrink-0 min-h-screen border-r border-slate-200/90 shadow-xs">
@@ -48,74 +52,42 @@ export const HospitalSidebar: React.FC = () => {
         </div>
       </div>
 
-      {/* Navigation Sections */}
-      <div className="px-3.5 py-4 flex-1 overflow-y-auto space-y-6">
-        <div>
-          <span className="px-3 text-[10px] font-bold text-slate-400 tracking-widest uppercase">
-            {hospitalFacility} Workspace
-          </span>
-          <div className="mt-2 space-y-1">
-            {workspaceItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all',
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-bold border-l-2 border-blue-600 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    )
-                  }
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
-
-        <div>
-          <span className="px-3 text-[10px] font-bold text-slate-400 tracking-widest uppercase">
-            Clinical Systems & Audit
-          </span>
-          <div className="mt-2 space-y-1">
-            {integrationItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all',
-                      isActive
-                        ? 'bg-blue-50 text-blue-700 font-bold border-l-2 border-blue-600 shadow-xs'
-                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                    )
-                  }
-                >
-                  <Icon className="w-4 h-4 shrink-0" />
-                  <span>{item.label}</span>
-                </NavLink>
-              );
-            })}
-          </div>
-        </div>
+      {/* Navigation Items in Requested Exact Order */}
+      <div className="px-3.5 py-4 flex-1 overflow-y-auto space-y-1">
+        {navigationItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all',
+                  isActive
+                    ? 'bg-blue-50 text-blue-700 font-bold border-l-2 border-blue-600 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                )
+              }
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span>{item.label}</span>
+            </NavLink>
+          );
+        })}
       </div>
 
-      {/* Sidebar Footer */}
-      <div className="p-4 border-t border-slate-100 bg-slate-50/60">
-        <div className="flex items-center gap-2 text-emerald-700 text-[11px] font-semibold">
-          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Clinical System Operational</span>
-        </div>
-        <p className="text-[10px] text-slate-400 mt-1 font-mono">
-          Node: {hospitalFacility} Tertiary Care
-        </p>
+      {/* Sidebar Bottom: Hospital Name & Logout Icon */}
+      <div className="p-4 border-t border-slate-100 flex items-center justify-between bg-slate-50/50">
+        <span className="text-xs font-bold text-slate-800 truncate" title={hospitalDisplayName}>
+          {hospitalDisplayName}
+        </span>
+        <button
+          onClick={handleLogout}
+          title="Sign Out"
+          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+        >
+          <LogOut className="w-4 h-4" />
+        </button>
       </div>
     </aside>
   );

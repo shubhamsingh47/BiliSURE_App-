@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import api from '../../services/api';
 import { SuperAdminOverviewData } from '../../types';
+import { TestBalanceButton } from '../../components/common/TestBalanceButton';
 
 export const SuperAdminDashboard: React.FC = () => {
   const [data, setData] = useState<SuperAdminOverviewData | null>(null);
@@ -78,23 +79,21 @@ export const SuperAdminDashboard: React.FC = () => {
   ];
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto">
-      {/* Top Banner Card */}
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-7 text-slate-800 shadow-sm">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+      {/* Top Header: ONLY Heading on left, Percentage Ring on right */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Overview</h1>
+        <TestBalanceButton />
+      </div>
+
+      {/* Facility Filter & Export Bar */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-purple-700 uppercase tracking-widest bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg">
-                District Health Network
-              </span>
-              <span className="text-xs text-slate-500 font-mono">Lucknow Division</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900 mt-2">
-              Central Neonatal Command Hub
-            </h1>
-            <p className="text-xs text-slate-500 mt-1">
-              Consolidated real-time monitoring across PGI, RML, and KGMU hospital centres
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-purple-700 uppercase tracking-widest bg-purple-50 border border-purple-200 px-2.5 py-1 rounded-lg">
+              District Health Network
+            </span>
+            <span className="text-xs text-slate-500 font-mono">Lucknow Division</span>
           </div>
 
           <div className="flex items-center gap-3">
@@ -120,7 +119,7 @@ export const SuperAdminDashboard: React.FC = () => {
         </div>
 
         {/* Tab Switcher */}
-        <div className="mt-6 pt-5 border-t border-slate-100 flex gap-2">
+        <div className="mt-4 pt-4 border-t border-slate-100 flex gap-2">
           <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold border border-slate-200">
             <button
               onClick={() => setActiveTab('total')}

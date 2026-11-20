@@ -1,5 +1,6 @@
 import { HospitalModel, IHospital } from '../../models/Hospital';
 import { PTStationModel, IPTStation, PTStationStatus, PTStationType } from '../../models/PTStation';
+import { BabyModel } from '../../models/Baby';
 import { isMongoConnected } from '../../config/database';
 import { NotFoundError, BadRequestError } from '../../common/errors';
 
@@ -169,7 +170,46 @@ export class HospitalsService {
 
     if (isMongoConnected) {
       try {
-        const list = await PTStationModel.find({ hospitalId }).lean();
+        const query: any = {
+          $or: [
+            { hospitalId },
+            { hospitalId: String(hospitalId) },
+          ],
+        };
+        if (hospitalId.startsWith('hosp_')) {
+          const facCode = hospitalId.replace('hosp_', '').toUpperCase();
+          query.$or.push({ hospitalName: facCode });
+        }
+        let list = await PTStationModel.find(query).lean();
+
+        // Cross-check with any active babies in this facility with status 'under_treatment'
+        const activeBabies = await BabyModel.find({
+          status: 'under_treatment',
+          currentStationId: { $exists: true, $ne: null },
+        }).lean();
+
+        if (activeBabies.length > 0 && list.length > 0) {
+          list = list.map((st: any) => {
+            const matchingBaby = activeBabies.find(
+              (b: any) =>
+                b.currentStationId === st.stationId ||
+                b.currentStationId === st.name ||
+                (st.currentBabyUhid && b.uhid === st.currentBabyUhid)
+            );
+            if (matchingBaby) {
+              return {
+                ...st,
+                operationalStatus: 'occupied',
+                currentBabyId: matchingBaby._id,
+                currentBabyName: matchingBaby.parentsName || matchingBaby.name,
+                currentBabyUhid: matchingBaby.uhid,
+                allocatedAt: st.allocatedAt || matchingBaby.updatedAt || new Date(),
+              };
+            }
+            return st;
+          });
+        }
+
         if (list.length > 0) return naturalSort(list as any);
       } catch { }
     }
@@ -226,7 +266,56 @@ export class HospitalsService {
     status: PTStationStatus,
     meta?: { babyId?: string; babyName?: string; babyUhid?: string; notes?: string }
   ) {
-    const station = memoryStations.find((s) => String((s as any)._id) === String(stationId) || s.stationId === stationId);
+    const norm = String(stationId).trim();
+    let station = memoryStations.find(
+      (s) =>
+        String((s as any)._id) === norm ||
+        s.stationId?.toUpperCase() === norm.toUpperCase() ||
+        s.name?.toUpperCase() === norm.toUpperCase()
+    );
+
+    if (isMongoConnected) {
+      try {
+        const query: any = {
+          $or: [
+            { stationId: norm.toUpperCase() },
+            { stationId: norm },
+            { name: norm.toUpperCase() },
+          ],
+        };
+        if (norm.match(/^[0-9a-fA-F]{24}$/)) {
+          query.$or.push({ _id: norm });
+        }
+        const mongoStation = await PTStationModel.findOne(query);
+        if (mongoStation) {
+          mongoStation.operationalStatus = status;
+          mongoStation.lastUpdated = new Date();
+          if (status === 'occupied') {
+            mongoStation.currentBabyId = meta?.babyId || mongoStation.currentBabyId;
+            mongoStation.currentBabyName = meta?.babyName || mongoStation.currentBabyName;
+            mongoStation.currentBabyUhid = meta?.babyUhid || mongoStation.currentBabyUhid;
+            mongoStation.allocatedAt = new Date();
+          } else if (status === 'cleaning_prep' || status === 'available') {
+            mongoStation.currentBabyId = null;
+            mongoStation.currentBabyName = null;
+            mongoStation.currentBabyUhid = null;
+            mongoStation.allocatedAt = null;
+            if (status === 'available') mongoStation.lastCleanedAt = new Date();
+          }
+          if (meta?.notes !== undefined) mongoStation.notes = meta.notes;
+          await mongoStation.save();
+
+          if (station) {
+            Object.assign(station, mongoStation.toObject());
+          }
+          await this.refreshCapacity(String(mongoStation.hospitalId));
+          return mongoStation.toObject();
+        }
+      } catch (e) {
+        console.error('Error updating station status in mongo:', e);
+      }
+    }
+
     if (!station) throw new NotFoundError('PT Station not found');
 
     // Rule: Double allocation prevention!
@@ -249,28 +338,16 @@ export class HospitalsService {
       station.currentBabyName = meta?.babyName || station.currentBabyName;
       station.currentBabyUhid = meta?.babyUhid || station.currentBabyUhid;
       station.allocatedAt = new Date();
-    } else if (status === 'cleaning_prep') {
-      // Releasing station after patient discharge
+    } else if (status === 'cleaning_prep' || status === 'available') {
       station.currentBabyId = null;
       station.currentBabyName = null;
       station.currentBabyUhid = null;
       station.allocatedAt = null;
-    } else if (status === 'available') {
-      station.currentBabyId = null;
-      station.currentBabyName = null;
-      station.currentBabyUhid = null;
-      station.allocatedAt = null;
-      station.lastCleanedAt = new Date();
+      if (status === 'available') station.lastCleanedAt = new Date();
     }
 
     if (meta?.notes !== undefined) {
       station.notes = meta.notes;
-    }
-
-    if (isMongoConnected) {
-      try {
-        await PTStationModel.findByIdAndUpdate(station._id, station);
-      } catch { }
     }
 
     await this.refreshCapacity(String(station.hospitalId));

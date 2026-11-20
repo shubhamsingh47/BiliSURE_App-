@@ -1,5 +1,5 @@
 import React from 'react';
-import { LogOut, Building2, User, ShieldCheck, HeartPulse } from 'lucide-react';
+import { LogOut, Building2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { TestBalanceButton } from '../common/TestBalanceButton';
@@ -29,10 +29,6 @@ export const HospitalHeader: React.FC = () => {
         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs font-bold shadow-xs">
           <Building2 className="w-3.5 h-3.5 text-blue-600" />
           <span>{hospitalLabel}</span>
-        </div>
-        <div className="hidden lg:flex items-center gap-2 text-[11px] text-slate-500 font-medium pl-2 border-l border-slate-200">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span>Live Clinical Telemetry Active</span>
         </div>
       </div>
 

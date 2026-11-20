@@ -61,6 +61,7 @@ export interface BilirubinReading {
   babyId?: string;
   babyUhid: string;
   babyName?: string;
+  motherName?: string;
   department?: string;
   value: number;
   valueMgDl: number;

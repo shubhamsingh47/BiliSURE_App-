@@ -18,6 +18,7 @@ import {
 import clsx from 'clsx';
 import api from '../../services/api';
 import { DeviceItem, DeviceHealthSummary, DeviceDiagnosticRecord } from '../../types';
+import { TestBalanceButton } from '../../components/common/TestBalanceButton';
 
 export const SuperAdminDeviceTestingPage: React.FC = () => {
   const [facilityFilter, setFacilityFilter] = useState<'All' | 'PGI' | 'RML' | 'KGMU'>('All');
@@ -109,62 +110,34 @@ export const SuperAdminDeviceTestingPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-16">
-      {/* Top Banner Card */}
-      <div className="bg-[#121c2d] border border-[#1e2f47] rounded-3xl p-7 text-white shadow-md">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-purple-400 uppercase tracking-widest bg-purple-500/10 border border-purple-500/30 px-2.5 py-1 rounded-lg">
-                District Device Fleet Oversight
-              </span>
-              <span className="text-xs text-slate-400 font-mono">Lucknow Division</span>
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
-              Device Testing & Diagnostics Command
-            </h1>
-            <p className="text-xs text-slate-400 mt-1">
-              Consolidated optical spectrophotometer fleet telemetry across{' '}
-              <span className="text-white font-semibold">PGI</span>,{' '}
-              <span className="text-white font-semibold">RML</span>, and{' '}
-              <span className="text-white font-semibold">KGMU</span> hospital centres.
-            </p>
-          </div>
+      {/* Page Header: ONLY Heading on left, Percentage Ring on right */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Device Testing</h1>
+        <TestBalanceButton />
+      </div>
 
-          <div className="flex items-center gap-3">
+      {/* Hospital Filter Tabs */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-3">
+        <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-bold border border-slate-200 gap-1">
+          {(['All', 'PGI', 'RML', 'KGMU'] as const).map((fac) => (
             <button
-              onClick={fetchData}
-              disabled={loading}
-              className="px-3.5 py-2 bg-[#1a2942] hover:bg-[#253a5c] border border-[#2a3f61] rounded-xl text-xs font-bold text-white transition inline-flex items-center gap-1.5"
+              key={fac}
+              onClick={() => setFacilityFilter(fac)}
+              className={clsx(
+                'px-4 py-1.5 rounded-lg transition font-bold text-xs',
+                facilityFilter === fac
+                  ? 'bg-purple-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              )}
             >
-              <RotateCw className={clsx('w-3.5 h-3.5', loading && 'animate-spin')} />
-              <span>Refresh Fleet</span>
+              {fac === 'All' ? 'All Hospitals' : `${fac} Hospital`}
             </button>
-          </div>
+          ))}
         </div>
 
-        {/* Hospital Filter Tabs */}
-        <div className="mt-6 pt-5 border-t border-[#1e2f47] flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex rounded-xl bg-[#09111c] p-1 text-xs font-bold border border-[#1e2f47] gap-1">
-            {(['All', 'PGI', 'RML', 'KGMU'] as const).map((fac) => (
-              <button
-                key={fac}
-                onClick={() => setFacilityFilter(fac)}
-                className={clsx(
-                  'px-4 py-1.5 rounded-lg transition font-bold text-xs',
-                  facilityFilter === fac
-                    ? 'bg-purple-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                )}
-              >
-                {fac === 'All' ? 'All Hospitals (Consolidated)' : `${fac} Hospital`}
-              </button>
-            ))}
-          </div>
-
-          <span className="text-[11px] text-slate-400 font-mono">
-            Scope: {facilityFilter === 'All' ? 'PGI + RML + KGMU' : `${facilityFilter} Node Only`}
-          </span>
-        </div>
+        <span className="text-[11px] text-slate-500 font-mono">
+          Scope: {facilityFilter === 'All' ? 'PGI + RML + KGMU' : `${facilityFilter} Node Only`}
+        </span>
       </div>
 
       {/* Fleet KPI Summary Cards */}
@@ -291,7 +264,16 @@ export const SuperAdminDeviceTestingPage: React.FC = () => {
                         {d.facility}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-bold text-purple-700 group-hover:underline">{d.serialNumber}</td>
+                    <td className="py-3.5 px-4 font-bold text-purple-700 group-hover:underline">
+                      {d.facility}{' '}
+                      {d.serialNumber.includes('-101') || d.serialNumber.includes('-201') || d.serialNumber.includes('-301')
+                        ? 'D1'
+                        : d.serialNumber.includes('-102') || d.serialNumber.includes('-202') || d.serialNumber.includes('-302')
+                        ? 'D2'
+                        : d.serialNumber.includes('-103') || d.serialNumber.includes('-203') || d.serialNumber.includes('-303')
+                        ? 'D3'
+                        : 'D1'}
+                    </td>
                     <td className="py-3.5 px-4 font-sans text-slate-600">{d.deviceModel}</td>
                     <td className="py-3.5 px-4 font-sans text-slate-600">{d.assignedWard || d.department}</td>
                     <td className="py-3.5 px-4 font-sans">{getStatusBadge(d.lastDiagnosticStatus || d.status)}</td>
@@ -363,7 +345,14 @@ export const SuperAdminDeviceTestingPage: React.FC = () => {
                       })}
                     </td>
                     <td className="py-3.5 px-4 font-bold text-slate-900 font-sans">{rec.facility}</td>
-                    <td className="py-3.5 px-4 font-bold text-purple-700">{rec.deviceSerial}</td>
+                    <td className="py-3.5 px-4 font-bold text-purple-700">
+                      {rec.facility}{' '}
+                      {rec.deviceSerial.includes('-101') || rec.deviceSerial.includes('-201') || rec.deviceSerial.includes('-301')
+                        ? 'D1'
+                        : rec.deviceSerial.includes('-102') || rec.deviceSerial.includes('-202') || rec.deviceSerial.includes('-302')
+                        ? 'D2'
+                        : 'D3'}
+                    </td>
                     <td className="py-3.5 px-4 font-sans text-slate-500">{rec.department}</td>
                     <td className="py-3.5 px-4 font-bold text-slate-900">{rec.overallScore} / 100</td>
                     <td className="py-3.5 px-4 font-sans">{getStatusBadge(rec.healthStatus)}</td>
@@ -527,20 +516,7 @@ export const SuperAdminDeviceTestingPage: React.FC = () => {
               {getStatusBadge(selectedScanReport.healthStatus)}
             </div>
 
-            {/* Recommendation */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-800">
-              <span className="font-bold block text-slate-900 mb-1">Recommendation:</span>
-              {selectedScanReport.recommendation}
-              {selectedScanReport.issues && selectedScanReport.issues.length > 0 && (
-                <ul className="mt-2 list-disc list-inside text-rose-700 font-mono text-[11px]">
-                  {selectedScanReport.issues.map((iss, idx) => (
-                    <li key={idx}>{iss}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Checks list */}
+            {/* Checks list (Pure diagnostic checks, recommendation removed) */}
             <div className="space-y-2">
               <span className="text-xs font-bold text-slate-900 uppercase tracking-wide">
                 Sensor Checks ({selectedScanReport.checks?.length || 0})

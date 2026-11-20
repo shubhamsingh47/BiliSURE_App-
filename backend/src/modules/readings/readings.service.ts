@@ -72,7 +72,7 @@ export class ReadingsService {
     // Enrich with baby details (name, gestational age, department)
     const babyUhids = Array.from(new Set(items.map((r: any) => r.babyUhid).filter(Boolean)));
     const babies = await BabyModel.find({ uhid: { $in: babyUhids } })
-      .select('uhid name dateOfBirth gestationalAgeWeeks department severityState facility')
+      .select('uhid name parentsName dateOfBirth gestationalAgeWeeks department severityState facility')
       .lean();
     const babyMap = new Map<string, any>();
     babies.forEach((b: any) => babyMap.set(b.uhid, b));
@@ -82,6 +82,8 @@ export class ReadingsService {
       return {
         ...r,
         babyName: baby?.name || r.babyUhid,
+        motherName: baby?.parentsName || '—',
+        parentsName: baby?.parentsName || '—',
         department: baby?.department || 'NICU',
         gestationalAgeWeeks: baby?.gestationalAgeWeeks || 38,
         babyFacility: baby?.facility || 'Hospital',

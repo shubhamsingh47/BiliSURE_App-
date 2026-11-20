@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Cpu,
   CheckCircle2,
   AlertTriangle,
   Wrench,
-  RotateCw,
-  Sliders,
-  Calendar,
-  Sparkles,
   Activity,
   FileText,
-  Clock,
   Eye,
   X,
-  Check,
+  ShieldCheck,
 } from 'lucide-react';
 import clsx from 'clsx';
 import api from '../../services/api';
@@ -24,9 +18,35 @@ import {
   DeviceDiagnosticRecord,
   DiagnosticCheckItem,
 } from '../../types';
+import { TestBalanceButton } from '../../components/common/TestBalanceButton';
+
+// Consistently map device serial or item to (Hospital) D1, D2, D3
+export const getCleanDeviceName = (
+  device: { serialNumber?: string } | string,
+  facilityName: string,
+  index?: number
+): string => {
+  const serial = typeof device === 'string' ? device : device?.serialNumber || '';
+  const fac = facilityName || 'Hospital';
+
+  if (serial.includes('-101') || serial.includes('-201') || serial.includes('-301')) {
+    return `${fac} D1`;
+  }
+  if (serial.includes('-102') || serial.includes('-202') || serial.includes('-302')) {
+    return `${fac} D2`;
+  }
+  if (serial.includes('-103') || serial.includes('-203') || serial.includes('-303')) {
+    return `${fac} D3`;
+  }
+  if (index !== undefined) {
+    return `${fac} D${index + 1}`;
+  }
+  return `${fac} Unit`;
+};
 
 export const DeviceTestingPage: React.FC = () => {
   const { hospitalFacility } = useAuth();
+  const facility = hospitalFacility || 'Hospital';
 
   const [devices, setDevices] = useState<DeviceItem[]>([]);
   const [summary, setSummary] = useState<DeviceHealthSummary | null>(null);
@@ -40,9 +60,6 @@ export const DeviceTestingPage: React.FC = () => {
   const [scanStageIndex, setScanStageIndex] = useState<number>(0);
   const [currentResult, setCurrentResult] = useState<DeviceDiagnosticRecord | null>(null);
 
-  // Simulation mode
-  const [selectedScenario, setSelectedScenario] = useState<string>('auto');
-
   // Filter history by device
   const [historyFilterSerial, setHistoryFilterSerial] = useState<string>('all');
 
@@ -51,11 +68,11 @@ export const DeviceTestingPage: React.FC = () => {
 
   const scanStages = [
     { title: 'Optical Sensor Initialization', detail: 'Calibrating baseline photodiodes and dual-LED drivers...' },
-    { title: 'Inspecting Dual-Wavelength Optical Emitters', detail: 'Testing 460nm and 550nm spectral luminance balance...' },
-    { title: 'Photodiode Signal-to-Noise Ratio (SNR)', detail: 'Measuring analog frontend response & dark-noise voltage...' },
-    { title: 'Evaluating Spectrophotometer Linearity', detail: 'Running multi-point reflectance curve validation...' },
-    { title: 'Reference Tile Calibration Verification', detail: 'Checking white ceramic calibration standard tolerances...' },
-    { title: 'Finalizing Health Telemetry Report', detail: 'Synthesizing hardware diagnostic metrics and saving to DB...' },
+    { title: 'Dual-Wavelength Spectral Luminance', detail: 'Testing 460nm and 550nm spectral luminance balance...' },
+    { title: 'Signal-to-Noise Ratio (SNR) Analysis', detail: 'Measuring analog frontend response & dark-noise voltage...' },
+    { title: 'Spectrophotometer Linearity Verification', detail: 'Running multi-point reflectance curve validation...' },
+    { title: 'Reference Tile Calibration Inspection', detail: 'Checking white ceramic calibration standard tolerances...' },
+    { title: 'Telemetry Synthesis & Report Generation', detail: 'Compiling hardware diagnostic telemetry and saving...' },
   ];
 
   const fetchData = async () => {
@@ -64,19 +81,18 @@ export const DeviceTestingPage: React.FC = () => {
       const [devicesRes, summaryRes, historyRes] = await Promise.all([
         api.get('/device-testing/devices'),
         api.get('/device-testing/summary'),
-        api.get('/device-testing/history', { params: { limit: 25 } }),
+        api.get('/device-testing/history', { params: { limit: 30 } }),
       ]);
 
       const devs: DeviceItem[] = devicesRes.data.data || [];
+      devs.sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
       setDevices(devs);
       setSummary(summaryRes.data.data || null);
       setHistory(historyRes.data.records || []);
 
-      // Pre-select first device if none selected
       if (!selectedDevice && devs.length > 0) {
         setSelectedDevice(devs[0]);
       } else if (selectedDevice) {
-        // update selected device with fresh data
         const updated = devs.find((d) => d.serialNumber === selectedDevice.serialNumber);
         if (updated) setSelectedDevice(updated);
       }
@@ -111,17 +127,14 @@ export const DeviceTestingPage: React.FC = () => {
         setScanStageIndex(stage);
         return next;
       });
-    }, 450);
+    }, 400);
 
     try {
-      const scenarioParam = selectedScenario === 'auto' ? undefined : selectedScenario;
       const res = await api.post('/device-testing/scan', {
         deviceSerial: selectedDevice.serialNumber,
         department: selectedDevice.assignedWard || 'NICU',
-        requestedScenario: scenarioParam,
       });
 
-      // Wait for progress animation to complete
       setTimeout(() => {
         clearInterval(interval);
         setScanProgress(100);
@@ -129,9 +142,9 @@ export const DeviceTestingPage: React.FC = () => {
         setTimeout(() => {
           setIsScanning(false);
           setCurrentResult(res.data.data);
-          fetchData(); // refresh devices and history from DB
-        }, 600);
-      }, 3000);
+          fetchData();
+        }, 500);
+      }, 2400);
     } catch (err) {
       clearInterval(interval);
       setIsScanning(false);
@@ -144,26 +157,26 @@ export const DeviceTestingPage: React.FC = () => {
       case 'healthy':
       case 'calibrated':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            Device Healthy
+            Healthy
           </span>
         );
       case 'issue_detected':
       case 'alert_broken':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
             <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            Issue Detected
+            Issue
           </span>
         );
       case 'calibration_required':
       case 'maintenance':
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <Wrench className="w-3.5 h-3.5 text-amber-600" />
-            Calibration Required
+            Calibration Due
           </span>
         );
     }
@@ -176,424 +189,192 @@ export const DeviceTestingPage: React.FC = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-bold text-blue-600 uppercase tracking-widest">
-            <Cpu className="w-4 h-4 text-blue-600" />
-            Biomedical Engineering Suite
-          </div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight mt-1">
-            Device Testing & Diagnostics
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Real-time telemetry, spectrophotometer calibration verification, and optical sensor health for{' '}
-            <span className="text-slate-800 font-semibold">{hospitalFacility}</span>.
-          </p>
-        </div>
-
-        <button
-          onClick={fetchData}
-          disabled={loading || isScanning}
-          className="inline-flex items-center gap-2 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-semibold transition border border-slate-200 shadow-sm"
-        >
-          <RotateCw className={clsx('w-3.5 h-3.5 text-blue-600', loading && 'animate-spin')} />
-          Refresh Fleet Status
-        </button>
+      {/* Page Header: ONLY Heading on left, Percentage Ring on right */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-900">Device Testing</h1>
+        <TestBalanceButton />
       </div>
 
-      {/* Fleet KPI Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-slate-500">Total Assigned Fleet</span>
-            <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-              <Cpu className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-slate-900">
-              {summary?.totalDevices ?? devices.length}
-            </span>
-            <span className="text-xs text-slate-500">Units in {hospitalFacility}</span>
-          </div>
-          <div className="mt-2 text-[11px] text-slate-400">
-            All devices tracked in MongoDB
-          </div>
-        </div>
-
-        <div className="bg-white border border-emerald-200 bg-emerald-50/20 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-emerald-800">Optimal & Healthy</span>
-            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
-              <CheckCircle2 className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-emerald-700">
+      {/* KPI Overview Summary Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500">Healthy Devices</span>
+            <div className="text-2xl font-extrabold text-emerald-600 mt-1">
               {summary?.healthy ?? 0}
-            </span>
-            <span className="text-xs text-emerald-700/80">
-              {summary?.totalDevices
-                ? `${Math.round(((summary.healthy || 0) / summary.totalDevices) * 100)}% of fleet`
-                : ''}
-            </span>
-          </div>
-          <div className="mt-2 text-[11px] text-emerald-600">
-            Approved for clinical neonatal use
-          </div>
-        </div>
-
-        <div className="bg-white border border-rose-200 bg-rose-50/20 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-rose-800">Attention / Issues</span>
-            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-rose-700">
-              {summary?.issues ?? 0}
-            </span>
-            <span className="text-xs text-rose-600">Requires inspection</span>
-          </div>
-          <div className="mt-2 text-[11px] text-rose-600">
-            Optical or sensor alerts flagged
-          </div>
-        </div>
-
-        <div className="bg-white border border-amber-200 bg-amber-50/20 rounded-2xl p-5 shadow-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold text-amber-800">Calibration Required</span>
-            <div className="p-2 bg-amber-100 text-amber-700 rounded-xl">
-              <Wrench className="w-4 h-4" />
-            </div>
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl font-extrabold text-amber-700">
-              {summary?.calibrationRequired ?? 0}
-            </span>
-            <span className="text-xs text-amber-600">Due or drift exceeded</span>
-          </div>
-          <div className="mt-2 text-[11px] text-amber-600">
-            Dock on reference standard tile
-          </div>
-        </div>
-      </div>
-
-      {/* Main Workbench: Device Selector & Scan Control */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column: Device Selector & Metadata */}
-        <div className="lg:col-span-1 space-y-4">
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm">
-            <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase flex items-center gap-2">
-              <Sliders className="w-4 h-4 text-blue-600" />
-              Select Device to Test
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Choose an active unit assigned to {hospitalFacility}.
-            </p>
-
-            <div className="mt-4 space-y-2">
-              {devices.map((dev) => {
-                const isSelected = selectedDevice?.serialNumber === dev.serialNumber;
-                return (
-                  <button
-                    key={dev.serialNumber}
-                    onClick={() => {
-                      setSelectedDevice(dev);
-                      setCurrentResult(null);
-                    }}
-                    className={clsx(
-                      'w-full text-left p-3.5 rounded-xl border transition-all flex flex-col gap-2',
-                      isSelected
-                        ? 'bg-blue-50 border-blue-500 shadow-sm ring-1 ring-blue-500/30'
-                        : 'bg-white border-slate-200 hover:bg-slate-50'
-                    )}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-mono font-bold text-slate-900">
-                        {dev.serialNumber}
-                      </span>
-                      {getStatusBadge(dev.lastDiagnosticStatus || dev.status)}
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>{dev.deviceModel}</span>
-                      <span className="font-medium text-slate-700">{dev.assignedWard || dev.department}</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Selected Device Calibration & Hardware Details */}
-          {selectedDevice && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-5 space-y-3 shadow-sm">
-              <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5 text-blue-600" />
-                Calibration & Life Tracker
-              </h3>
-
-              <div className="space-y-2.5 text-xs pt-1">
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Last Calibrated:</span>
-                  <span className="font-semibold text-slate-800">
-                    {selectedDevice.lastCalibratedAt
-                      ? new Date(selectedDevice.lastCalibratedAt).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : 'Not recorded'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Next Calibration Due:</span>
-                  <span className={clsx('font-semibold', selectedDevice.lastDiagnosticStatus === 'calibration_required' ? 'text-amber-600 font-bold' : 'text-slate-800')}>
-                    {selectedDevice.nextCalibrationDue
-                      ? new Date(selectedDevice.nextCalibrationDue).toLocaleDateString('en-IN', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                        })
-                      : 'In 60 days'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center py-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Firmware Build:</span>
-                  <span className="font-mono text-slate-700 font-medium">
-                    {selectedDevice.firmwareVersion || 'v2.4.2-clinical'}
-                  </span>
-                </div>
-
-                <div className="flex justify-between items-center py-1.5">
-                  <span className="text-slate-500">Sensor Tests Remaining:</span>
-                  <span className="font-mono font-bold text-blue-600">
-                    {selectedDevice.remainingTests?.toLocaleString() || '7,500'} / {selectedDevice.totalTests?.toLocaleString() || '14,000'}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Right Column: Live Testing Panel & Scanner */}
-        <div className="lg:col-span-2 space-y-5">
-          {/* Diagnostic Action Card */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-6 relative overflow-hidden shadow-sm">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <span className="text-xs font-bold text-blue-600 uppercase tracking-widest flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-                  Automated Multi-Stage Test
-                </span>
-                <h3 className="text-lg font-bold text-slate-900 mt-1">
-                  Run Diagnostic Scan on {selectedDevice?.serialNumber || 'Unit'}
-                </h3>
-                <p className="text-xs text-slate-500 mt-1 max-w-lg">
-                  Executes automated test protocols verifying dual-wavelength optics, photodiode SNR, dark noise current, and reflectance calibration tolerances.
-                </p>
-              </div>
-
-              {/* Simulation Mode selector */}
-              <div className="flex flex-col gap-1.5 shrink-0">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Simulation Protocol
-                </label>
-                <select
-                  value={selectedScenario}
-                  onChange={(e: any) => setSelectedScenario(e.target.value)}
-                  disabled={isScanning}
-                  className="bg-white border border-slate-200 text-xs text-slate-700 rounded-xl px-3 py-2 font-medium focus:outline-none focus:border-blue-500 shadow-sm"
-                >
-                  <option value="auto">Auto (Evaluate Device State)</option>
-                  <option value="healthy">Scenario 1: Healthy (Pass All)</option>
-                  <option value="issue_detected">Scenario 2: Optical Issue Detected</option>
-                  <option value="calibration_required">Scenario 3: Calibration Drift Due</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="mt-6 flex items-center gap-4">
-              <button
-                onClick={handleStartScan}
-                disabled={!selectedDevice || isScanning}
-                className={clsx(
-                  'px-6 py-3 rounded-xl font-bold text-xs tracking-wider uppercase transition-all shadow-md flex items-center gap-2.5',
-                  isScanning
-                    ? 'bg-blue-400 text-white cursor-not-allowed'
-                    : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-95'
-                )}
-              >
-                <Activity className={clsx('w-4 h-4', isScanning && 'animate-spin')} />
-                {isScanning ? 'Executing Diagnostic Cycle...' : 'Scan Device Now'}
-              </button>
-
-              <span className="text-[11px] text-slate-500 font-mono">
-                {selectedDevice ? `Target: ${selectedDevice.serialNumber} (${selectedDevice.assignedWard})` : 'Select a device'}
+              <span className="text-xs font-normal text-slate-400 ml-1.5">
+                of {summary?.totalDevices ?? devices.length} units
               </span>
             </div>
-
-            {/* Live Animated Scanning Radar / Progress Box */}
-            {isScanning && (
-              <div className="mt-6 bg-blue-50/70 border border-blue-200 rounded-xl p-5 relative overflow-hidden animate-fade-in">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-bold text-blue-700">
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-ping" />
-                    Stage {scanStageIndex + 1} of {scanStages.length}: {scanStages[scanStageIndex].title}
-                  </div>
-                  <span className="text-xs font-mono font-bold text-blue-700">{scanProgress}%</span>
-                </div>
-
-                {/* Progress bar */}
-                <div className="w-full bg-slate-200 rounded-full h-2 mt-3 overflow-hidden">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${scanProgress}%` }}
-                  />
-                </div>
-
-                <p className="text-[11px] text-slate-600 font-mono mt-2.5">
-                  {scanStages[scanStageIndex].detail}
-                </p>
-              </div>
-            )}
           </div>
+          <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+            <CheckCircle2 className="w-5 h-5" />
+          </div>
+        </div>
 
-          {/* Diagnostic Result Card */}
-          {currentResult && (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-5 animate-fade-in shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b border-slate-100 gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-                    <FileText className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono text-slate-500">
-                        {currentResult.diagnosticId}
-                      </span>
-                      <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-mono">
-                        Just Now
-                      </span>
-                    </div>
-                    <h4 className="text-base font-bold text-slate-900 mt-0.5">
-                      Diagnostic Report: {currentResult.deviceSerial}
-                    </h4>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="text-[10px] uppercase font-bold text-slate-400">Health Score</div>
-                    <div className="text-xl font-extrabold text-slate-900">
-                      {currentResult.overallScore}<span className="text-xs text-slate-400">/100</span>
-                    </div>
-                  </div>
-                  {getStatusBadge(currentResult.healthStatus)}
-                </div>
-              </div>
-
-              {/* Clinical Recommendation Alert Box */}
-              <div
-                className={clsx(
-                  'p-4 rounded-xl border text-xs',
-                  currentResult.healthStatus === 'healthy'
-                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                    : currentResult.healthStatus === 'issue_detected'
-                    ? 'bg-rose-50 border-rose-200 text-rose-800'
-                    : 'bg-amber-50 border-amber-200 text-amber-800'
-                )}
-              >
-                <div className="font-bold flex items-center gap-1.5 mb-1">
-                  {currentResult.healthStatus === 'healthy' ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  ) : currentResult.healthStatus === 'issue_detected' ? (
-                    <AlertTriangle className="w-4 h-4 text-rose-600" />
-                  ) : (
-                    <Wrench className="w-4 h-4 text-amber-600" />
-                  )}
-                  Clinical Recommendation
-                </div>
-                <p className="leading-relaxed opacity-90">{currentResult.recommendation}</p>
-                {currentResult.issues && currentResult.issues.length > 0 && (
-                  <ul className="mt-2 list-disc list-inside space-y-1 font-mono text-[11px] opacity-95">
-                    {currentResult.issues.map((iss, idx) => (
-                      <li key={idx}>{iss}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-
-              {/* Diagnostic Check Matrix */}
-              <div>
-                <h5 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">
-                  Telemetry & Calibration Sensor Verification
-                </h5>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {currentResult.checks.map((chk: DiagnosticCheckItem, i: number) => (
-                    <div
-                      key={i}
-                      className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-slate-800">{chk.name}</span>
-                        <span
-                          className={clsx(
-                            'text-[10px] font-bold px-2 py-0.5 rounded uppercase',
-                            chk.status === 'passed'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : chk.status === 'warning'
-                              ? 'bg-amber-100 text-amber-700'
-                              : 'bg-rose-100 text-rose-700'
-                          )}
-                        >
-                          {chk.status}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-500">{chk.message}</p>
-                      {chk.measuredValue && (
-                        <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 pt-1 border-t border-slate-200">
-                          <span>Measured: <span className="text-slate-800 font-semibold">{chk.measuredValue}</span></span>
-                          {chk.referenceThreshold && <span>Ref: {chk.referenceThreshold}</span>}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500">Issues Flagged</span>
+            <div className="text-2xl font-extrabold text-rose-600 mt-1">
+              {summary?.issues ?? 0}
             </div>
-          )}
+          </div>
+          <div className="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <span className="text-xs font-semibold text-slate-500">Calibration Required</span>
+            <div className="text-2xl font-extrabold text-amber-600 mt-1">
+              {summary?.calibrationRequired ?? 0}
+            </div>
+          </div>
+          <div className="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+            <Wrench className="w-5 h-5" />
+          </div>
         </div>
       </div>
 
-      {/* Diagnostic Scan History Table */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 space-y-4 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* Device Selection & Scan Workbench */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-5 shadow-sm space-y-5">
+        {/* Compact Device Selector Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {devices.map((dev, idx) => {
+            const displayName = getCleanDeviceName(dev, facility, idx);
+            const isSelected = selectedDevice?.serialNumber === dev.serialNumber;
+
+            return (
+              <button
+                key={dev.serialNumber}
+                onClick={() => {
+                  setSelectedDevice(dev);
+                  setCurrentResult(null);
+                }}
+                className={clsx(
+                  'p-3.5 rounded-xl border text-left transition flex items-center justify-between',
+                  isSelected
+                    ? 'bg-blue-50/60 border-blue-500 ring-1 ring-blue-500/20 shadow-xs'
+                    : 'bg-white border-slate-200 hover:bg-slate-50'
+                )}
+              >
+                <div>
+                  <div className="text-sm font-bold text-slate-900">{displayName}</div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    {dev.assignedWard || dev.department || 'NICU'}
+                  </div>
+                </div>
+                <div>{getStatusBadge(dev.lastDiagnosticStatus || dev.status)}</div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Scan Action Bar: Just ONE clean button "Scan Device" */}
+        <div className="pt-4 border-t border-slate-100 flex items-center justify-between">
           <div>
-            <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <Clock className="w-4 h-4 text-blue-600" />
-              Device Testing & Calibration Audit History
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Persistent chronological diagnostic logs retrieved from MongoDB Atlas.
+            <div className="text-sm font-bold text-slate-800">
+              {selectedDevice ? getCleanDeviceName(selectedDevice, facility) : 'Device'} Diagnostics
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">
+              Verify optical sensor balance, dark noise SNR, and white tile calibration tolerance.
+            </div>
+          </div>
+
+          <button
+            onClick={handleStartScan}
+            disabled={!selectedDevice || isScanning}
+            className={clsx(
+              'px-5 py-2.5 rounded-xl font-bold text-xs transition inline-flex items-center gap-2 shadow-sm',
+              isScanning
+                ? 'bg-blue-400 text-white cursor-not-allowed'
+                : 'bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20 active:scale-95'
+            )}
+          >
+            <Activity className={clsx('w-4 h-4', isScanning && 'animate-spin')} />
+            <span>{isScanning ? 'Scanning...' : 'Scan Device'}</span>
+          </button>
+        </div>
+
+        {/* Inline Scan Animation */}
+        {isScanning && (
+          <div className="bg-blue-50/60 border border-blue-200 rounded-xl p-4">
+            <div className="flex items-center justify-between text-xs font-bold text-blue-700">
+              <span className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
+                {scanStages[scanStageIndex].title}
+              </span>
+              <span>{scanProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-1.5 mt-2.5 overflow-hidden">
+              <div
+                className="bg-blue-600 h-1.5 rounded-full transition-all duration-300"
+                style={{ width: `${scanProgress}%` }}
+              />
+            </div>
+            <p className="text-[11px] text-slate-500 mt-2 font-mono">
+              {scanStages[scanStageIndex].detail}
             </p>
+          </div>
+        )}
+
+        {/* Diagnostic Results Matrix */}
+        {currentResult && (
+          <div className="p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-bold text-slate-800">
+                  Diagnostic Result: {getCleanDeviceName(currentResult.deviceSerial, facility)}
+                </span>
+              </div>
+              {getStatusBadge(currentResult.healthStatus)}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+              {currentResult.checks?.map((check: DiagnosticCheckItem) => (
+                <div key={check.name} className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700">{check.name}</span>
+                    <span
+                      className={clsx(
+                        'text-[10px] font-bold uppercase',
+                        check.status === 'passed' ? 'text-emerald-600' : 'text-rose-600'
+                      )}
+                    >
+                      {check.status}
+                    </span>
+                  </div>
+                  <div className="text-xs font-mono font-bold text-slate-900 mt-1">
+                    {check.measuredValue || check.message}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Diagnostics History Ledger */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Diagnostic Scan History</h2>
+            <span className="text-xs text-slate-400">Timestamped sensor audit telemetry</span>
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Filter Unit:</span>
+            <span className="text-xs font-semibold text-slate-500">Filter Device:</span>
             <select
               value={historyFilterSerial}
               onChange={(e) => setHistoryFilterSerial(e.target.value)}
-              className="bg-white border border-slate-200 text-xs text-slate-700 rounded-lg px-2.5 py-1.5 font-medium focus:outline-none shadow-sm"
+              className="bg-slate-50 border border-slate-200 text-xs text-slate-700 rounded-xl px-3 py-1.5 font-medium focus:outline-none"
             >
               <option value="all">All Devices</option>
-              {devices.map((d) => (
-                <option key={d.serialNumber} value={d.serialNumber}>
-                  {d.serialNumber}
+              {devices.map((dev, idx) => (
+                <option key={dev.serialNumber} value={dev.serialNumber}>
+                  {getCleanDeviceName(dev, facility, idx)}
                 </option>
               ))}
             </select>
@@ -601,148 +382,114 @@ export const DeviceTestingPage: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 font-bold uppercase tracking-wider text-[10px]">
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3 px-4">Timestamp</th>
-                <th className="py-3 px-4">Device Serial</th>
-                <th className="py-3 px-4">Ward / Dept</th>
-                <th className="py-3 px-4">Health Status</th>
-                <th className="py-3 px-4">Health Score</th>
-                <th className="py-3 px-4">Engineer / Staff</th>
+                <th className="py-3 px-4">Device</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4">SNR Ratio</th>
+                <th className="py-3 px-4">Spectral Balance</th>
                 <th className="py-3 px-4 text-right">Report</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 font-medium text-slate-700">
+            <tbody className="divide-y divide-slate-100">
               {filteredHistory.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-400">
-                    No diagnostic records found for this selection.
+                  <td colSpan={6} className="py-8 text-center text-slate-400">
+                    No diagnostic records found for selected filter.
                   </td>
                 </tr>
               ) : (
-                filteredHistory.map((rec) => (
-                  <tr
-                    key={rec.diagnosticId}
-                    className="hover:bg-blue-50/60 transition-colors cursor-pointer group"
-                    onClick={() => setInspectRecord(rec)}
-                  >
-                    <td className="py-3.5 px-4 text-slate-600">
-                      {new Date(rec.createdAt).toLocaleDateString('en-IN', {
-                        day: '2-digit',
-                        month: 'short',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900 group-hover:text-blue-600 transition font-mono">
-                      {rec.deviceSerial}
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-600">{rec.department}</td>
-                    <td className="py-3.5 px-4">{getStatusBadge(rec.healthStatus)}</td>
-                    <td className="py-3.5 px-4 font-bold text-slate-900">
-                      {rec.overallScore} / 100
-                    </td>
-                    <td className="py-3.5 px-4 text-slate-500">{rec.scannedBy || 'System'}</td>
-                    <td className="py-3.5 px-4 text-right">
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 group-hover:bg-blue-100 group-hover:text-blue-700 text-slate-600 rounded-lg text-[11px] font-semibold transition">
-                        <Eye className="w-3 h-3" />
-                        Audit
-                      </span>
-                    </td>
-                  </tr>
-                ))
+                filteredHistory.map((rec) => {
+                  const devIndex = devices.findIndex((d) => d.serialNumber === rec.deviceSerial);
+                  const displayDev = getCleanDeviceName(
+                    rec.deviceSerial,
+                    facility,
+                    devIndex >= 0 ? devIndex : undefined
+                  );
+
+                  return (
+                    <tr key={rec._id || rec.diagnosticId} className="hover:bg-slate-50/80 transition">
+                      <td className="py-3 px-4 text-slate-500 font-mono">
+                        {rec.createdAt ? new Date(rec.createdAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-slate-800">
+                        {displayDev}
+                      </td>
+                      <td className="py-3 px-4">{getStatusBadge(rec.healthStatus)}</td>
+                      <td className="py-3 px-4 font-mono text-slate-700">
+                        {rec.overallScore} / 100
+                      </td>
+                      <td className="py-3 px-4 font-mono text-slate-700">
+                        {rec.testDurationMs ? `${rec.testDurationMs}ms` : '320ms'}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button
+                          onClick={() => setInspectRecord(rec)}
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-700"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>View</span>
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Inspect Past Report Modal */}
+      {/* Inspect Modal */}
       {inspectRecord && (
-        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white border border-slate-200 rounded-2xl max-w-2xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-xl border border-slate-200 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div>
-                <span className="text-[10px] font-mono text-slate-400">{inspectRecord.diagnosticId}</span>
                 <h3 className="text-base font-bold text-slate-900">
-                  Historical Diagnostic Audit: {inspectRecord.deviceSerial}
+                  {getCleanDeviceName(inspectRecord.deviceSerial, facility)} Diagnostic Report
                 </h3>
+                <span className="text-xs text-slate-400 font-mono">
+                  {inspectRecord.createdAt ? new Date(inspectRecord.createdAt).toLocaleString() : ''}
+                </span>
               </div>
               <button
                 onClick={() => setInspectRecord(null)}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition"
+                className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="flex items-center justify-between text-xs py-1">
-              <span className="text-slate-500">
-                Conducted on{' '}
-                {new Date(inspectRecord.createdAt).toLocaleString('en-IN', {
-                  day: '2-digit',
-                  month: 'short',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
+            <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
+              <span className="text-xs font-semibold text-slate-600">Overall Diagnostic Verdict:</span>
               {getStatusBadge(inspectRecord.healthStatus)}
             </div>
 
-            {/* Recommendation */}
-            <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-700">
-              <span className="font-bold block text-slate-900 mb-1">Recommendation:</span>
-              {inspectRecord.recommendation}
-            </div>
-
-            {/* Checks list */}
             <div className="space-y-2">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wide">
-                Sensor & Hardware Check Results
-              </span>
-              <div className="space-y-2">
-                {inspectRecord.checks?.map((c, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-200/80 rounded-lg text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-slate-800">{c.name}</div>
-                      <div className="text-[11px] text-slate-500">{c.message}</div>
-                    </div>
-                    <div className="text-right">
-                      <span
-                        className={clsx(
-                          'text-[10px] font-bold px-2 py-0.5 rounded uppercase',
-                          c.status === 'passed'
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : c.status === 'warning'
-                            ? 'bg-amber-100 text-amber-700'
-                            : 'bg-rose-100 text-rose-700'
-                        )}
-                      >
-                        {c.status}
-                      </span>
-                      {c.measuredValue && (
-                        <div className="text-[10px] font-mono text-slate-500 mt-1">
-                          {c.measuredValue}
-                        </div>
-                      )}
+              <div className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                Telemetry Verifications
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {inspectRecord.checks?.map((c: any) => (
+                  <div key={c.name} className="p-2.5 border border-slate-200 rounded-lg bg-white">
+                    <div className="text-[11px] text-slate-500">{c.name}</div>
+                    <div className="text-xs font-bold font-mono text-slate-900 mt-0.5">
+                      {c.measuredValue ?? c.message} ({c.status})
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="pt-2 flex justify-end">
+            <div className="pt-3 border-t border-slate-100 flex justify-end">
               <button
                 onClick={() => setInspectRecord(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition"
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl"
               >
-                Close Audit
+                Close Report
               </button>
             </div>
           </div>

@@ -79,20 +79,21 @@ export const TestBalanceButton: React.FC = () => {
     : hospitalBalance?.remainingTests ?? 0;
 
   // Mini circular SVG parameters
-  const radius = 14;
-  const stroke = 2.5;
+  const radius = 16;
+  const stroke = 3;
   const normalizedRadius = radius - stroke * 2;
   const circumference = normalizedRadius * 2 * Math.PI;
   const strokeDashoffset = circumference - (Math.min(usagePercent, 100) / 100) * circumference;
+  const displayPercent = Math.max(0, Math.round(100 - usagePercent));
 
   return (
     <div className="relative inline-block" ref={popoverRef}>
       {/* Circular Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        title="Hospital Test Quota Balance"
+        title="Test Balance"
         className={clsx(
-          'w-10 h-10 rounded-full flex items-center justify-center transition-all relative border focus:outline-none shadow-xs',
+          'w-11 h-11 rounded-full flex items-center justify-center transition-all relative border focus:outline-none shadow-xs',
           isOpen
             ? 'bg-blue-50 border-blue-500 shadow-sm ring-2 ring-blue-100'
             : 'bg-white border-slate-200/90 hover:border-blue-400 hover:bg-slate-50/80'
@@ -123,8 +124,8 @@ export const TestBalanceButton: React.FC = () => {
         </svg>
 
         {/* Center Indicator */}
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-700 tracking-tight">
-          {isSuperAdmin ? '3' : `${Math.round(100 - usagePercent)}%`}
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-800 tracking-tight">
+          {displayPercent}%
         </span>
       </button>
 

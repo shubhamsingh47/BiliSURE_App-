@@ -5,12 +5,11 @@ import { Login } from './pages/Login';
 import { HospitalLayout } from './components/layout/HospitalLayout';
 import { SuperAdminLayout } from './components/layout/SuperAdminLayout';
 import { OverviewPage } from './pages/hospital/OverviewPage';
-import { PatientsPage } from './pages/hospital/PatientsPage';
-import { ReadingsPage } from './pages/hospital/ReadingsPage';
+import { NomogramPage } from './pages/hospital/NomogramPage';
+import { PatientPage } from './pages/hospital/PatientPage';
 import { PhototherapyPage } from './pages/hospital/PhototherapyPage';
 import { ReferralsPage } from './pages/hospital/ReferralsPage';
 import { ReportsPage } from './pages/hospital/ReportsPage';
-import { ChatPage } from './pages/hospital/ChatPage';
 import { DeviceTestingPage } from './pages/hospital/DeviceTestingPage';
 import { SuperAdminDashboard } from './pages/admin/SuperAdminDashboard';
 import { SuperAdminDeviceTestingPage } from './pages/admin/SuperAdminDeviceTestingPage';
@@ -63,13 +62,17 @@ export const App: React.FC = () => {
           >
             <Route index element={<Navigate to="/hospital/overview" replace />} />
             <Route path="overview" element={<OverviewPage />} />
-            <Route path="patients" element={<PatientsPage />} />
-            <Route path="readings" element={<ReadingsPage />} />
+            <Route path="nomogram" element={<NomogramPage />} />
+            <Route path="patient" element={<PatientPage />} />
             <Route path="phototherapy" element={<PhototherapyPage />} />
             <Route path="device-testing" element={<DeviceTestingPage />} />
             <Route path="referrals" element={<ReferralsPage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="chat" element={<ChatPage />} />
+
+            {/* Backwards-compatible redirects */}
+            <Route path="patients" element={<Navigate to="/hospital/patient" replace />} />
+            <Route path="readings" element={<Navigate to="/hospital/nomogram" replace />} />
+            <Route path="chat" element={<Navigate to="/hospital/referrals" replace />} />
           </Route>
 
           {/* Super Admin Protected Routes */}
