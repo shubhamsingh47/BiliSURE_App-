@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Alert,
   ScrollView,
   BackHandler,
 } from 'react-native';
@@ -33,6 +32,7 @@ import { usePatientStore } from '../../../store/usePatientStore';
 import { Admission, TreatmentSession, BilirubinReading } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 import { getScreenTopPadding, fontScale, moderateScale } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 interface NurseTreatmentTrackerScreenProps {
   onBack?: () => void;
@@ -451,7 +451,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     if (!detailedAdmission) return;
     const num = parseFloat(editAdmissionTsbValue);
     if (isNaN(num) || num <= 0 || num > 40) {
-      Alert.alert('Invalid Value', 'Please enter a valid bilirubin reading between 0.1 and 40.0 mg/dL.');
+      AppAlert.warning('Invalid Value', 'Please enter a valid bilirubin reading between 0.1 and 40.0 mg/dL.');
       return;
     }
     try {
@@ -465,9 +465,9 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
         usePatientStore.getState().updateBaby(matchingBaby.id, { initialValue: num });
       }
       setEditAdmissionTsbModalVisible(false);
-      Alert.alert('Initial Bilirubin Updated', `Initial Bilirubin set to ${num.toFixed(1)} mg/dL.`);
+      AppAlert.success('Initial Bilirubin Updated', `Initial Bilirubin set to ${num.toFixed(1)} mg/dL.`);
     } catch {
-      Alert.alert('Error', 'Failed to update Initial Bilirubin.');
+      AppAlert.error('Error', 'Failed to update Initial Bilirubin.');
     }
   };
 
@@ -546,7 +546,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   const handleSavePtLog = async () => {
     if (!targetAdmissionForLog) return;
     if (ptDurationHours <= 0) {
-      Alert.alert('Invalid Duration', 'Please enter a duration greater than 0.');
+      AppAlert.warning('Invalid Duration', 'Please enter a duration greater than 0.');
       return;
     }
 
@@ -581,7 +581,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
         });
         setLogModalVisible(false);
         setEditingSessionId(null);
-        Alert.alert(
+        AppAlert.success(
           'Session Updated',
           `${ptDurationHours} hrs updated for ${targetAdmissionForLog.babyName} (${formatDateShort(targetDate.toISOString())}, ${pad2(sH)}:${pad2(sM)}–${pad2(eH)}:${pad2(eM)}).`
         );
@@ -594,13 +594,13 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
           nurseName: user.name,
         });
         setLogModalVisible(false);
-        Alert.alert(
+        AppAlert.success(
           'Session Logged',
           `${ptDurationHours} hrs recorded for ${targetAdmissionForLog.babyName} (${formatDateShort(targetDate.toISOString())}, ${pad2(sH)}:${pad2(sM)}–${pad2(eH)}:${pad2(eM)}).`
         );
       }
     } catch {
-      Alert.alert('Error', 'Failed to save phototherapy session');
+      AppAlert.error('Error', 'Failed to save phototherapy session.');
     } finally {
       setIsLoggingPt(false);
     }
@@ -611,7 +611,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     if (!targetAdmissionForBili) return;
     const num = parseFloat(biliValue);
     if (isNaN(num) || num <= 0 || num > 40) {
-      Alert.alert('Invalid Value', 'Please enter a valid bilirubin reading between 0.1 and 40.0 mg/dL.');
+      AppAlert.warning('Invalid Value', 'Please enter a valid bilirubin reading between 0.1 and 40.0 mg/dL.');
       return;
     }
 
@@ -624,7 +624,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
         });
         setBiliModalVisible(false);
         setEditingReadingId(null);
-        Alert.alert(
+        AppAlert.success(
           'Reading Updated',
           `${num.toFixed(1)} mg/dL (${biliMethod}) updated for ${targetAdmissionForBili.babyName}.`
         );
@@ -642,13 +642,13 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
           source: 'clinical_flowsheet',
         });
         setBiliModalVisible(false);
-        Alert.alert(
+        AppAlert.success(
           'Reading Recorded',
           `${num.toFixed(1)} mg/dL (${biliMethod}) recorded for ${targetAdmissionForBili.babyName} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.`
         );
       }
     } catch {
-      Alert.alert('Error', 'Failed to save bilirubin reading');
+      AppAlert.error('Error', 'Failed to save bilirubin reading.');
     } finally {
       setIsLoggingBili(false);
     }
@@ -659,30 +659,26 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     const totalMinutes = (admission.treatmentSessions || []).reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
     const totalHours = (totalMinutes / 60).toFixed(1);
 
-    Alert.alert(
-      'Conclude Phototherapy Treatment',
-      `Complete treatment course for ${admission.babyName} (${admission.babyUhid})?\n\n• Cumulative Exposure: ${totalHours} hrs\n• Station: ${admission.ptStationName || 'Bed'}\n\nThis will release the station back to the sanitization pool. The patient will remain admitted in observation until discharged by the doctor.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: '✓ Conclude & Free Station',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await concludePhototherapy(admission.id || admission.admissionId);
+    AppAlert.confirm({
+      title: 'Conclude Phototherapy Treatment',
+      message: `Complete treatment course for ${admission.babyName} (${admission.babyUhid})?\n\n• Cumulative Exposure: ${totalHours} hrs\n• Station: ${admission.ptStationName || 'Bed'}\n\nThis will release the station back to the sanitization pool. The patient will remain admitted in observation until discharged by the doctor.`,
+      type: 'danger',
+      confirmText: 'Conclude & Free Station',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          await concludePhototherapy(admission.id || admission.admissionId);
 
-              setDetailedAdmission(null);
-              Alert.alert(
-                'Treatment Concluded',
-                `Phototherapy finished. Station released to cleaning pool. Patient is now in observation.`
-              );
-            } catch {
-              Alert.alert('Error', 'Failed to conclude treatment');
-            }
-          },
-        },
-      ]
-    );
+          setDetailedAdmission(null);
+          AppAlert.success(
+            'Treatment Concluded',
+            'Phototherapy finished. Station released to cleaning pool. Patient is now in observation.'
+          );
+        } catch {
+          AppAlert.error('Error', 'Failed to conclude treatment.');
+        }
+      },
+    });
   };
 
   // Pre-calculate flowsheet metrics if detailed admission is active
@@ -2239,15 +2235,20 @@ const styles = StyleSheet.create({
   // Modals Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
+    padding: moderateScale(20),
     maxHeight: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   modalHeaderRow: {
     flexDirection: 'row',

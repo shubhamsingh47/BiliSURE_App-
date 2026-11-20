@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Admission } from '../../../types';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { COLORS } from '../../../theme/colors';
+import { AppAlert } from '../../../components';
 
 interface DischargeApprovalScreenProps {
   admission: Admission;
@@ -40,7 +41,7 @@ export const DischargeApprovalScreen: React.FC<DischargeApprovalScreenProps> = (
   const handleApproveDischarge = async () => {
     const valNum = parseFloat(dischargeVal);
     if (isNaN(valNum) || valNum <= 0) {
-      Alert.alert('Invalid Reading', 'Please enter a valid discharge bilirubin concentration.');
+      AppAlert.warning('Invalid Reading', 'Please enter a valid discharge bilirubin concentration.');
       return;
     }
 
@@ -53,13 +54,14 @@ export const DischargeApprovalScreen: React.FC<DischargeApprovalScreenProps> = (
         followUpPlan,
       });
 
-      Alert.alert(
+      AppAlert.success(
         'Discharge Approved!',
         `Discharge finalized for ${admission.babyName}. PT Station ${admission.ptStationName || ''} has been released to Cleaning & Preparation pool.`,
-        [{ text: 'Done', onPress: onSuccess }]
+        onSuccess,
+        'Done'
       );
     } catch {
-      Alert.alert('Error', 'Failed to approve discharge');
+      AppAlert.error('Error', 'Failed to approve discharge.');
     } finally {
       setIsSubmitting(false);
     }

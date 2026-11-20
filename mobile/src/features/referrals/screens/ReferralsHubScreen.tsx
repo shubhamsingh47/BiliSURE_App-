@@ -7,7 +7,6 @@ import {
   FlatList,
   Modal,
   TextInput,
-  Alert,
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
@@ -18,6 +17,7 @@ import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 interface ReferralsHubScreenProps {
   onOpenNotifications?: () => void;
@@ -89,12 +89,12 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
     try {
       await acceptReferral(referral.referralId, user?.name || `${currentHospital} Attending`);
       await Promise.all([loadNetworkData(), usePatientStore.getState().loadBabies()]);
-      Alert.alert(
+      AppAlert.success(
         'Referral Accepted',
         `Referral for ${referral.babyName} (${referral.babyUhid}) from ${referral.referringCentreName} has been accepted.`
       );
     } catch {
-      Alert.alert('Error', 'Failed to accept referral. Please try again.');
+      AppAlert.error('Error', 'Failed to accept referral. Please try again.');
     } finally {
       setIsActionProcessing(false);
     }
@@ -109,7 +109,7 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
   const handleConfirmReject = async () => {
     if (!selectedReferralForReject) return;
     if (!rejectionReason.trim()) {
-      Alert.alert('Reason Required', 'Please enter a clinical or operational reason for declining this referral.');
+      AppAlert.warning('Reason Required', 'Please enter a clinical or operational reason for declining this referral.');
       return;
     }
 
@@ -124,9 +124,9 @@ export const ReferralsHubScreen: React.FC<ReferralsHubScreenProps> = ({
       setSelectedReferralForReject(null);
       setRejectionReason('');
       await Promise.all([loadNetworkData(), usePatientStore.getState().loadBabies()]);
-      Alert.alert('Referral Declined', 'The referring centre has been notified with the recorded reason.');
+      AppAlert.success('Referral Declined', 'The referring centre has been notified with the recorded reason.');
     } catch {
-      Alert.alert('Error', 'Failed to decline referral. Please try again.');
+      AppAlert.error('Error', 'Failed to decline referral. Please try again.');
     } finally {
       setIsActionProcessing(false);
     }
@@ -1203,61 +1203,68 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   modalBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: moderateScale(22),
+    padding: moderateScale(22),
     width: '100%',
-    maxWidth: 400,
+    maxWidth: moderateScale(340),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 10,
   },
   modalTitle: {
-    fontSize: fontScale(16),
-    fontWeight: '700',
+    fontSize: fontScale(17),
+    fontWeight: '800',
     color: '#0F172A',
   },
   modalSubtitle: {
     fontSize: fontScale(12),
     color: '#64748B',
-    marginTop: 4,
-    marginBottom: 14,
+    marginTop: moderateScale(4),
+    marginBottom: moderateScale(14),
     lineHeight: 18,
   },
   modalInput: {
     borderWidth: 1,
     borderColor: '#CBD5E1',
-    borderRadius: 8,
-    padding: 10,
-    fontSize: fontScale(12),
+    borderRadius: moderateScale(12),
+    padding: moderateScale(10),
+    fontSize: fontScale(13),
     color: '#0F172A',
     minHeight: 70,
     textAlignVertical: 'top',
-    marginBottom: 16,
+    marginBottom: moderateScale(16),
   },
   modalButtonsRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 10,
+    gap: moderateScale(10),
   },
   modalCancelBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalCancelText: {
     fontSize: fontScale(13),
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#475569',
   },
   modalConfirmBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(16),
+    borderRadius: moderateScale(12),
     backgroundColor: '#DC2626',
     minWidth: 110,
     alignItems: 'center',

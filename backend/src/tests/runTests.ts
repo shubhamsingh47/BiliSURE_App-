@@ -209,12 +209,22 @@ async function runAllTests() {
 
     // 8. Hospital Doctor Accepts Referral
     console.log('\n[Phase 8] Hospital Doctor Reviews & Accepts Referral (Steps 13-15)...');
+    const pgiDocEmail = `pgidoc_${Date.now()}@pgi.hospital.org`;
+    const pgiDocReg = await testEndpoint(testPort, 'POST', '/api/v1/auth/register', {
+      email: pgiDocEmail,
+      password: 'SecurePassword123!',
+      name: 'Dr. Rajesh Verma (Neonatologist)',
+      role: 'receiving_hospital',
+      facility: receivingHospital.name || 'PGI',
+    });
+    const hospToken = pgiDocReg.data?.data?.accessToken || 'mock_jwt_token_pgi';
+
     const acceptRes = await testEndpoint(
       testPort,
       'PATCH',
       `/api/v1/referrals/${createdReferral.referralId}/accept`,
       { doctorName: 'Dr. Rajesh Verma (Neonatologist)' },
-      token
+      hospToken
     );
     if (acceptRes.status !== 200 || acceptRes.data.data.status !== 'accepted') {
       throw new Error('Referral acceptance failed');
@@ -234,7 +244,7 @@ async function runAllTests() {
         stationName: 'BED 1',
         reservedBy: 'Dr. Rajesh Verma',
       },
-      token
+      hospToken
     );
     if (resvCreate.status !== 201) throw new Error('Capacity reservation creation failed');
     const reservation = resvCreate.data.data;
@@ -251,7 +261,7 @@ async function runAllTests() {
         hospitalId: receivingHospital._id || receivingHospital.id,
         durationMinutes: 60,
       },
-      token
+      hospToken
     );
     if (duplicateResv.status === 400) {
       console.log('  PASS: Duplicate reservation correctly blocked by guardrail.');
@@ -264,7 +274,7 @@ async function runAllTests() {
       'PATCH',
       `/api/v1/hospitals/${receivingHospital._id || receivingHospital.id}/pause-referrals`,
       { isPaused: true, reason: 'Temporary NICU sterilization' },
-      token
+      hospToken
     );
     if (pauseRes.status !== 200) throw new Error('Pause referrals toggle failed');
     console.log('  PASS: Hospital referral pause activated.');
@@ -295,7 +305,7 @@ async function runAllTests() {
       'PATCH',
       `/api/v1/hospitals/${receivingHospital._id || receivingHospital.id}/pause-referrals`,
       { isPaused: false },
-      token
+      hospToken
     );
     console.log('  PASS: Hospital referral intake resumed.');
 
@@ -310,7 +320,7 @@ async function runAllTests() {
         nurseName: 'Nurse Sunita',
         hospitalId: receivingHospital._id || receivingHospital.id,
       },
-      token
+      hospToken
     );
     if (arrivalRes.status !== 201) throw new Error('Arrival confirmation failed');
     const admission = arrivalRes.data.data.admission;
@@ -324,7 +334,7 @@ async function runAllTests() {
       'GET',
       `/api/v1/hospitals/${receivingHospital._id || receivingHospital.id}/stations`,
       undefined,
-      token
+      hospToken
     );
     const availableStation = stationsRes.data.data.find((s: any) => s.operationalStatus === 'available');
     if (!availableStation) throw new Error('No available PT station found in test facility');
@@ -337,7 +347,7 @@ async function runAllTests() {
         stationId: availableStation.stationId,
         nurseName: 'Nurse Sunita',
       },
-      token
+      hospToken
     );
     if (allocRes.status !== 200) throw new Error('PT Station allocation failed');
     console.log(`  PASS: Allocated PT Station: ${availableStation.name} (${availableStation.stationId}). Station marked 'occupied'.`);
@@ -353,7 +363,7 @@ async function runAllTests() {
         babyId: 'different_baby_id',
         babyName: 'Other Baby',
       },
-      token
+      hospToken
     );
     if (doubleAllocAttempt.status === 400) {
       console.log('  PASS: Double allocation successfully blocked by system guardrail');
@@ -371,7 +381,7 @@ async function runAllTests() {
         nurseName: 'Nurse Sunita',
         notes: 'Continuous phototherapy initiated. Eye shields positioned.',
       },
-      token
+      hospToken
     );
     if (sessionStart.status !== 200) throw new Error('Session start failed');
     const activeSession = sessionStart.data.data.session;
@@ -385,7 +395,7 @@ async function runAllTests() {
         nurseName: 'Nurse Sunita',
         notes: '12h cycle completed. Infant clinically stable.',
       },
-      token
+      hospToken
     );
     if (sessionEnd.status !== 200) throw new Error('Session end failed');
     console.log(`  PASS: Treatment session completed. Automatically computed duration: ${sessionEnd.data.data.session.durationMinutes} mins`);
@@ -402,7 +412,7 @@ async function runAllTests() {
         dischargeNotes: 'Bilirubin declined from 15.6 to 7.8 mg/dL. Normal feeding established.',
         followUpPlan: 'Recheck TcB at local CHC in 48 hours to confirm absence of rebound.',
       },
-      token
+      hospToken
     );
     if (dischargeRes.status !== 200 || dischargeRes.data.data.admissionStatus !== 'discharged') {
       throw new Error('Discharge failed');
@@ -416,7 +426,7 @@ async function runAllTests() {
       'PATCH',
       `/api/v1/hospitals/${receivingHospital._id || receivingHospital.id}/stations/${availableStation.stationId}/status`,
       { status: 'available', notes: 'Sanitized with hospital-grade disinfectant and calibrated.' },
-      token
+      hospToken
     );
     if (readyRes.status !== 200 || readyRes.data.data.operationalStatus !== 'available') {
       throw new Error('Station release failed');

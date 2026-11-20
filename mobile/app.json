@@ -10,9 +10,15 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.bilisure",
+      "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#632DAA"
+      }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "6e0bd715-4cb4-4549-b967-467e66576008"
       }
     }
   }

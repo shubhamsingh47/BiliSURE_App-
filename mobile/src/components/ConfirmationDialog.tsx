@@ -1,8 +1,14 @@
 import React from 'react';
-import { Modal, View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { COLORS } from '../theme/colors';
-import { PrimaryButton } from './PrimaryButton';
-import { SecondaryButton } from './SecondaryButton';
+import {
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TouchableWithoutFeedback,
+} from 'react-native';
+import { AlertCircle } from 'lucide-react-native';
+import { moderateScale, fontScale } from '../theme/responsive';
 
 interface ConfirmationDialogProps {
   visible: boolean;
@@ -10,6 +16,7 @@ interface ConfirmationDialogProps {
   message: string;
   confirmText?: string;
   cancelText?: string;
+  isDestructive?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,29 +27,65 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
   message,
   confirmText = 'Confirm',
   cancelText = 'Cancel',
+  isDestructive = false,
   onConfirm,
   onCancel,
 }) => {
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <View style={styles.overlay}>
-        <View style={styles.dialog}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
-          <View style={styles.actions}>
-            <SecondaryButton
-              title={cancelText}
-              onPress={onCancel}
-              style={styles.btn}
-            />
-            <PrimaryButton
-              title={confirmText}
-              onPress={onConfirm}
-              style={[styles.btn, styles.confirmBtn]}
-            />
-          </View>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+    >
+      <TouchableWithoutFeedback onPress={onCancel}>
+        <View style={styles.overlay}>
+          <TouchableWithoutFeedback>
+            <View style={styles.dialogCard}>
+              <View
+                style={[
+                  styles.iconWrapper,
+                  { backgroundColor: isDestructive ? '#FEE2E2' : '#EDE9FE' },
+                ]}
+              >
+                <AlertCircle
+                  size={moderateScale(26)}
+                  color={isDestructive ? '#DC2626' : '#7D3BFF'}
+                  strokeWidth={2.4}
+                />
+              </View>
+
+              <Text style={styles.titleText}>{title}</Text>
+              <Text style={styles.messageText}>{message}</Text>
+
+              <View style={styles.actionsRow}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={onCancel}
+                  activeOpacity={0.7}
+                  accessibilityRole="button"
+                  accessibilityLabel={cancelText}
+                >
+                  <Text style={styles.cancelButtonText}>{cancelText}</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.confirmButton,
+                    { backgroundColor: isDestructive ? '#DC2626' : '#7D3BFF' },
+                  ]}
+                  onPress={onConfirm}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                  accessibilityLabel={confirmText}
+                >
+                  <Text style={styles.confirmButtonText}>{confirmText}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
         </View>
-      </View>
+      </TouchableWithoutFeedback>
     </Modal>
   );
 };
@@ -50,37 +93,79 @@ export const ConfirmationDialog: React.FC<ConfirmationDialogProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'center',
-    padding: 24,
+    alignItems: 'center',
+    padding: moderateScale(20),
   },
-  dialog: {
-    backgroundColor: COLORS.white,
-    borderRadius: 24,
-    padding: 24,
+  dialogCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(22),
+    paddingVertical: moderateScale(24),
+    paddingHorizontal: moderateScale(22),
+    width: '100%',
+    maxWidth: moderateScale(340),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 10,
   },
-  title: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
+  iconWrapper: {
+    width: moderateScale(52),
+    height: moderateScale(52),
+    borderRadius: moderateScale(26),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: moderateScale(4),
   },
-  message: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    marginVertical: 14,
+  titleText: {
+    fontSize: fontScale(17.5),
+    fontWeight: '800',
+    color: '#0F172A',
+    textAlign: 'center',
+    marginTop: moderateScale(10),
+    letterSpacing: -0.2,
+  },
+  messageText: {
+    fontSize: fontScale(13.5),
+    color: '#64748B',
+    textAlign: 'center',
     lineHeight: 20,
+    marginTop: moderateScale(8),
+    marginBottom: moderateScale(20),
+    paddingHorizontal: moderateScale(4),
   },
-  actions: {
+  actionsRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 8,
+    gap: moderateScale(10),
+    width: '100%',
+    marginTop: moderateScale(4),
   },
-  btn: {
-    minWidth: 100,
-    height: 48,
-    marginLeft: 10,
+  cancelButton: {
+    flex: 1,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+    backgroundColor: '#F1F5F9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  confirmBtn: {
-    backgroundColor: COLORS.primary,
+  cancelButtonText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#475569',
+  },
+  confirmButton: {
+    flex: 1.15,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: {
+    fontSize: fontScale(13.5),
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
 });

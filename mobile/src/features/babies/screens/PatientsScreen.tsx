@@ -8,7 +8,6 @@ import {
   TextInput,
   Modal,
   ScrollView,
-  Alert,
 } from 'react-native';
 import {
   Search,
@@ -25,6 +24,8 @@ import {
 import { usePatientStore } from '../../../store/usePatientStore';
 import { Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { AppAlert } from '../../../components';
+import { moderateScale, fontScale } from '../../../theme/responsive';
 
 interface PatientsScreenProps {
   onSelectBaby: (baby: Baby) => void;
@@ -60,11 +61,11 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
 
   const handleOpenEdit = (baby: Baby) => {
     if (baby.status === 'discharged') {
-      Alert.alert('Record Locked', 'This patient has been discharged and their record is locked.');
+      AppAlert.warning('Record Locked', 'This patient has been discharged and their record is locked.');
       return;
     }
     if (baby.referralStatus === 'pending' || baby.referredToHospitalName || baby.isTransferredOut || baby.isHistoricalOnly) {
-      Alert.alert('Record Locked', 'This patient has been referred to another facility and cannot be edited.');
+      AppAlert.warning('Record Locked', 'This patient has been referred to another facility and cannot be edited.');
       return;
     }
     setEditingBaby(baby);
@@ -80,7 +81,7 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
   const handleSaveEdit = async () => {
     if (!editingBaby) return;
     if (!editName.trim()) {
-      Alert.alert('Required', "Mother's name cannot be empty");
+      AppAlert.warning('Required Field', "Mother's name cannot be empty.");
       return;
     }
 
@@ -95,9 +96,9 @@ export const PatientsScreen: React.FC<PatientsScreenProps> = ({
         assignedDoctor: editDoctor.trim() && editDoctor.trim() !== 'None' ? editDoctor.trim() : undefined,
       });
       setEditingBaby(null);
-      Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
+      AppAlert.success('Updated', `Details for ${editName.trim()} have been updated.`);
     } catch {
-      Alert.alert('Error', 'Failed to update patient details');
+      AppAlert.error('Error', 'Failed to update patient details.');
     } finally {
       setIsSaving(false);
     }
@@ -499,15 +500,20 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
     maxHeight: '85%',
-    padding: 20,
+    padding: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -515,16 +521,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    paddingBottom: 14,
-    marginBottom: 14,
+    paddingBottom: moderateScale(14),
+    marginBottom: moderateScale(14),
   },
   modalTitle: {
-    fontSize: 17,
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#0F172A',
   },
   modalSub: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#7D3BFF',
     fontWeight: '700',
     marginTop: 2,
@@ -533,61 +539,61 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   modalBody: {
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#334155',
     marginBottom: 5,
-    marginTop: 8,
+    marginTop: moderateScale(8),
   },
   textInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    height: 44,
-    paddingHorizontal: 12,
-    fontSize: 14,
+    borderRadius: moderateScale(12),
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(12),
+    fontSize: fontScale(14),
     color: '#0F172A',
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: moderateScale(12),
   },
   halfInput: {
     flex: 1,
   },
   modalBtnRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 20,
+    gap: moderateScale(12),
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(20),
   },
   cancelBtn: {
     flex: 1,
-    height: 46,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#64748B',
   },
   saveBtn: {
     flex: 1.5,
-    height: 46,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#FFFFFF',
   },

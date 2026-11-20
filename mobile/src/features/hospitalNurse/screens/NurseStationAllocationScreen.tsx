@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PTStation, Admission, Baby } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { AppAlert } from '../../../components';
 
 interface NurseStationAllocationScreenProps {
   onBack?: () => void;
@@ -54,13 +55,13 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     const targetBaby: Baby | null = selectedBaby;
 
     if (!targetBaby) {
-      Alert.alert('No Baby Selected', 'Please select a baby to send to phototherapy first.');
+      AppAlert.warning('No Baby Selected', 'Please select a baby to send to phototherapy first.');
       return;
     }
 
     // STRICT CHECK: Ensure patient is not already allocated anywhere
     if (isBabyAlreadyAllocated(targetBaby.uhid, targetBaby.id)) {
-      Alert.alert(
+      AppAlert.warning(
         'Patient Already Allocated',
         `Patient ${targetBaby.parentsName || targetBaby.name} (${targetBaby.uhid}) is already assigned to an active phototherapy station.`
       );
@@ -68,17 +69,17 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
     }
 
     if (station.operationalStatus === 'occupied') {
-      Alert.alert('Station Occupied', `Station ${station.stationId} is already occupied by ${station.currentBabyName || 'another patient'}. Double allocation is prevented.`);
+      AppAlert.warning('Station Occupied', `Station ${station.stationId} is already occupied by ${station.currentBabyName || 'another patient'}. Double allocation is prevented.`);
       return;
     }
 
     if (station.operationalStatus === 'maintenance' || station.operationalStatus === 'out_of_service') {
-      Alert.alert('Station Unavailable', `Station ${station.stationId} is currently under maintenance.`);
+      AppAlert.warning('Station Unavailable', `Station ${station.stationId} is currently under maintenance.`);
       return;
     }
 
     if (station.operationalStatus === 'cleaning_prep') {
-      Alert.alert('Cleaning in Progress', `Station ${station.stationId} requires sanitization confirmation before it can be occupied.`);
+      AppAlert.warning('Cleaning in Progress', `Station ${station.stationId} requires sanitization confirmation before it can be occupied.`);
       return;
     }
 
@@ -95,13 +96,13 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
 
       usePatientStore.getState().selectBaby(null);
 
-      Alert.alert(
+      AppAlert.success(
         'Station Allocated!',
         `${babyName} (${babyUhid}) placed in ${station.name} (${station.stationId}). Phototherapy treatment has begun!`
       );
       onBabyAllocated?.(targetBaby, station);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to allocate station');
+      AppAlert.error('Error', err?.message || 'Failed to allocate station.');
     } finally {
       setIsProcessing(false);
     }
@@ -113,12 +114,12 @@ export const NurseStationAllocationScreen: React.FC<NurseStationAllocationScreen
       await updateStationStatus(station.id || station.stationId, 'available', {
         notes: `Sanitized and inspected ready for neonatal admission by ${user.name}`,
       });
-      Alert.alert(
+      AppAlert.success(
         'Station Ready',
         `Station ${station.name} (${station.stationId}) has returned to the Available Pool. Hospital capacity updated.`
       );
     } catch {
-      Alert.alert('Error', 'Failed to update station readiness');
+      AppAlert.error('Error', 'Failed to update station readiness.');
     } finally {
       setIsProcessing(false);
     }

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Edit3, ChevronRight } from 'lucide-react-native';
 import { COLORS } from '../theme/colors';
@@ -92,6 +92,11 @@ export const BabyCard: React.FC<BabyCardProps> = ({
   const isBabyInPt =
     (phototherapyInfo?.status === 'in_treatment' && !!activeStationName) ||
     (baby.status === 'under_treatment' && !!activeStationName);
+  const formattedStationTag = useMemo(() => {
+    if (!activeStationName || !activeStationName.trim()) return null;
+    const clean = activeStationName.trim().replace(/^PT\s*[-•:]*\s*/i, '');
+    return `PT - ${clean || activeStationName.trim()}`;
+  }, [activeStationName]);
   const isBabyPtConcluded = phototherapyInfo?.status === 'concluded' || (!isBabyInPt && !!baby.dischargeValue);
   const isBabyDischarged = baby.status === 'discharged';
   const dischargeTimeStr = isBabyDischarged ? formatDischargeDateTime(baby) : '';
@@ -107,8 +112,8 @@ export const BabyCard: React.FC<BabyCardProps> = ({
           ? `${displayName}, ${badgeLabel}`
           : isBabyDischarged
             ? `${displayName}, Discharged`
-            : isBabyInPt && activeStationName
-              ? `${displayName}, PT, ${activeStationName}`
+            : isBabyInPt && formattedStationTag
+              ? `${displayName}, ${formattedStationTag}`
               : `${displayName}`
       }
     >
@@ -149,10 +154,10 @@ export const BabyCard: React.FC<BabyCardProps> = ({
             <Text style={styles.metaSubText} numberOfLines={1}>
               {baby.uhid ? `UHID: ${baby.uhid}` : ''}
             </Text>
-          ) : isBabyInPt && activeStationName ? (
+          ) : isBabyInPt && formattedStationTag ? (
             <View style={styles.inPtBadge}>
-              <Text style={styles.inPtBadgeText}>
-                PT • {activeStationName}
+              <Text style={styles.inPtBadgeText} numberOfLines={1} ellipsizeMode="tail">
+                {formattedStationTag}
               </Text>
             </View>
           ) : isBabyPtConcluded ? (

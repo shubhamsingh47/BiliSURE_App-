@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { ArrowLeft, Trash2, AlertCircle } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
+import { AppAlert } from '../../../components';
 
 interface DeviceAlertScreenProps {
   onBack: () => void;
@@ -17,7 +17,7 @@ interface DeviceAlertScreenProps {
 
 export const DeviceAlertScreen: React.FC<DeviceAlertScreenProps> = ({ onBack }) => {
   const handleContactSupport = () => {
-    Alert.alert(
+    AppAlert.show(
       'BiliSURE Support',
       'Device replacement request generated for BiliSURE Serial #BS-2026-X1-9942. Our biomedical support team will deliver new sensor modules within 4 hours.'
     );

@@ -25,6 +25,7 @@ import { ReferralTrackerScreen } from '../features/referrals/screens/ReferralTra
 import { HospitalDirectoryScreen } from '../features/referrals/screens/HospitalDirectoryScreen';
 
 import { BottomTabBar, TabName } from './BottomTabNavigator';
+import { AppDialog } from '../components';
 import { usePatientStore } from '../store/usePatientStore';
 import { useNetworkStore } from '../store/useNetworkStore';
 import { useAuthStore } from '../store/useAuthStore';
@@ -334,6 +335,9 @@ export const RootNavigator: React.FC = () => {
           onLogoutPress={() => setShowLogoutModal(true)}
         />
       )}
+
+      {/* Global App Dialog Modal for system-wide clean popups */}
+      <AppDialog />
 
       {/* Custom Logout Confirmation Modal */}
       <Modal

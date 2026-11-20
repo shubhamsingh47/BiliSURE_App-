@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PTStation, PTStationType, PTStationStatus } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { moderateScale, fontScale } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 export const AdminStationsManagementScreen: React.FC = () => {
   const { stations, registerStation, updateStationStatus, hospitals } = useNetworkStore();
@@ -22,7 +24,7 @@ export const AdminStationsManagementScreen: React.FC = () => {
 
   const handleAddStation = async () => {
     if (!newStationId.trim() || !newStationName.trim()) {
-      Alert.alert('Required Fields', 'Please enter Station ID and Station Name');
+      AppAlert.warning('Required Fields', 'Please enter Station ID and Station Name.');
       return;
     }
 
@@ -40,9 +42,9 @@ export const AdminStationsManagementScreen: React.FC = () => {
       setAddModalVisible(false);
       setNewStationId('');
       setNewStationName('');
-      Alert.alert('Station Added', `Station ${newStationId.toUpperCase()} registered into facility fleet.`);
+      AppAlert.success('Station Added', `Station ${newStationId.toUpperCase()} registered into facility fleet.`);
     } catch {
-      Alert.alert('Error', 'Failed to register station');
+      AppAlert.error('Error', 'Failed to register station.');
     } finally {
       setIsProcessing(false);
     }
@@ -54,9 +56,9 @@ export const AdminStationsManagementScreen: React.FC = () => {
       await updateStationStatus(station.id || station.stationId, newStatus, {
         notes: newStatus === 'maintenance' ? 'Scheduled engineering inspection' : 'Maintenance completed & operational',
       });
-      Alert.alert('Status Updated', `Station marked as ${newStatus.toUpperCase()}`);
+      AppAlert.success('Status Updated', `Station marked as ${newStatus.toUpperCase()}`);
     } catch {
-      Alert.alert('Error', 'Failed to update status');
+      AppAlert.error('Error', 'Failed to update status.');
     }
   };
 
@@ -448,40 +450,45 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
+    padding: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#181829',
   },
   modalSub: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#64748B',
-    marginBottom: 14,
+    marginBottom: moderateScale(14),
   },
   inputLabel: {
-    fontSize: 11,
+    fontSize: fontScale(11),
     fontWeight: '700',
     color: '#181829',
     marginBottom: 4,
-    marginTop: 8,
+    marginTop: moderateScale(8),
   },
   textInput: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    height: 44,
-    paddingHorizontal: 12,
-    fontSize: 13,
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(12),
+    fontSize: fontScale(13),
     color: '#181829',
   },
   typeRow: {
@@ -490,9 +497,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   typePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
+    paddingHorizontal: moderateScale(8),
+    paddingVertical: moderateScale(5),
+    borderRadius: moderateScale(8),
     backgroundColor: '#F1F5F9',
     marginRight: 6,
     marginBottom: 6,
@@ -501,7 +508,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#7D3BFF',
   },
   typePillText: {
-    fontSize: 10,
+    fontSize: fontScale(10),
     fontWeight: '700',
     color: '#64748B',
   },
@@ -511,33 +518,33 @@ const styles = StyleSheet.create({
   modalBtnRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 16,
-    marginBottom: 8,
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(8),
   },
   cancelBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: moderateScale(10),
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#64748B',
   },
   saveBtn: {
     flex: 2,
-    height: 48,
-    borderRadius: 14,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '800',
     color: '#FFFFFF',
   },

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import {
   Calendar as CalendarIcon,
@@ -201,6 +202,74 @@ export const BirthDateTimePickerModal: React.FC<BirthDateTimePickerModalProps> =
   // Format 12-hour components
   const display12Hour = selectedHour === 0 ? 12 : selectedHour > 12 ? selectedHour - 12 : selectedHour;
   const ampm = selectedHour >= 12 ? 'PM' : 'AM';
+
+  // Direct text editing states for hour and minute inputs
+  const [isHourFocused, setIsHourFocused] = useState(false);
+  const [isMinuteFocused, setIsMinuteFocused] = useState(false);
+  const [hourInputText, setHourInputText] = useState(pad2(display12Hour));
+  const [minuteInputText, setMinuteInputText] = useState(pad2(selectedMinute));
+
+  useEffect(() => {
+    if (!isHourFocused) {
+      setHourInputText(pad2(display12Hour));
+    }
+  }, [display12Hour, isHourFocused]);
+
+  useEffect(() => {
+    if (!isMinuteFocused) {
+      setMinuteInputText(pad2(selectedMinute));
+    }
+  }, [selectedMinute, isMinuteFocused]);
+
+  const handleHourChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '').slice(0, 2);
+    setHourInputText(cleaned);
+    if (!cleaned) return;
+    const num = parseInt(cleaned, 10);
+    if (num >= 1 && num <= 12) {
+      if (ampm === 'AM') {
+        setSelectedHour(num === 12 ? 0 : num);
+      } else {
+        setSelectedHour(num === 12 ? 12 : num + 12);
+      }
+    }
+  };
+
+  const handleHourBlur = () => {
+    setIsHourFocused(false);
+    const num = parseInt(hourInputText, 10);
+    if (!isNaN(num) && num >= 1 && num <= 12) {
+      if (ampm === 'AM') {
+        setSelectedHour(num === 12 ? 0 : num);
+      } else {
+        setSelectedHour(num === 12 ? 12 : num + 12);
+      }
+      setHourInputText(pad2(num));
+    } else {
+      setHourInputText(pad2(display12Hour));
+    }
+  };
+
+  const handleMinuteChange = (text: string) => {
+    const cleaned = text.replace(/[^0-9]/g, '').slice(0, 2);
+    setMinuteInputText(cleaned);
+    if (!cleaned) return;
+    const num = parseInt(cleaned, 10);
+    if (num >= 0 && num <= 59) {
+      setSelectedMinute(num);
+    }
+  };
+
+  const handleMinuteBlur = () => {
+    setIsMinuteFocused(false);
+    const num = parseInt(minuteInputText, 10);
+    if (!isNaN(num) && num >= 0 && num <= 59) {
+      setSelectedMinute(num);
+      setMinuteInputText(pad2(num));
+    } else {
+      setMinuteInputText(pad2(selectedMinute));
+    }
+  };
 
   // Preview formatted output
   const previewFormattedStr = useMemo(() => {
@@ -464,17 +533,29 @@ export const BirthDateTimePickerModal: React.FC<BirthDateTimePickerModalProps> =
                       onPress={() => stepHour(1)}
                       style={styles.stepBtn}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityLabel="Increase Hour"
                     >
                       <ChevronUp size={20} color="#7D3BFF" strokeWidth={2.5} />
                     </TouchableOpacity>
-                    <View style={styles.rollerDisplay}>
-                      <Text style={styles.rollerDisplayText}>{pad2(display12Hour)}</Text>
+                    <View style={[styles.rollerDisplay, isHourFocused && styles.rollerDisplayFocused]}>
+                      <TextInput
+                        style={styles.rollerInput}
+                        value={hourInputText}
+                        onChangeText={handleHourChange}
+                        onFocus={() => setIsHourFocused(true)}
+                        onBlur={handleHourBlur}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        selectTextOnFocus
+                        accessibilityLabel="Hour Input"
+                      />
                     </View>
                     <TouchableOpacity
                       activeOpacity={0.6}
                       onPress={() => stepHour(-1)}
                       style={styles.stepBtn}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityLabel="Decrease Hour"
                     >
                       <ChevronDown size={20} color="#7D3BFF" strokeWidth={2.5} />
                     </TouchableOpacity>
@@ -487,20 +568,32 @@ export const BirthDateTimePickerModal: React.FC<BirthDateTimePickerModalProps> =
                   <View style={styles.rollerCol}>
                     <TouchableOpacity
                       activeOpacity={0.6}
-                      onPress={() => stepMinute(5)}
+                      onPress={() => stepMinute(1)}
                       style={styles.stepBtn}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityLabel="Increase Minute"
                     >
                       <ChevronUp size={20} color="#7D3BFF" strokeWidth={2.5} />
                     </TouchableOpacity>
-                    <View style={styles.rollerDisplay}>
-                      <Text style={styles.rollerDisplayText}>{pad2(selectedMinute)}</Text>
+                    <View style={[styles.rollerDisplay, isMinuteFocused && styles.rollerDisplayFocused]}>
+                      <TextInput
+                        style={styles.rollerInput}
+                        value={minuteInputText}
+                        onChangeText={handleMinuteChange}
+                        onFocus={() => setIsMinuteFocused(true)}
+                        onBlur={handleMinuteBlur}
+                        keyboardType="number-pad"
+                        maxLength={2}
+                        selectTextOnFocus
+                        accessibilityLabel="Minute Input"
+                      />
                     </View>
                     <TouchableOpacity
                       activeOpacity={0.6}
-                      onPress={() => stepMinute(-5)}
+                      onPress={() => stepMinute(-1)}
                       style={styles.stepBtn}
                       hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+                      accessibilityLabel="Decrease Minute"
                     >
                       <ChevronDown size={20} color="#7D3BFF" strokeWidth={2.5} />
                     </TouchableOpacity>
@@ -798,6 +891,21 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 1,
+  },
+  rollerDisplayFocused: {
+    borderColor: '#6D28D9',
+    backgroundColor: '#FAF5FF',
+    shadowOpacity: 0.25,
+  },
+  rollerInput: {
+    fontSize: fontScale(22),
+    fontWeight: '800',
+    color: '#7D3BFF',
+    textAlign: 'center',
+    padding: 0,
+    margin: 0,
+    width: '100%',
+    height: '100%',
   },
   rollerDisplayText: {
     fontSize: fontScale(22),

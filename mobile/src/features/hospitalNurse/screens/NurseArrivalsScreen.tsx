@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { COLORS } from '../../../theme/colors';
 import { getScreenTopPadding } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 interface NurseArrivalsScreenProps {
   onArrivalConfirmed?: (admissionId: string) => void;
@@ -30,18 +31,16 @@ export const NurseArrivalsScreen: React.FC<NurseArrivalsScreenProps> = ({
     setIsProcessing(true);
     try {
       const admission = await confirmArrival(referral.referralId, user.name, user.facility);
-      Alert.alert(
+      AppAlert.success(
         'Arrival Confirmed!',
         `${referral.babyName} (${referral.babyUhid}) marked as physically arrived. Admission episode ${admission.admissionId} created. You can now allocate a PT Station.`,
-        [
-          {
-            text: 'Allocate PT Station',
-            onPress: () => onArrivalConfirmed && onArrivalConfirmed(admission.admissionId),
-          },
-        ]
+        () => {
+          if (onArrivalConfirmed) onArrivalConfirmed(admission.admissionId);
+        },
+        'Allocate PT Station'
       );
     } catch {
-      Alert.alert('Error', 'Failed to confirm arrival');
+      AppAlert.error('Error', 'Failed to confirm arrival.');
     } finally {
       setIsProcessing(false);
     }

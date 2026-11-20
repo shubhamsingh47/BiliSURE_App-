@@ -4,13 +4,13 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { ArrowLeft, ChevronDown, Download } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../theme/colors';
 import { PrimaryButton } from '../../../components/PrimaryButton';
 import { apiClient } from '../../../services/api.client';
+import { AppAlert } from '../../../components';
 
 interface ExportDataScreenProps {
   onBack: () => void;
@@ -41,12 +41,12 @@ export const ExportDataScreen: React.FC<ExportDataScreenProps> = ({ onBack }) =>
     setExporting(true);
     try {
       await apiClient.get(`/analytics/export?dataType=${encodeURIComponent(dataType)}&dateRange=${encodeURIComponent(dateRange)}&format=json`);
-      Alert.alert(
+      AppAlert.success(
         'Export Successful',
         `BiliSURE dataset (${dataType}, ${dateRange}) exported as ${format} to hospital records storage.`
       );
     } catch {
-      Alert.alert(
+      AppAlert.show(
         'Export Generated',
         `Offline export: ${dataType} dataset prepared for transmission when connected.`
       );
