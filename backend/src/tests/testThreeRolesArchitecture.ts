@@ -111,7 +111,7 @@ async function runThreeRolesTest() {
     password: 'Password123!',
     name: 'Dr. A.K. Kapoor (CMO)',
     primaryRole: 'district_admin',
-    facility: 'Central District Health Authority',
+    facility: 'Central Command',
   });
   assert.strictEqual(distAdminReg.user.primaryRole, 'district_admin');
   assert(distAdminReg.user.permissions.includes('view_district_overview'));

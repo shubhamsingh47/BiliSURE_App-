@@ -75,24 +75,22 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
     readings.length > 0 ? readings[readings.length - 1] : null
   );
 
-  // Chart dimensions & scaling
   const width = 640;
-  const height = 360;
+  const height = 340;
   const paddingLeft = 45;
   const paddingRight = 25;
-  const paddingTop = 25;
+  const paddingTop = 20;
   const paddingBottom = 40;
 
   const plotWidth = width - paddingLeft - paddingRight;
   const plotHeight = height - paddingTop - paddingBottom;
 
-  const maxHour = 144; // 0 to 144 hours (6 days)
-  const maxMgDl = 20; // 0 to 20 mg/dL
+  const maxHour = 144;
+  const maxMgDl = 20;
 
   const scaleX = (h: number) => paddingLeft + (Math.max(0, Math.min(maxHour, h)) / maxHour) * plotWidth;
   const scaleY = (v: number) => paddingTop + plotHeight - (Math.max(0, Math.min(maxMgDl, v)) / maxMgDl) * plotHeight;
 
-  // Build SVG polygon for zones
   const buildZonePolygon = (
     bottomCurve: 'zero' | 'p40' | 'p75' | 'p95',
     topCurve: 'p40' | 'p75' | 'p95' | 'top'
@@ -100,14 +98,12 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
     const points = BHUTANI_NOMOGRAM_DATA.filter((p) => p.hour <= maxHour);
     const coords: string[] = [];
 
-    // Forward along top
     for (let i = 0; i < points.length; i++) {
       const x = scaleX(points[i].hour);
       const y = topCurve === 'top' ? scaleY(maxMgDl) : scaleY(points[i][topCurve]);
       coords.push(`${x},${y}`);
     }
 
-    // Backward along bottom
     for (let i = points.length - 1; i >= 0; i--) {
       const x = scaleX(points[i].hour);
       const y = bottomCurve === 'zero' ? scaleY(0) : scaleY(points[i][bottomCurve]);
@@ -127,47 +123,46 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
   const sorted = [...readings].sort((a, b) => a.postnatalAgeHours - b.postnatalAgeHours);
   const currentPoint = selectedPoint || (sorted.length > 0 ? sorted[sorted.length - 1] : null);
 
-  // Evaluate risk of active selected point
   let riskZone = 'Low Risk';
-  let riskColor = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+  let riskColor = 'text-emerald-800 bg-emerald-50 border-emerald-200';
   let clinicalAdvice = 'Standard nursery care. Support maternal breastfeeding.';
 
   if (currentPoint) {
     const th = getPercentilesAtHour(currentPoint.postnatalAgeHours);
     if (currentPoint.valueMgDl >= th.p95) {
       riskZone = 'High Risk (> 95th %tile)';
-      riskColor = 'text-rose-700 bg-rose-50 border-rose-300';
+      riskColor = 'text-rose-800 bg-rose-50 border-rose-200';
       clinicalAdvice = 'Immediate phototherapy evaluation recommended. Review serum TSB confirmation.';
     } else if (currentPoint.valueMgDl >= th.p75) {
       riskZone = 'High-Intermediate Risk (75th–95th %tile)';
-      riskColor = 'text-amber-700 bg-amber-50 border-amber-300';
+      riskColor = 'text-amber-800 bg-amber-50 border-amber-200';
       clinicalAdvice = 'High surveillance. Repeat bilirubin within 8–12 hours and inspect risk factors.';
     } else if (currentPoint.valueMgDl >= th.p40) {
       riskZone = 'Low-Intermediate Risk (40th–74th %tile)';
-      riskColor = 'text-blue-700 bg-blue-50 border-blue-200';
+      riskColor = 'text-blue-800 bg-blue-50 border-blue-200';
       clinicalAdvice = 'Follow-up within 24–48 hours based on hospital discharge protocol.';
     }
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-sm space-y-4">
+    <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4">
       {/* Header & Risk Callout */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="text-sm font-bold text-slate-900">Bhutani Nomogram</h3>
-            <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Bhutani Nomogram</h3>
+            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
               AAP 2022 Guidelines (≥35w)
             </span>
           </div>
-          <p className="text-xs text-slate-500 mt-0.5">
+          <p className="text-xs text-slate-400 mt-0.5">
             Hour-specific bilirubin risk stratification over postnatal hours
           </p>
         </div>
 
         {currentPoint && (
-          <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-xl border text-xs font-semibold ${riskColor}`}>
-            <span className="w-2 h-2 rounded-full bg-current"></span>
+          <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-lg border text-xs font-semibold ${riskColor}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current" />
             <span>{riskZone}</span>
           </div>
         )}
@@ -175,14 +170,14 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
 
       {/* SVG Nomogram Canvas */}
       <div className="relative w-full overflow-x-auto">
-        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[380px] font-sans">
+        <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto max-h-[360px] font-sans">
           {/* Background Risk Zone Polygons */}
           <polygon points={buildZonePolygon('p95', 'top')} fill="#fee2e2" opacity="0.65" />
           <polygon points={buildZonePolygon('p75', 'p95')} fill="#fef3c7" opacity="0.65" />
           <polygon points={buildZonePolygon('p40', 'p75')} fill="#dbeafe" opacity="0.6" />
           <polygon points={buildZonePolygon('zero', 'p40')} fill="#dcfce7" opacity="0.6" />
 
-          {/* Grid lines (X Axis Hours: 24, 48, 72, 96, 120, 144) */}
+          {/* Grid lines */}
           {[24, 48, 72, 96, 120, 144].map((h) => (
             <g key={`x-${h}`}>
               <line
@@ -190,7 +185,7 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
                 y1={paddingTop}
                 x2={scaleX(h)}
                 y2={paddingTop + plotHeight}
-                stroke="#cbd5e1"
+                stroke="#e2e8f0"
                 strokeDasharray="3 3"
                 strokeWidth="1"
               />
@@ -207,7 +202,6 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
             </g>
           ))}
 
-          {/* Grid lines (Y Axis mg/dL: 0, 5, 10, 15, 20) */}
           {[0, 5, 10, 15, 20].map((v) => (
             <g key={`y-${v}`}>
               <line
@@ -215,7 +209,7 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
                 y1={scaleY(v)}
                 x2={paddingLeft + plotWidth}
                 y2={scaleY(v)}
-                stroke="#cbd5e1"
+                stroke="#e2e8f0"
                 strokeDasharray={v === 0 ? '' : '3 3'}
                 strokeWidth="1"
               />
@@ -248,7 +242,7 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
             40th %tile
           </text>
 
-          {/* Chronological Trajectory Line across patient's measurements */}
+          {/* Chronological Trajectory Line */}
           {sorted.length > 1 && (
             <path
               d={sorted.map((r, i) => `${i === 0 ? 'M' : 'L'} ${scaleX(r.postnatalAgeHours)} ${scaleY(r.valueMgDl)}`).join(' ')}
@@ -273,7 +267,7 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
                 className="cursor-pointer group"
               >
                 {isSelected && (
-                  <circle cx={cx} cy={cy} r="10" fill="#2563eb" fillOpacity="0.25" />
+                  <circle cx={cx} cy={cy} r="9" fill="#2563eb" fillOpacity="0.25" />
                 )}
                 <circle
                   cx={cx}
@@ -282,11 +276,10 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
                   fill="#0f172a"
                   stroke="#ffffff"
                   strokeWidth="2"
-                  className="transition-transform duration-150 group-hover:scale-125"
                 />
                 <text
                   x={cx}
-                  y={cy - 9}
+                  y={cy - 8}
                   textAnchor="middle"
                   fontSize="10"
                   fontWeight="700"
@@ -325,7 +318,7 @@ export const BhutaniNomogramWeb: React.FC<BhutaniNomogramWebProps> = ({
 
       {/* Selected Point Details Panel */}
       {currentPoint ? (
-        <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3.5 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
               <span className="font-bold text-slate-900">
