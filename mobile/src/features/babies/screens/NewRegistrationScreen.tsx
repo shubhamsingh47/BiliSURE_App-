@@ -6,7 +6,6 @@ import {
   ScrollView,
   Switch,
   TouchableOpacity,
-  Alert,
   useWindowDimensions,
 } from 'react-native';
 import { ArrowLeft, Paperclip, ChevronDown, Calendar as CalendarIcon, Clock, Check } from 'lucide-react-native';
@@ -15,6 +14,7 @@ import { COLORS } from '../../../theme/colors';
 import { CustomInput } from '../../../components/CustomInput';
 import { BirthDateTimePickerModal } from '../../../components/BirthDateTimePickerModal';
 import { PrimaryButton } from '../../../components/PrimaryButton';
+import { AppAlert } from '../../../components';
 import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { SeverityState } from '../../../types';
@@ -123,18 +123,18 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
 
   const handleContinue = async () => {
     if (!motherName.trim()) {
-      Alert.alert('Required Field', "Please enter the mother's name");
+      AppAlert.warning('Required Field', "Please enter the mother's name.");
       return;
     }
 
     if (!gestationalAge.trim()) {
-      Alert.alert('Required Field', 'Please enter gestational age in weeks.');
+      AppAlert.warning('Required Field', 'Please enter gestational age in weeks.');
       return;
     }
 
     const parsedGestAge = parseInt(gestationalAge.trim(), 10);
     if (isNaN(parsedGestAge) || parsedGestAge < 20 || parsedGestAge > 46) {
-      Alert.alert('Invalid Gestational Age', 'Please enter a valid gestational age between 20 and 46 weeks.');
+      AppAlert.warning('Invalid Gestational Age', 'Please enter a valid gestational age between 20 and 46 weeks.');
       return;
     }
 
@@ -142,20 +142,20 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
     if (gestationalDays.trim()) {
       const daysTrimmed = gestationalDays.trim();
       if (!/^[0-6]$/.test(daysTrimmed)) {
-        Alert.alert('Invalid Gestational Days', 'Days must be a whole number between 0 and 6.');
+        AppAlert.warning('Invalid Gestational Days', 'Days must be a whole number between 0 and 6.');
         return;
       }
       parsedGestDays = parseInt(daysTrimmed, 10);
     }
 
     if (!birthWeight.trim()) {
-      Alert.alert('Required Field', 'Please enter birth weight in kg.');
+      AppAlert.warning('Required Field', 'Please enter birth weight in kg.');
       return;
     }
 
     const parsedWeight = parseFloat(birthWeight.trim());
     if (isNaN(parsedWeight) || parsedWeight <= 0 || parsedWeight > 10) {
-      Alert.alert('Invalid Birth Weight', 'Please enter a valid birth weight in kg (e.g. 3.1).');
+      AppAlert.warning('Invalid Birth Weight', 'Please enter a valid birth weight in kg (e.g. 3.1).');
       return;
     }
 
@@ -191,7 +191,7 @@ export const NewRegistrationScreen: React.FC<NewRegistrationScreenProps> = ({
       });
       onSuccess(created.uhid);
     } catch {
-      Alert.alert('Error', 'Failed to register patient');
+      AppAlert.error('Registration Failed', 'Failed to register patient. Please check details and try again.');
     } finally {
       setLoading(false);
     }

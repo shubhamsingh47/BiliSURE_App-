@@ -5,6 +5,7 @@ export const CreateBabySchema = z.object({
   name: z.string().min(1),
   parentsName: z.string().min(1),
   dateOfBirth: z.string().datetime().or(z.string().min(4)),
+  exactTimeOfBirth: z.string().optional(),
   gestationalAgeWeeks: z.number().optional(),
   gestationalAgeDays: z.number().int().min(0).max(6).optional(),
   birthWeightGrams: z.number().optional(),
@@ -19,7 +20,10 @@ export const CreateBabySchema = z.object({
   initialValue: z.number().optional(),
   dischargeValue: z.number().optional(),
   attachments: z.array(z.string()).optional(),
-});
+  registeredAt: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+}).passthrough();
 
 export const QueryBabySchema = z.object({
   department: z.string().optional(),

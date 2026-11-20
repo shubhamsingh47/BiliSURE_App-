@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { PTStation } from '../../../types';
 import { COLORS } from '../../../theme/colors';
+import { AppAlert } from '../../../components';
 
 interface StationReadinessScreenProps {
   onBack?: () => void;
@@ -27,12 +28,12 @@ export const StationReadinessScreen: React.FC<StationReadinessScreenProps> = ({
       await updateStationStatus(station.id || station.stationId, 'available', {
         notes: `Sanitized and inspected ready for neonatal admission by ${user.name}`,
       });
-      Alert.alert(
+      AppAlert.success(
         'Operational Readiness Confirmed',
         `Station ${station.name} (${station.stationId}) has returned to the Available Pool. Hospital capacity updated.`
       );
     } catch {
-      Alert.alert('Error', 'Failed to update readiness status');
+      AppAlert.error('Error', 'Failed to update readiness status.');
     } finally {
       setIsProcessing(false);
     }

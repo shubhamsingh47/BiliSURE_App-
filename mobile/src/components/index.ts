@@ -44,8 +44,10 @@ export { DropdownField } from './DropdownField';
 export { DateTimePickerField } from './DateTimePickerField';
 export { BirthDateTimePickerModal } from './BirthDateTimePickerModal';
 
-// 15. Confirmation Dialogs
+// 15. Confirmation Dialogs & App Alert System
 export { ConfirmationDialog } from './ConfirmationDialog';
+export { AppDialog } from './AppDialog';
+export { AppAlert, useDialogStore } from '../store/useDialogStore';
 
 // 16. Notification Items
 export { NotificationItem } from './NotificationItem';

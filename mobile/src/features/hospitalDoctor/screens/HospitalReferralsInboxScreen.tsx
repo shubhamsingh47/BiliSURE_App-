@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Referral } from '../../../types';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { COLORS } from '../../../theme/colors';
-import { getScreenTopPadding } from '../../../theme/responsive';
+import { getScreenTopPadding, moderateScale, fontScale } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 interface HospitalReferralsInboxScreenProps {
   onOpenNotifications?: () => void;
@@ -32,12 +33,12 @@ export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreen
     setIsProcessing(true);
     try {
       await acceptReferral(referral.referralId, user.name);
-      Alert.alert(
+      AppAlert.success(
         'Referral Accepted',
         `${referral.babyName} (${referral.babyUhid}) accepted. Referring centre and nursing unit notified to prepare arrival.`
       );
     } catch {
-      Alert.alert('Error', 'Failed to accept referral');
+      AppAlert.error('Error', 'Failed to accept referral.');
     } finally {
       setIsProcessing(false);
     }
@@ -46,7 +47,7 @@ export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreen
   const handleConfirmReject = async () => {
     if (!selectedReferral) return;
     if (!rejectionReason.trim()) {
-      Alert.alert('Reason Required', 'Please enter a clinical or operational reason for declining this referral.');
+      AppAlert.warning('Reason Required', 'Please enter a clinical or operational reason for declining this referral.');
       return;
     }
 
@@ -56,9 +57,9 @@ export const HospitalReferralsInboxScreen: React.FC<HospitalReferralsInboxScreen
       setRejectModalVisible(false);
       setRejectionReason('');
       setSelectedReferral(null);
-      Alert.alert('Referral Declined', 'Referring doctor notified with the recorded reason.');
+      AppAlert.success('Referral Declined', 'Referring doctor notified with the recorded reason.');
     } catch {
-      Alert.alert('Error', 'Failed to decline referral');
+      AppAlert.error('Error', 'Failed to decline referral.');
     } finally {
       setIsProcessing(false);
     }
@@ -434,68 +435,73 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
+    padding: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#181829',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
   },
   modalSub: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#64748B',
-    marginBottom: 14,
+    marginBottom: moderateScale(14),
     lineHeight: 16,
   },
   reasonInput: {
     backgroundColor: '#F8FAFC',
-    borderRadius: 14,
-    padding: 12,
-    fontSize: 13,
+    borderRadius: moderateScale(12),
+    padding: moderateScale(12),
+    fontSize: fontScale(13),
     color: '#181829',
     borderWidth: 1,
     borderColor: '#E2E8F0',
     minHeight: 80,
     textAlignVertical: 'top',
-    marginBottom: 16,
+    marginBottom: moderateScale(16),
   },
   modalActionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   cancelBtn: {
     flex: 1,
-    height: 48,
-    borderRadius: 14,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: moderateScale(10),
   },
   cancelBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#64748B',
   },
   confirmRejectBtn: {
     flex: 1.5,
-    height: 48,
-    borderRadius: 14,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#FC3949',
     alignItems: 'center',
     justifyContent: 'center',
   },
   confirmRejectBtnText: {
-    fontSize: 13,
+    fontSize: fontScale(13),
     fontWeight: '800',
     color: '#FFFFFF',
   },

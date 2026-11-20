@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -23,6 +22,7 @@ import { useNetworkStore } from '../../../store/useNetworkStore';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Baby, ClinicalObservation, BilirubinReading } from '../../../types';
 import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 const OBS_SITES = ['Forehead', 'Sternum'];
 
@@ -83,6 +83,12 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     babyAdmission?.ptStationName ||
     activeBaby?.currentStationId;
 
+  const formattedStationTag = useMemo(() => {
+    if (!currentStationDisplayName || !currentStationDisplayName.trim()) return null;
+    const clean = currentStationDisplayName.trim().replace(/^PT\s*[-•:]*\s*/i, '');
+    return `PT - ${clean || currentStationDisplayName.trim()}`;
+  }, [currentStationDisplayName]);
+
   const ptSessions = babyAdmission?.treatmentSessions || [];
   const totalPtMinutes = ptSessions.reduce((acc, s) => acc + (s.durationMinutes || 0), 0);
   const totalPtHours = (totalPtMinutes / 60).toFixed(1);
@@ -115,7 +121,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   const handleOpenEdit = () => {
     if (isLocked) {
-      Alert.alert(
+      AppAlert.warning(
         'Record Locked',
         isReferred
           ? 'This patient has been referred to another facility and cannot be edited.'
@@ -135,7 +141,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   const handleSaveEdit = async () => {
     if (!editName.trim()) {
-      Alert.alert('Required', "Mother's name cannot be empty");
+      AppAlert.warning('Required Field', "Mother's name cannot be empty.");
       return;
     }
 
@@ -148,9 +154,9 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
         weight: parseFloat(editWeight) || 3.1,
       });
       setShowEditModal(false);
-      Alert.alert('Updated', `Details for ${editName.trim()} have been updated.`);
+      AppAlert.success('Updated', `Details for ${editName.trim()} have been updated.`);
     } catch {
-      Alert.alert('Error', 'Failed to update patient details');
+      AppAlert.error('Error', 'Failed to update patient details.');
     } finally {
       setIsSaving(false);
     }
@@ -210,7 +216,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
   const handleDischarge = async () => {
     // 1. Mandatory constraint: Cannot discharge while phototherapy is active!
     if (isPhototherapyActive) {
-      Alert.alert(
+      AppAlert.warning(
         'Cannot Discharge Patient',
         'Phototherapy is currently in progress. You must conclude the phototherapy course before approving discharge.'
       );
@@ -218,28 +224,37 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
     }
 
     if (babyObservations.length === 0) {
-      Alert.alert('No readings', 'Add an observation before discharging.');
+      AppAlert.warning('No Readings', 'Add an observation before discharging.');
       return;
     }
 
     const lastVal = babyObservations[0].bilirubinValue;
     const nowIso = new Date().toISOString();
 
-    await updateBaby(activeBaby.id, {
-      status: 'discharged',
-      dischargeValue: lastVal,
-      dischargedAt: nowIso,
+    AppAlert.confirm({
+      title: 'Approve Discharge',
+      message: `Are you sure you want to approve discharge for ${activeBaby.name} with last recorded bilirubin of ${lastVal.toFixed(1)} mg/dL?`,
+      type: 'success',
+      confirmText: 'Approve & Discharge',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        await updateBaby(activeBaby.id, {
+          status: 'discharged',
+          dischargeValue: lastVal,
+          dischargedAt: nowIso,
+        });
+
+        if (babyAdmission) {
+          await approveDischarge(babyAdmission.id || babyAdmission.admissionId, {
+            doctorName: user?.name || 'Attending Pediatrician',
+            dischargeBilirubinValue: lastVal,
+            dischargeNotes: 'Discharge approved after concluding phototherapy.',
+          });
+        }
+
+        AppAlert.success('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
+      },
     });
-
-    if (babyAdmission) {
-      await approveDischarge(babyAdmission.id || babyAdmission.admissionId, {
-        doctorName: user?.name || 'Attending Pediatrician',
-        dischargeBilirubinValue: lastVal,
-        dischargeNotes: 'Discharge approved after concluding phototherapy.',
-      });
-    }
-
-    Alert.alert('Discharged', `${activeBaby.name} has been discharged with value ${lastVal.toFixed(1)} mg/dL.`);
   };
 
   const recentObservations = babyObservations.slice(0, 4);
@@ -365,7 +380,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   const handleOpenAddObs = () => {
     if (isLocked) {
-      Alert.alert(
+      AppAlert.warning(
         'Record Locked',
         isReferred
           ? 'This patient has been referred to another facility. New observations cannot be added.'
@@ -382,7 +397,7 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
 
   const handleOpenEditObs = (obs: ClinicalObservation) => {
     if (isLocked) {
-      Alert.alert(
+      AppAlert.warning(
         'Record Locked',
         isReferred
           ? 'This patient has been referred to another facility and cannot be edited.'
@@ -461,15 +476,17 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
               onPress={() => setShowBabyDropdown(true)}
               style={[
                 styles.babyDropdownPill,
-                hasDoctor ? styles.babyDropdownPillWithDoctor : styles.babyDropdownPillSolo,
+                (hasDoctor || (isPhototherapyActive && !!formattedStationTag))
+                  ? styles.babyDropdownPillWithDoctor
+                  : styles.babyDropdownPillSolo,
               ]}
               accessibilityLabel="Select Patient Dropdown"
             >
-              <ChevronDown size={hasDoctor ? 15 : 16} color="#7D3BFF" />
+              <ChevronDown size={hasDoctor || (isPhototherapyActive && !!formattedStationTag) ? 15 : 16} color="#7D3BFF" />
               <Text
                 style={[
                   styles.babyDropdownText,
-                  !hasDoctor && styles.babyDropdownTextSolo,
+                  !(hasDoctor || (isPhototherapyActive && !!formattedStationTag)) && styles.babyDropdownTextSolo,
                 ]}
                 numberOfLines={1}
                 ellipsizeMode="tail"
@@ -482,6 +499,14 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
               <View style={styles.doctorHeaderTag}>
                 <Text style={styles.doctorHeaderTagText} numberOfLines={1} ellipsizeMode="tail">
                   {activeBaby.assignedDoctor}
+                </Text>
+              </View>
+            )}
+
+            {isPhototherapyActive && !!formattedStationTag && (
+              <View style={styles.ptHeaderTag}>
+                <Text style={styles.ptHeaderTagText} numberOfLines={1} ellipsizeMode="tail">
+                  {formattedStationTag}
                 </Text>
               </View>
             )}
@@ -767,8 +792,8 @@ export const PatientTrendsScreen: React.FC<PatientTrendsScreenProps> = ({
               </Text>
             </View>
             <Text style={styles.referralActiveSub}>
-              {currentStationDisplayName
-                ? `Station: ${currentStationDisplayName} (${babyAdmission?.hospitalName || occupiedStation?.hospitalName || 'Ward Station'})`
+              {formattedStationTag
+                ? `Station: ${formattedStationTag} (${babyAdmission?.hospitalName || occupiedStation?.hospitalName || 'Ward Station'})`
                 : 'Active under phototherapy continuous monitoring.'}
             </Text>
             <Text style={styles.referralActiveHint}>
@@ -1084,6 +1109,22 @@ const styles = StyleSheet.create({
     fontSize: fontScale(10.5),
     fontWeight: '700',
     color: '#475569',
+    letterSpacing: 0.1,
+  },
+  ptHeaderTag: {
+    backgroundColor: '#ECFDF5',
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+    borderRadius: moderateScale(10),
+    paddingHorizontal: moderateScale(7),
+    paddingVertical: moderateScale(3),
+    maxWidth: '44%',
+    flexShrink: 1,
+  },
+  ptHeaderTagText: {
+    fontSize: fontScale(10.5),
+    fontWeight: '700',
+    color: '#065F46',
     letterSpacing: 0.1,
   },
   statCardsRow: {
@@ -1483,22 +1524,22 @@ const styles = StyleSheet.create({
   },
   dropdownBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: moderateScale(22),
   },
   dropdownCard: {
     width: '100%',
-    maxWidth: 340,
+    maxWidth: moderateScale(340),
     backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 16,
-    elevation: 8,
+    borderRadius: moderateScale(22),
+    padding: moderateScale(20),
+    elevation: 10,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
   },
   dropdownHeader: {
     flexDirection: 'row',
@@ -1561,15 +1602,20 @@ const styles = StyleSheet.create({
   },
   editModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   editModalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
     maxHeight: '85%',
-    padding: 20,
+    padding: moderateScale(20),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   editModalHeader: {
     flexDirection: 'row',
@@ -1577,16 +1623,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: 1,
     borderBottomColor: '#F1F5F9',
-    paddingBottom: 14,
-    marginBottom: 14,
+    paddingBottom: moderateScale(14),
+    marginBottom: moderateScale(14),
   },
   editModalTitle: {
-    fontSize: 17,
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#0F172A',
   },
   editModalSub: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     color: '#7D3BFF',
     fontWeight: '700',
     marginTop: 2,
@@ -1595,61 +1641,61 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   editModalBody: {
-    marginBottom: 10,
+    marginBottom: moderateScale(10),
   },
   inputLabel: {
-    fontSize: 12,
+    fontSize: fontScale(12),
     fontWeight: '700',
     color: '#334155',
     marginBottom: 5,
-    marginTop: 8,
+    marginTop: moderateScale(8),
   },
   textInput: {
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    borderRadius: 12,
-    height: 44,
-    paddingHorizontal: 12,
-    fontSize: 14,
+    borderRadius: moderateScale(12),
+    height: moderateScale(44),
+    paddingHorizontal: moderateScale(12),
+    fontSize: fontScale(14),
     color: '#0F172A',
   },
   inputRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: moderateScale(12),
   },
   halfInput: {
     flex: 1,
   },
   modalBtnRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-    marginBottom: 20,
+    gap: moderateScale(12),
+    marginTop: moderateScale(16),
+    marginBottom: moderateScale(20),
   },
   cancelBtn: {
     flex: 1,
-    height: 46,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   cancelBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#64748B',
   },
   saveBtn: {
     flex: 1.5,
-    height: 46,
-    borderRadius: 12,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveBtnText: {
-    fontSize: 14,
+    fontSize: fontScale(13.5),
     fontWeight: '700',
     color: '#FFFFFF',
   },

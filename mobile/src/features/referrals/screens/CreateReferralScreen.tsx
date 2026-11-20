@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   Modal,
   FlatList,
   ActivityIndicator,
@@ -28,8 +27,9 @@ import { usePatientStore } from '../../../store/usePatientStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { BhutaniNomogramChart } from '../../../components/BhutaniNomogramChart';
 import { calculatePostnatalAgeHours } from '../../../services/bhutani.service';
+import { moderateScale, fontScale, SPACING, getScreenTopPadding } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 import { Hospital, ReferralUrgency, Baby } from '../../../types';
-import { fontScale, getScreenTopPadding } from '../../../theme/responsive';
 
 interface CreateReferralScreenProps {
   hospital?: Hospital;
@@ -127,11 +127,11 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
 
   const handleOpenConfirm = () => {
     if (!chosenBaby) {
-      Alert.alert('Select Patient', 'Please select a patient first.');
+      AppAlert.warning('Select Patient', 'Please select a patient first.');
       return;
     }
     if (!selectedReceivingHospital) {
-      Alert.alert('Select Hospital', 'Please choose a hospital to refer.');
+      AppAlert.warning('Select Hospital', 'Please choose a hospital to refer.');
       return;
     }
     setConfirmModalVisible(true);
@@ -151,10 +151,10 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
         targetName.toUpperCase() === 'KGMU'
           ? 'hosp_kgmu'
           : targetName.toUpperCase() === 'RML'
-          ? 'hosp_rml'
-          : targetName.toUpperCase() === 'PGI'
-          ? 'hosp_pgi'
-          : selectedReceivingHospital.id || selectedReceivingHospital._id || 'hosp_kgmu';
+            ? 'hosp_rml'
+            : targetName.toUpperCase() === 'PGI'
+              ? 'hosp_pgi'
+              : selectedReceivingHospital.id || selectedReceivingHospital._id || 'hosp_kgmu';
 
       await createReferral({
         babyId: chosenBaby.id,
@@ -181,13 +181,14 @@ export const CreateReferralScreen: React.FC<CreateReferralScreenProps> = ({
       await usePatientStore.getState().loadBabies();
 
       setConfirmModalVisible(false);
-      Alert.alert(
+      AppAlert.success(
         'Referral Dispatched',
         `Referral for ${chosenBaby.name} (${chosenBaby.uhid}) sent to ${selectedReceivingHospital.name}.`,
-        [{ text: 'OK', onPress: onSuccess }]
+        onSuccess,
+        'Done'
       );
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.message || err?.message || 'Failed to dispatch referral. Please try again.');
+      AppAlert.error('Referral Error', err?.response?.data?.message || err?.message || 'Failed to dispatch referral. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -816,34 +817,39 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: moderateScale(20),
   },
   modalBox: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    padding: 18,
+    borderRadius: moderateScale(22),
+    padding: moderateScale(22),
     width: '100%',
-    maxWidth: 360,
+    maxWidth: moderateScale(340),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
+    elevation: 10,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 6,
+    marginBottom: moderateScale(6),
   },
   modalTitle: {
-    fontSize: fontScale(16),
+    fontSize: fontScale(17),
     fontWeight: '800',
     color: '#0F172A',
   },
   modalSub: {
     fontSize: fontScale(12),
     color: '#64748B',
-    marginBottom: 14,
-    lineHeight: 17,
+    marginBottom: moderateScale(14),
+    lineHeight: 18,
   },
   modalCloseBtn: {
     padding: 2,
@@ -888,43 +894,48 @@ const styles = StyleSheet.create({
   },
   modalCancelBtn: {
     flex: 1,
-    height: 40,
-    borderRadius: 8,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#F1F5F9',
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalCancelText: {
-    fontSize: fontScale(12),
-    fontWeight: '600',
+    fontSize: fontScale(13),
+    fontWeight: '700',
     color: '#475569',
   },
   modalConfirmBtn: {
     flex: 1.4,
     flexDirection: 'row',
-    height: 40,
-    borderRadius: 8,
+    height: moderateScale(44),
+    borderRadius: moderateScale(12),
     backgroundColor: '#7D3BFF',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: 6,
   },
   modalConfirmText: {
-    fontSize: fontScale(12),
+    fontSize: fontScale(13),
     fontWeight: '700',
     color: '#FFFFFF',
   },
   pickerModalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   pickerModalSheet: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    padding: 16,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
+    padding: moderateScale(20),
     maxHeight: '75%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   pickerModalHeader: {
     flexDirection: 'row',

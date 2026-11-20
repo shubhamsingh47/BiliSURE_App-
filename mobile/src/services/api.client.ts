@@ -6,6 +6,18 @@ import Constants from 'expo-constants';
 const DEV_LAN_IP = '192.168.1.103';
 
 const getBackendBaseUrl = (): string => {
+  // 1. Explicit production / preview environment variable (e.g. from EAS Build or .env)
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL.replace(/\/+$/, '');
+  }
+
+  // 2. Extra config from app.json / eas.json
+  const extraApiUrl = Constants?.expoConfig?.extra?.apiUrl;
+  if (extraApiUrl) {
+    return String(extraApiUrl).replace(/\/+$/, '');
+  }
+
+  // 3. Auto-detected IP when running in Expo Go development bundler
   try {
     const hostUri =
       Constants?.expoConfig?.hostUri ||
@@ -21,7 +33,7 @@ const getBackendBaseUrl = (): string => {
     }
   } catch { }
 
-  // Fallback to PC Wi-Fi IP so physical Android/iOS devices connect reliably
+  // 4. Fallback to PC Wi-Fi IP so physical Android/iOS devices connect reliably on the local network
   return `http://${DEV_LAN_IP}:5000/api/v1`;
 };
 

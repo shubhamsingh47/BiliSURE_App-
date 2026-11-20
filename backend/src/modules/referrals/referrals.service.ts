@@ -263,7 +263,10 @@ export class ReferralsService {
 
     const userFacility = (user?.facility || '').trim().toUpperCase();
     const targetHospital = (ref.receivingHospitalName || '').trim().toUpperCase();
-    if (userFacility && targetHospital && userFacility !== targetHospital) {
+    const userFacNorm = userFacility.replace(/\s*(HOSPITAL|CENTRE|CENTER)\s*/gi, '').trim();
+    const targetNorm = targetHospital.replace(/\s*(HOSPITAL|CENTRE|CENTER)\s*/gi, '').trim();
+    const isAdmin = user?.role === 'admin' || user?.role === 'district_admin';
+    if (!isAdmin && userFacility && targetHospital && userFacNorm !== targetNorm && !userFacNorm.includes(targetNorm) && !targetNorm.includes(userFacNorm)) {
       throw new ForbiddenError(
         `Only the designated receiving hospital (${ref.receivingHospitalName}) can accept this referral`
       );
@@ -348,7 +351,10 @@ export class ReferralsService {
 
     const userFacility = (user?.facility || '').trim().toUpperCase();
     const targetHospital = (ref.receivingHospitalName || '').trim().toUpperCase();
-    if (userFacility && targetHospital && userFacility !== targetHospital) {
+    const userFacNorm = userFacility.replace(/\s*(HOSPITAL|CENTRE|CENTER)\s*/gi, '').trim();
+    const targetNorm = targetHospital.replace(/\s*(HOSPITAL|CENTRE|CENTER)\s*/gi, '').trim();
+    const isAdmin = user?.role === 'admin' || user?.role === 'district_admin';
+    if (!isAdmin && userFacility && targetHospital && userFacNorm !== targetNorm && !userFacNorm.includes(targetNorm) && !targetNorm.includes(userFacNorm)) {
       throw new ForbiddenError(
         `Only the designated receiving hospital (${ref.receivingHospitalName}) can reject this referral`
       );

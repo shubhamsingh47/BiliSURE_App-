@@ -10,5 +10,6 @@ router.get('/', authenticate, validateQuery(QueryBabySchema), BabiesController.l
 router.get('/:id', authenticate, BabiesController.getById);
 router.post('/', authenticate, validateBody(CreateBabySchema), BabiesController.create);
 router.put('/:id', authenticate, BabiesController.update);
+router.patch('/:id', authenticate, BabiesController.update);
 
 export const babyRoutes = router;

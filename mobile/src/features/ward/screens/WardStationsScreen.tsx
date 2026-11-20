@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Modal,
   TextInput,
-  Alert,
   FlatList,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +17,7 @@ import { PTStationType, Baby } from '../../../types';
 import { NurseStationAllocationScreen } from '../../hospitalNurse/screens/NurseStationAllocationScreen';
 import { NurseTreatmentTrackerScreen } from '../../hospitalNurse/screens/NurseTreatmentTrackerScreen';
 import { fontScale, moderateScale, getScreenTopPadding } from '../../../theme/responsive';
+import { AppAlert } from '../../../components';
 
 interface WardStationsScreenProps {
   initialSegment?: 'allocation' | 'treatment';
@@ -109,7 +109,7 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
 
   const handleAddStation = async () => {
     if (!newStationId.trim() || !newStationName.trim()) {
-      Alert.alert('Required Fields', 'Please enter a Station ID and Station Name');
+      AppAlert.warning('Required Fields', 'Please enter a Station ID and Station Name.');
       return;
     }
 
@@ -127,9 +127,9 @@ export const WardStationsScreen: React.FC<WardStationsScreenProps> = ({
       setAddModalVisible(false);
       setNewStationId('');
       setNewStationName('');
-      Alert.alert('Station Added', `Station ${newStationId.toUpperCase().trim()} registered successfully.`);
+      AppAlert.success('Station Added', `Station ${newStationId.toUpperCase().trim()} registered successfully.`);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to register station');
+      AppAlert.error('Error', err?.message || 'Failed to register station.');
     } finally {
       setIsProcessing(false);
     }
@@ -794,15 +794,20 @@ const styles = StyleSheet.create({
   // Modal styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(15, 23, 42, 0.58)',
     justifyContent: 'flex-end',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: moderateScale(26),
+    borderTopRightRadius: moderateScale(26),
+    padding: moderateScale(20),
     maxHeight: '85%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 12,
   },
   modalHeader: {
     flexDirection: 'row',
