@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Download, FileText, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Download, FileText, CheckCircle2 } from 'lucide-react';
 import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 
@@ -76,97 +76,100 @@ export const ReportsPage: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Clinical Reports & Audit Exports</h1>
-          <p className="text-xs text-slate-500 mt-1">
-            Database-backed clinical audit logs, CSV exports, and FHIR interoperability packages for {hospitalFacility}
-          </p>
+    <div className="w-full max-w-[1700px] mx-auto space-y-5">
+      {/* Dynamic Header Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+        <div className="flex items-center gap-3 flex-wrap">
+          <h1 className="text-xl font-bold tracking-tight text-slate-900">Clinical Reports & Audit Exports</h1>
+          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold">
+            <span>{hospitalFacility} Archive</span>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={handleExportCsv}
             disabled={downloading}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-2 shadow-sm shadow-blue-500/20 disabled:opacity-50"
+            className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shadow-xs disabled:opacity-50"
           >
-            <Download className="w-4 h-4" />
-            <span>{downloading ? 'Streaming from DB...' : 'Export Complete CSV'}</span>
+            <Download className="w-3.5 h-3.5" />
+            <span>{downloading ? 'Streaming...' : 'Export Complete CSV'}</span>
           </button>
 
           <button
             onClick={handleDownloadFhir}
-            className="px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold transition inline-flex items-center gap-2 shadow-sm"
+            className="px-3.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 shadow-xs"
           >
-            <FileText className="w-4 h-4 text-blue-600" />
+            <FileText className="w-3.5 h-3.5 text-blue-600" />
             <span>Download FHIR Bundle</span>
           </button>
         </div>
       </div>
 
       {/* Two Column Layout: Content Specification & Live Database Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {/* Left: Content Specification */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm space-y-5">
-          <h3 className="text-sm font-bold text-slate-900">Audit Export Specifications</h3>
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs space-y-4">
+          <h3 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Audit Export Specifications</h3>
 
-          <div>
-            <h4 className="text-xs font-bold text-slate-800">1. Neonatal Identifiers</h4>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Hospital UHID, permanent BiliSURE patient ID, gestational age in weeks, birth timestamp, and attending neonatologist.
-            </p>
-          </div>
+          <div className="space-y-3">
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <h4 className="text-xs font-semibold text-slate-900">1. Neonatal Identifiers</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Hospital UHID, permanent BiliSURE patient ID, gestational age in weeks, birth timestamp, and attending neonatologist.
+              </p>
+            </div>
 
-          <div>
-            <h4 className="text-xs font-bold text-slate-800">2. Measurement Telemetry</h4>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Test modality (TcB/TSB), bilirubin concentration (mg/dL and µmol/L), anatomical site (Forehead/Sternum), device serial, and timestamp.
-            </p>
-          </div>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <h4 className="text-xs font-semibold text-slate-900">2. Measurement Telemetry</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Test modality (TcB/TSB), bilirubin concentration (mg/dL and µmol/L), anatomical site (Forehead/Sternum), device serial, and timestamp.
+              </p>
+            </div>
 
-          <div>
-            <h4 className="text-xs font-bold text-slate-800">3. Bhutani Risk Assessment</h4>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Hour-specific risk zone (Low, Low-Int, High-Int, High), percentile approximation, and clinical triage sign-off status.
-            </p>
-          </div>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <h4 className="text-xs font-semibold text-slate-900">3. Bhutani Risk Assessment</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Hour-specific risk zone (Low, Low-Int, High-Int, High), percentile approximation, and clinical triage sign-off status.
+              </p>
+            </div>
 
-          <div>
-            <h4 className="text-xs font-bold text-slate-800">4. EHR Delivery & Writeback</h4>
-            <p className="text-xs text-slate-500 mt-0.5">
-              HL7/FHIR writeback acknowledgement ID, tamper-evident audit trail, and synchronizing node.
-            </p>
+            <div className="p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <h4 className="text-xs font-semibold text-slate-900">4. EHR Delivery & Writeback</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                HL7/FHIR writeback acknowledgement ID, tamper-evident audit trail, and synchronizing node.
+              </p>
+            </div>
           </div>
         </div>
 
         {/* Right: Real Reporting Summary from Database */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm flex flex-col justify-between">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between">
           <div>
-            <h3 className="text-sm font-bold text-slate-900">Current Hospital Cohort Summary</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Live database statistics for {hospitalFacility}</p>
+            <h3 className="text-xs font-semibold text-slate-900 uppercase tracking-wider">Current Hospital Cohort Summary</h3>
+            <p className="text-xs text-slate-400 mt-0.5 font-medium">Real records from MongoDB for {hospitalFacility}</p>
 
-            <div className="grid grid-cols-3 gap-3 mt-6">
-              <div className="p-4 bg-slate-50 border border-slate-200/80 rounded-xl text-center">
+            <div className="grid grid-cols-3 gap-3 mt-4">
+              <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-xl text-center">
                 <span className="text-3xl font-extrabold text-slate-900">{stats.totalScreenings}</span>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1">Total Screenings</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-1">Total Screenings</p>
               </div>
 
-              <div className="p-4 bg-emerald-50/50 border border-emerald-200/80 rounded-xl text-center">
+              <div className="p-4 bg-emerald-50/50 border border-emerald-200 rounded-xl text-center">
                 <span className="text-3xl font-extrabold text-emerald-700">{stats.reviewed}</span>
                 <p className="text-[10px] font-bold text-emerald-700 uppercase tracking-wider mt-1">Reviewed</p>
               </div>
 
-              <div className="p-4 bg-amber-50/50 border border-amber-200/80 rounded-xl text-center">
+              <div className="p-4 bg-amber-50/50 border border-amber-200 rounded-xl text-center">
                 <span className="text-3xl font-extrabold text-amber-700">{stats.openReview}</span>
                 <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mt-1">Open Triage</p>
               </div>
             </div>
           </div>
 
-          <div className="mt-6 p-4 rounded-xl bg-blue-50/60 border border-blue-200/70 text-xs text-blue-900 leading-relaxed">
-            CSV downloads stream live clinical records. For electronic medical record interoperability, automated FHIR REST integration is supported.
+          <div className="mt-5 p-3.5 rounded-xl bg-blue-50 border border-blue-200 text-xs text-blue-900 leading-relaxed flex items-center gap-2">
+            <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>CSV downloads stream verified records. Full HL7 FHIR REST interoperability enabled.</span>
           </div>
         </div>
       </div>
