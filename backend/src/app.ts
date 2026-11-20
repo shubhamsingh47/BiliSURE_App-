@@ -25,6 +25,9 @@ import { billingRoutes } from './modules/billing/billing.routes';
 export function createApp(): express.Application {
   const app = express();
 
+  // Trust reverse proxy (Nginx) for secure IP forwarding & rate limiting
+  app.set('trust proxy', 1);
+
   // Security and standard middlewares
   app.use(helmet());
   app.use(cors({ origin: ENV.CORS_ORIGIN, credentials: true }));
@@ -61,6 +64,7 @@ export function createApp(): express.Application {
   apiV1.use('/billing', billingRoutes);
 
   app.use('/api/v1', apiV1);
+  app.use('/api', apiV1);
 
   // Centralized Error Handler
   app.use(errorHandler);
