@@ -1,5 +1,6 @@
 import { AdmissionModel, IAdmission, ITreatmentSession } from '../../models/Admission';
 import { BabyModel } from '../../models/Baby';
+import { PTStationModel } from '../../models/PTStation';
 import { ReferralsService } from '../referrals/referrals.service';
 import { HospitalsService } from '../hospitals/hospitals.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -10,35 +11,6 @@ const memoryAdmissions: IAdmission[] = [];
 
 export class AdmissionsService {
   static async listAdmissions(query: { hospitalId?: string; status?: string; facility?: string }) {
-    if (isMongoConnected) {
-      try {
-        const filter: any = {};
-        const targetHosp =
-          query.facility ||
-          (query.hospitalId === 'hosp_kgmu'
-            ? 'KGMU'
-            : query.hospitalId === 'hosp_rml'
-              ? 'RML'
-              : query.hospitalId === 'hosp_pgi'
-                ? 'PGI'
-                : undefined);
-
-        if (query.hospitalId || targetHosp) {
-          const hospConditions: any[] = [];
-          if (query.hospitalId) hospConditions.push({ hospitalId: query.hospitalId });
-          if (targetHosp) hospConditions.push({ hospitalName: new RegExp(`^${targetHosp}$`, 'i') });
-          filter.$or = hospConditions;
-        }
-        if (query.status) {
-          filter.admissionStatus = query.status;
-        }
-        return await AdmissionModel.find(filter).lean();
-      } catch (err) {
-        // Fallback to memory
-      }
-    }
-
-    let list = memoryAdmissions;
     const targetHosp =
       query.facility ||
       (query.hospitalId === 'hosp_kgmu'
@@ -47,19 +19,127 @@ export class AdmissionsService {
           ? 'RML'
           : query.hospitalId === 'hosp_pgi'
             ? 'PGI'
+            : query.hospitalId?.replace(/^hosp_/i, '').toUpperCase());
+
+    const targetHospId =
+      query.hospitalId ||
+      (targetHosp === 'KGMU'
+        ? 'hosp_kgmu'
+        : targetHosp === 'RML'
+          ? 'hosp_rml'
+          : targetHosp === 'PGI'
+            ? 'hosp_pgi'
             : undefined);
 
-    if (query.hospitalId || targetHosp) {
-      list = list.filter(
+    let list: any[] = [];
+
+    if (isMongoConnected) {
+      try {
+        const filter: any = {};
+        if (targetHospId || targetHosp) {
+          const hospConditions: any[] = [];
+          if (targetHospId) hospConditions.push({ hospitalId: targetHospId });
+          if (targetHosp) hospConditions.push({ hospitalName: new RegExp(`^${targetHosp}$`, 'i') });
+          filter.$or = hospConditions;
+        }
+        if (query.status) {
+          filter.admissionStatus = query.status;
+        }
+        list = await AdmissionModel.find(filter).lean();
+
+        // Also query BabyModel for any babies under treatment in this hospital
+        if (!query.status || query.status === 'under_treatment') {
+          const babyHospCond: any[] = [];
+          if (targetHosp) {
+            babyHospCond.push({ facility: new RegExp(`^${targetHosp}$`, 'i') });
+            babyHospCond.push({ currentHospital: new RegExp(`^${targetHosp}$`, 'i') });
+          }
+          if (targetHospId) {
+            babyHospCond.push({ facility: targetHospId });
+            babyHospCond.push({ currentHospital: targetHospId });
+          }
+
+          const activeBabies = await BabyModel.find({
+            status: 'under_treatment',
+            ...(babyHospCond.length > 0 ? { $or: babyHospCond } : {}),
+          }).lean();
+
+          if (activeBabies.length > 0) {
+            for (const b of activeBabies) {
+              const alreadyInList = list.some(
+                (a) => a.babyUhid === b.uhid || (b._id && String(a.babyId) === String(b._id))
+              );
+              if (!alreadyInList) {
+                // Find matching station to get full hospital-scoped station details
+                let stName = b.currentStationId || 'Station Assigned';
+                let stId = b.currentStationId || 'Station Assigned';
+                try {
+                  const stationQuery: any = {
+                    $or: [{ name: b.currentStationId }, { stationId: b.currentStationId }],
+                  };
+                  if (targetHospId || targetHosp) {
+                    stationQuery.$and = [
+                      {
+                        $or: [
+                          ...(targetHospId ? [{ hospitalId: targetHospId }] : []),
+                          ...(targetHosp ? [{ hospitalName: new RegExp(`^${targetHosp}$`, 'i') }] : []),
+                        ],
+                      },
+                    ];
+                  }
+                  const st = await PTStationModel.findOne(stationQuery).lean();
+                  if (st) {
+                    stName = `${st.name} (${st.stationId})`;
+                    stId = (st as any).stationId || String((st as any)._id);
+                  }
+                } catch { }
+
+                const syntheticAdm = {
+                  _id: 'adm_baby_' + b._id,
+                  admissionId: 'ADM-' + (b.uhid?.replace(/\D/g, '').slice(-4) || '0000'),
+                  babyId: String(b._id),
+                  babyUhid: b.uhid,
+                  babyName: b.parentsName || b.name,
+                  hospitalId: targetHospId || (b.facility ? `hosp_${b.facility.toLowerCase()}` : 'hosp_pgi'),
+                  hospitalName: targetHosp || b.facility || 'PGI',
+                  physicalArrivalConfirmed: true,
+                  arrivalConfirmedAt: b.createdAt || new Date(),
+                  admittedAt: b.createdAt || new Date(),
+                  admissionStatus: 'under_treatment' as const,
+                  assignedDoctor: b.assignedDoctor || 'Dr. Hospital Paediatrician',
+                  primaryNurse: 'Staff Nurse',
+                  ptStationId: stId,
+                  ptStationName: stName,
+                  initialAdmissionBilirubin: b.initialValue || 14.5,
+                  treatmentSessions: [],
+                  stationReleased: false,
+                  createdAt: b.createdAt || new Date(),
+                  updatedAt: b.updatedAt || new Date(),
+                };
+                list.push(syntheticAdm);
+              }
+            }
+          }
+        }
+
+        return list;
+      } catch (err) {
+        // Fallback to memory
+      }
+    }
+
+    let memList = [...memoryAdmissions];
+    if (targetHospId || targetHosp) {
+      memList = memList.filter(
         (a) =>
-          (query.hospitalId && String(a.hospitalId) === String(query.hospitalId)) ||
+          (targetHospId && String(a.hospitalId) === String(targetHospId)) ||
           (targetHosp && a.hospitalName?.toUpperCase() === targetHosp.toUpperCase())
       );
     }
     if (query.status) {
-      list = list.filter((a) => a.admissionStatus === query.status);
+      memList = memList.filter((a) => a.admissionStatus === query.status);
     }
-    return list;
+    return memList;
   }
 
   static async getById(id: string) {
@@ -173,12 +253,17 @@ export class AdmissionsService {
     }
 
     // Update station status to occupied with baby info
-    const station = await HospitalsService.updateStationStatus(data.stationId, 'occupied', {
-      babyId: String(admission.babyId),
-      babyName: admission.babyName,
-      babyUhid: admission.babyUhid,
-      notes: `Allocated to ${admission.babyName} by ${data.nurseName}`,
-    });
+    const station = await HospitalsService.updateStationStatus(
+      data.stationId,
+      'occupied',
+      {
+        babyId: String(admission.babyId),
+        babyName: admission.babyName,
+        babyUhid: admission.babyUhid,
+        notes: `Allocated to ${admission.babyName} by ${data.nurseName}`,
+      },
+      String(admission.hospitalId)
+    );
 
     admission.ptStationId = String((station as any)._id || station.stationId);
     admission.ptStationName = `${station.name} (${station.stationId})`;
@@ -468,9 +553,14 @@ export class AdmissionsService {
 
     // Release the PT station to 'cleaning_prep'
     if (releasedStationId) {
-      await HospitalsService.updateStationStatus(releasedStationId, 'cleaning_prep', {
-        notes: `Station freed following phototherapy conclusion for ${admission.babyName}. Ready for sanitization & cleaning.`,
-      });
+      await HospitalsService.updateStationStatus(
+        releasedStationId,
+        'cleaning_prep',
+        {
+          notes: `Station freed following phototherapy conclusion for ${admission.babyName}. Ready for sanitization & cleaning.`,
+        },
+        String(admission.hospitalId)
+      );
     }
 
     // Update Baby record: set to in_observation, clear station. CRITICAL: Baby is NOT discharged!
@@ -533,9 +623,14 @@ export class AdmissionsService {
 
     // Step 25: Release the PT station to 'cleaning_prep'
     if (admission.ptStationId) {
-      await HospitalsService.updateStationStatus(admission.ptStationId, 'cleaning_prep', {
-        notes: `Station freed following discharge of ${admission.babyName}. Ready for sanitization & cleaning.`,
-      });
+      await HospitalsService.updateStationStatus(
+        admission.ptStationId,
+        'cleaning_prep',
+        {
+          notes: `Station freed following discharge of ${admission.babyName}. Ready for sanitization & cleaning.`,
+        },
+        String(admission.hospitalId)
+      );
     }
 
     // Update Baby record

@@ -6,8 +6,8 @@ export class AdmissionsController {
   static async list(req: Request, res: Response, next: NextFunction) {
     try {
       const { hospitalId, status } = req.query as any;
-      const userFacility = (req as any).user?.facility;
-      const userFacilityId = (req as any).user?.facilityId;
+      const userFacility = (req as any).user?.facility || (req.headers['x-hospital-facility'] as string);
+      const userFacilityId = (req as any).user?.facilityId || (userFacility ? `hosp_${userFacility.toLowerCase()}` : undefined);
       const effectiveHospId = hospitalId || userFacilityId;
 
       const admissions = await AdmissionsService.listAdmissions({

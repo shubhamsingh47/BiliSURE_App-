@@ -168,24 +168,30 @@ export class HospitalsService {
       });
     };
 
+    const facCode = hospitalId.replace(/^hosp_/i, '').toUpperCase();
+
     if (isMongoConnected) {
       try {
         const query: any = {
           $or: [
             { hospitalId },
             { hospitalId: String(hospitalId) },
+            { hospitalName: new RegExp(`^${facCode}$`, 'i') },
+            { hospitalName: hospitalId },
           ],
         };
-        if (hospitalId.startsWith('hosp_')) {
-          const facCode = hospitalId.replace('hosp_', '').toUpperCase();
-          query.$or.push({ hospitalName: facCode });
-        }
         let list = await PTStationModel.find(query).lean();
 
-        // Cross-check with any active babies in this facility with status 'under_treatment'
+        // Cross-check with active babies ONLY in THIS facility with status 'under_treatment'
         const activeBabies = await BabyModel.find({
           status: 'under_treatment',
           currentStationId: { $exists: true, $ne: null },
+          $or: [
+            { facility: new RegExp(`^${facCode}$`, 'i') },
+            { currentHospital: new RegExp(`^${facCode}$`, 'i') },
+            { facility: hospitalId },
+            { currentHospital: hospitalId },
+          ],
         }).lean();
 
         if (activeBabies.length > 0 && list.length > 0) {
@@ -213,7 +219,12 @@ export class HospitalsService {
         if (list.length > 0) return naturalSort(list as any);
       } catch { }
     }
-    const mem = memoryStations.filter((s) => String(s.hospitalId) === String(hospitalId));
+    const mem = memoryStations.filter(
+      (s) =>
+        String(s.hospitalId) === String(hospitalId) ||
+        s.hospitalName?.toUpperCase() === facCode ||
+        s.hospitalId === `hosp_${facCode.toLowerCase()}`
+    );
     return naturalSort(mem as any);
   }
 
@@ -264,14 +275,21 @@ export class HospitalsService {
   static async updateStationStatus(
     stationId: string,
     status: PTStationStatus,
-    meta?: { babyId?: string; babyName?: string; babyUhid?: string; notes?: string }
+    meta?: { babyId?: string; babyName?: string; babyUhid?: string; notes?: string },
+    hospitalId?: string
   ) {
     const norm = String(stationId).trim();
+    const facCode = hospitalId ? hospitalId.replace(/^hosp_/i, '').toUpperCase() : undefined;
+
     let station = memoryStations.find(
       (s) =>
-        String((s as any)._id) === norm ||
-        s.stationId?.toUpperCase() === norm.toUpperCase() ||
-        s.name?.toUpperCase() === norm.toUpperCase()
+        (!hospitalId ||
+          String(s.hospitalId) === String(hospitalId) ||
+          s.hospitalName?.toUpperCase() === facCode ||
+          s.hospitalId === `hosp_${facCode?.toLowerCase()}`) &&
+        (String((s as any)._id) === norm ||
+          s.stationId?.toUpperCase() === norm.toUpperCase() ||
+          s.name?.toUpperCase() === norm.toUpperCase())
     );
 
     if (isMongoConnected) {
@@ -285,6 +303,18 @@ export class HospitalsService {
         };
         if (norm.match(/^[0-9a-fA-F]{24}$/)) {
           query.$or.push({ _id: norm });
+        }
+        if (hospitalId) {
+          query.$and = [
+            {
+              $or: [
+                { hospitalId },
+                { hospitalId: String(hospitalId) },
+                { hospitalName: new RegExp(`^${facCode}$`, 'i') },
+                { hospitalName: hospitalId },
+              ],
+            },
+          ];
         }
         const mongoStation = await PTStationModel.findOne(query);
         if (mongoStation) {

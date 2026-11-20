@@ -78,29 +78,33 @@ export const TestBalanceButton: React.FC = () => {
     ? districtBalances?.combined.remainingTests ?? 0
     : hospitalBalance?.remainingTests ?? 0;
 
-  // Mini circular SVG parameters
-  const radius = 16;
-  const stroke = 3;
-  const normalizedRadius = radius - stroke * 2;
+  // Circular indicator parameters matching reference design
+  const size = 18;
+  const radius = size / 2;
+  const stroke = 2;
+  const normalizedRadius = radius - stroke / 2;
   const circumference = normalizedRadius * 2 * Math.PI;
-  const strokeDashoffset = circumference - (Math.min(usagePercent, 100) / 100) * circumference;
-  const displayPercent = Math.max(0, Math.round(100 - usagePercent));
+  const displayPercent = Math.max(0, Math.min(100, Math.round(100 - usagePercent)));
+  const strokeDashoffset = circumference - (displayPercent / 100) * circumference;
 
   return (
     <div className="relative inline-block" ref={popoverRef}>
-      {/* Circular Button */}
+      {/* Test Balance Indicator Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         title="Test Balance"
         className={clsx(
-          'w-11 h-11 rounded-full flex items-center justify-center transition-all relative border focus:outline-none shadow-xs',
-          isOpen
-            ? 'bg-blue-50 border-blue-500 shadow-sm ring-2 ring-blue-100'
-            : 'bg-white border-slate-200/90 hover:border-blue-400 hover:bg-slate-50/80'
+          'inline-flex items-center gap-1.5 py-1 px-2 rounded-lg transition-colors focus:outline-none cursor-pointer select-none',
+          isOpen ? 'bg-slate-100' : 'hover:bg-slate-50/80'
         )}
       >
-        {/* SVG Progress Ring */}
-        <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
+        {/* Percentage Text to the Left of the Circle */}
+        <span className="text-xs font-medium text-slate-600 tracking-tight">
+          {displayPercent}% left
+        </span>
+
+        {/* Thin Clean Green Circular Ring */}
+        <svg height={size} width={size} className="transform -rotate-90 shrink-0">
           <circle
             stroke="#e2e8f0"
             fill="transparent"
@@ -110,7 +114,7 @@ export const TestBalanceButton: React.FC = () => {
             cy={radius}
           />
           <circle
-            stroke={usagePercent > 85 ? '#f59e0b' : '#2563eb'}
+            stroke="#22c55e"
             fill="transparent"
             strokeWidth={stroke}
             strokeDasharray={`${circumference} ${circumference}`}
@@ -122,11 +126,6 @@ export const TestBalanceButton: React.FC = () => {
             className="transition-all duration-500 ease-out"
           />
         </svg>
-
-        {/* Center Indicator */}
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-black text-slate-800 tracking-tight">
-          {displayPercent}%
-        </span>
       </button>
 
       {/* Popover Dropdown Panel */}

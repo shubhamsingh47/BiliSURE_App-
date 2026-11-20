@@ -24,7 +24,10 @@ export class HospitalsController {
 
   static async getStations(req: Request, res: Response, next: NextFunction) {
     try {
-      const stations = await HospitalsService.getStations(String(req.params.id));
+      const userFacility = (req as any).user?.facility;
+      const userFacilityId = (req as any).user?.facilityId;
+      const targetHospitalId = req.params.id || userFacilityId || (userFacility ? `hosp_${userFacility.toLowerCase()}` : undefined);
+      const stations = await HospitalsService.getStations(String(targetHospitalId));
       return sendSuccess(res, stations, 200);
     } catch (err) {
       next(err);
@@ -46,12 +49,20 @@ export class HospitalsController {
   static async updateStationStatus(req: Request, res: Response, next: NextFunction) {
     try {
       const { status, babyId, babyName, babyUhid, notes } = req.body;
-      const station = await HospitalsService.updateStationStatus(String(req.params.stationId), status, {
-        babyId,
-        babyName,
-        babyUhid,
-        notes,
-      });
+      const userFacility = (req as any).user?.facility;
+      const userFacilityId = (req as any).user?.facilityId;
+      const hospitalId = req.params.id || userFacilityId || (userFacility ? `hosp_${userFacility.toLowerCase()}` : undefined);
+      const station = await HospitalsService.updateStationStatus(
+        String(req.params.stationId),
+        status,
+        {
+          babyId,
+          babyName,
+          babyUhid,
+          notes,
+        },
+        hospitalId ? String(hospitalId) : undefined
+      );
       return sendSuccess(res, station, 200, `Station status updated to ${status}`);
     } catch (err) {
       next(err);

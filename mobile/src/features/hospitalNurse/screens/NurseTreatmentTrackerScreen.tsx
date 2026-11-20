@@ -94,7 +94,7 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
   highlightBabyIdOrUhid = null,
 }) => {
   const insets = useSafeAreaInsets();
-  const { admissions, logTreatmentSession, approveDischarge, concludePhototherapy, updateAdmission, updateTreatmentSession, notifications } = useNetworkStore();
+  const { admissions, logTreatmentSession, approveDischarge, concludePhototherapy, updateAdmission, updateTreatmentSession, notifications, stations, referrals } = useNetworkStore();
   const { user } = useAuthStore();
   const { babies, readings, addReading, updateReading, observations, updateBaby } = usePatientStore();
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -208,16 +208,107 @@ export const NurseTreatmentTrackerScreen: React.FC<NurseTreatmentTrackerScreenPr
     }
   }, [initialPtFilter]);
 
-  const activePatients = useMemo(
-    () =>
-      admissions.filter(
-        (a) =>
-          a.admissionStatus === 'under_treatment' &&
-          !a.stationReleased &&
-          (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
-      ),
-    [admissions, currentHospId, currentHosp]
-  );
+  const activePatients = useMemo(() => {
+    // 1. Direct active admissions
+    const directActive = admissions.filter(
+      (a) =>
+        (a.admissionStatus === 'under_treatment' || a.admissionStatus === 'admitted') &&
+        !a.stationReleased &&
+        (a.hospitalId === currentHospId || a.hospitalName?.toUpperCase() === currentHosp)
+    );
+
+    const result: Admission[] = [...directActive];
+    const seenUhids = new Set<string>(directActive.map((a) => (a.babyUhid || '').toUpperCase()).filter(Boolean));
+    const seenBabyIds = new Set<string>(directActive.map((a) => String(a.babyId || '')).filter(Boolean));
+
+    // 2. Hospital babies allocated to phototherapy or under treatment
+    const hospitalBabies = babies.filter(
+      (b) =>
+        (b.facility?.toUpperCase() === currentHosp || b.currentHospital?.toUpperCase() === currentHosp) &&
+        (b.status === 'under_treatment' || (b.currentStationId && b.status !== 'discharged'))
+    );
+
+    for (const b of hospitalBabies) {
+      const bUhid = (b.uhid || '').toUpperCase();
+      const bId = String(b.id || '');
+      if ((bUhid && seenUhids.has(bUhid)) || (bId && seenBabyIds.has(bId))) continue;
+
+      const matchingStation = stations.find(
+        (s) =>
+          (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
+          (s.stationId === b.currentStationId || s.name === b.currentStationId || (bUhid && s.currentBabyUhid?.toUpperCase() === bUhid))
+      );
+
+      const stName = matchingStation
+        ? `${matchingStation.name} (${matchingStation.stationId})`
+        : (b.currentStationId || 'Station Assigned');
+      const stId = matchingStation ? (matchingStation.id || matchingStation.stationId) : (b.currentStationId || 'Station Assigned');
+
+      const syntheticAdmission: Admission = {
+        id: 'adm_baby_' + (b.id || b.uhid),
+        admissionId: 'ADM-' + (b.uhid?.replace(/\D/g, '').slice(-4) || '0000'),
+        babyId: b.id || b.uhid,
+        babyUhid: b.uhid,
+        babyName: b.parentsName || b.name,
+        hospitalId: currentHospId,
+        hospitalName: currentHosp,
+        admissionStatus: 'under_treatment',
+        admittedAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString(),
+        physicalArrivalConfirmed: true,
+        stationReleased: false,
+        assignedDoctor: b.assignedDoctor || 'Dr. Attending Paediatrician',
+        primaryNurse: user?.name || 'Staff Nurse',
+        ptStationId: stId,
+        ptStationName: stName,
+        initialAdmissionBilirubin: b.initialValue || 14.5,
+        treatmentSessions: [],
+      };
+
+      result.push(syntheticAdmission);
+      if (bUhid) seenUhids.add(bUhid);
+      if (bId) seenBabyIds.add(bId);
+    }
+
+    // 3. Incoming patients for phototherapy (arrived / accepted referrals)
+    const incomingReferrals = (referrals || []).filter(
+      (r) =>
+        r.receivingHospitalName?.toUpperCase() === currentHosp &&
+        (r.phototherapyRecommended || r.urgency === 'urgent') &&
+        (r.status === 'accepted' || r.status === 'arrived' || r.status === 'pending')
+    );
+
+    for (const r of incomingReferrals) {
+      const rUhid = (r.babyUhid || '').toUpperCase();
+      const rBabyId = String(r.babyId || '');
+      if ((rUhid && seenUhids.has(rUhid)) || (rBabyId && seenBabyIds.has(rBabyId))) continue;
+
+      const syntheticIncoming: Admission = {
+        id: 'adm_ref_' + (r.id || r.referralId),
+        admissionId: 'ADM-' + (r.babyUhid?.replace(/\D/g, '').slice(-4) || '0000'),
+        babyId: r.babyId,
+        babyUhid: r.babyUhid,
+        babyName: r.babyName,
+        hospitalId: currentHospId,
+        hospitalName: currentHosp,
+        admissionStatus: r.status === 'arrived' ? 'admitted' : 'under_treatment',
+        admittedAt: r.createdAt || new Date().toISOString(),
+        physicalArrivalConfirmed: r.status === 'arrived',
+        stationReleased: false,
+        assignedDoctor: 'Dr. Attending Paediatrician',
+        primaryNurse: user?.name || 'Staff Nurse',
+        ptStationId: undefined,
+        ptStationName: 'Incoming • Station Pending',
+        initialAdmissionBilirubin: r.latestBilirubinValue || 15.0,
+        treatmentSessions: [],
+      };
+
+      result.push(syntheticIncoming);
+      if (rUhid) seenUhids.add(rUhid);
+      if (rBabyId) seenBabyIds.add(rBabyId);
+    }
+
+    return result;
+  }, [admissions, babies, stations, referrals, currentHospId, currentHosp, user?.name]);
 
   const concludedPatients = useMemo(
     () =>

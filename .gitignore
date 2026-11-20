@@ -31,6 +31,7 @@ yarn-error.log*
 *.log
 coverage/
 
-# OS files
+# Database dumps
+*dump.json
 .DS_Store
 Thumbs.db

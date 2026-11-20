@@ -401,14 +401,23 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
 
   allocateStation: async (admissionId, stationId, nurseName) => {
     const state = get();
-    const targetStation = state.stations.find((s) => s.id === stationId || s.stationId === stationId);
     const admission = state.admissions.find((a) => a.id === admissionId || a.admissionId === admissionId);
+    if (!admission) {
+      throw new Error('Admission record not found');
+    }
+
+    const currentHosp = (admission.hospitalName || useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
+    const currentHospId = admission.hospitalId || useAuthStore.getState().user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
+    const targetStation =
+      state.stations.find(
+        (s) =>
+          (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
+          (s.id === stationId || s.stationId === stationId || s.name === stationId)
+      ) || state.stations.find((s) => s.id === stationId || s.stationId === stationId);
 
     if (!targetStation) {
       throw new Error('Station not found');
-    }
-    if (!admission) {
-      throw new Error('Admission record not found');
     }
 
     if (targetStation.operationalStatus === 'occupied') {
@@ -418,6 +427,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     // STRICT DEFENSE: One UHID patient once allotted to a station cannot get another!
     const alreadyAllocated = state.stations.find(
       (s) =>
+        (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
         s.operationalStatus === 'occupied' &&
         ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
           (admission.babyId && s.currentBabyId === admission.babyId))
@@ -432,6 +442,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       admission.ptStationId &&
       state.stations.some(
         (s) =>
+          (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
           (s.id === admission.ptStationId || s.stationId === admission.ptStationId) &&
           s.operationalStatus === 'occupied' &&
           ((admission.babyUhid && s.currentBabyUhid === admission.babyUhid) ||
@@ -442,18 +453,20 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       throw new Error(`Admission ${admission.admissionId} already has an active PT station assigned.`);
     }
 
-    const updatedStations = state.stations.map((s) =>
-      s.id === stationId || s.stationId === stationId
-        ? {
+    const updatedStations = state.stations.map((s) => {
+      const isTargetHospital = s.hospitalId === targetStation.hospitalId || s.hospitalName?.toUpperCase() === targetStation.hospitalName?.toUpperCase();
+      if (isTargetHospital && (s.id === stationId || s.stationId === stationId || s.name === stationId)) {
+        return {
           ...s,
           operationalStatus: 'occupied' as const,
           currentBabyId: admission.babyId,
           currentBabyName: admission.babyName,
           currentBabyUhid: admission.babyUhid,
           allocatedAt: new Date().toISOString(),
-        }
-        : s
-    );
+        };
+      }
+      return s;
+    });
 
     const updatedAdmissions = state.admissions.map((a) =>
       a.id === admissionId || a.admissionId === admissionId
@@ -461,8 +474,8 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           ...a,
           hospitalId: targetStation.hospitalId,
           hospitalName: targetStation.hospitalName,
-          ptStationId: stationId,
-          ptStationName: targetStation.name || targetStation.stationId,
+          ptStationId: targetStation.stationId || stationId,
+          ptStationName: targetStation.name ? `${targetStation.name} (${targetStation.stationId})` : (targetStation.stationId || stationId),
           admissionStatus: 'under_treatment' as const,
           stationReleased: false,
         }
@@ -482,12 +495,21 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       }).catch(() => { });
     }
 
-    apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId, nurseName }).catch(() => { });
+    apiClient.post(`/admissions/${admissionId}/allocate-station`, { stationId: targetStation.stationId || stationId, nurseName }).catch(() => { });
   },
 
   allocateBabyToStation: async (baby, stationId, nurseName) => {
     const state = get();
-    const targetStation = state.stations.find((s) => s.id === stationId || s.stationId === stationId);
+    const currentHosp = (useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
+    const currentHospId = useAuthStore.getState().user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
+    const targetStation =
+      state.stations.find(
+        (s) =>
+          (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
+          (s.id === stationId || s.stationId === stationId || s.name === stationId)
+      ) || state.stations.find((s) => s.id === stationId || s.stationId === stationId);
+
     if (!targetStation) throw new Error('Station not found');
     if (targetStation.operationalStatus === 'occupied') {
       throw new Error(`Station ${targetStation.stationId} is already occupied by ${targetStation.currentBabyName || 'another patient'}`);
@@ -496,9 +518,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     const babyName = baby.parentsName?.trim() || baby.name;
     const babyUhid = baby.uhid;
 
-    // Check if baby is already allocated to any active station
+    // Check if baby is already allocated to any active station in this hospital
     const alreadyAllocated = state.stations.find(
       (s) =>
+        (s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp) &&
         s.operationalStatus === 'occupied' &&
         ((babyUhid && s.currentBabyUhid === babyUhid) || (baby.id && s.currentBabyId === baby.id))
     );
@@ -512,7 +535,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
     );
 
     if (admission) {
-      await state.allocateStation(admission.id || admission.admissionId, stationId, nurseName);
+      await state.allocateStation(admission.id || admission.admissionId, targetStation.stationId || stationId, nurseName);
     } else {
       const newAdmId = 'adm_' + Date.now();
       const newAdmCode = 'ADM-' + Math.floor(10000 + Math.random() * 90000);
@@ -521,6 +544,10 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       if (baby.initialValue && baby.initialValue > 0) {
         resolvedInitialBili = baby.initialValue;
       }
+
+      const formattedStationName = targetStation.name
+        ? `${targetStation.name} (${targetStation.stationId})`
+        : (targetStation.stationId || stationId);
 
       const newAdmission: Admission = {
         id: newAdmId,
@@ -536,24 +563,26 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
         stationReleased: false,
         assignedDoctor: '',
         primaryNurse: nurseName,
-        ptStationId: stationId,
-        ptStationName: targetStation.name || targetStation.stationId,
+        ptStationId: targetStation.stationId || stationId,
+        ptStationName: formattedStationName,
         initialAdmissionBilirubin: resolvedInitialBili,
         treatmentSessions: [],
       };
 
-      const updatedStations = state.stations.map((s) =>
-        s.id === stationId || s.stationId === stationId
-          ? {
+      const updatedStations = state.stations.map((s) => {
+        const isTargetHospital = s.hospitalId === targetStation.hospitalId || s.hospitalName?.toUpperCase() === targetStation.hospitalName?.toUpperCase();
+        if (isTargetHospital && (s.id === stationId || s.stationId === stationId || s.name === stationId)) {
+          return {
             ...s,
             operationalStatus: 'occupied' as const,
             currentBabyId: baby.id,
             currentBabyName: babyName,
             currentBabyUhid: baby.uhid,
             allocatedAt: new Date().toISOString(),
-          }
-          : s
-      );
+          };
+        }
+        return s;
+      });
 
       set({
         admissions: [newAdmission, ...state.admissions],
@@ -567,6 +596,13 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
           currentStationId: targetStation.name || targetStation.stationId,
         }).catch(() => { });
       }
+
+      apiClient.patch(`/hospitals/${targetStation.hospitalId}/stations/${targetStation.stationId || stationId}/status`, {
+        status: 'occupied',
+        babyId: baby.id,
+        babyName,
+        babyUhid: baby.uhid,
+      }).catch(() => { });
     }
   },
 
@@ -801,9 +837,14 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
   },
 
   updateStationStatus: async (stationId, status, meta) => {
+    const currentHosp = (useAuthStore.getState().user?.facility || useAuthStore.getState().activeHospital || 'PGI').toUpperCase();
+    const currentHospId = useAuthStore.getState().user?.facilityId || (currentHosp === 'KGMU' ? 'hosp_kgmu' : currentHosp === 'RML' ? 'hosp_rml' : 'hosp_pgi');
+
     set((state) => {
       const updatedStations = state.stations.map((s) => {
-        if (s.id !== stationId && s.stationId !== stationId) return s;
+        const matchesHospital = s.hospitalId === currentHospId || s.hospitalName?.toUpperCase() === currentHosp;
+        if (!matchesHospital) return s;
+        if (s.id !== stationId && s.stationId !== stationId && s.name !== stationId) return s;
         return {
           ...s,
           operationalStatus: status,
@@ -822,7 +863,7 @@ export const useNetworkStore = create<NetworkState>((set, get) => ({
       };
     });
 
-    apiClient.patch(`/hospitals/hosp_001/stations/${stationId}/status`, { status, ...meta }).catch(() => { });
+    apiClient.patch(`/hospitals/${currentHospId}/stations/${stationId}/status`, { status, ...meta }).catch(() => { });
   },
 
   registerStation: async (stationData) => {
